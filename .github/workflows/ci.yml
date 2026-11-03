@@ -1,0 +1,44 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: oe, POSTGRES_USER: oe, POSTGRES_DB: oe }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      OE_PG_DSN: postgresql://oe:oe@localhost:5432/oe
+    defaults: { run: { working-directory: sdk-python } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --python 3.12
+      - run: uv run ruff check packages
+      - run: uv run pytest -q
+
+  typescript:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: oe, POSTGRES_USER: oe, POSTGRES_DB: oe }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      OE_PG_DSN: postgresql://oe:oe@localhost:5432/oe
+    defaults: { run: { working-directory: sdk-js } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
