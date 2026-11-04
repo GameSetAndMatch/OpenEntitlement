@@ -238,3 +238,14 @@ describe("usage validation", () => {
     await c.requireWithin("seats.max", { pool: 0 }, 1);
   });
 });
+
+describe("guard ordering", () => {
+  it("resolves once before counting and checks that same entitlement snapshot", async () => {
+    const order: string[] = [];
+    let limit = 1;
+    const p: Provider = { metadata: { name: "changing" }, capabilities: { overrides: false, grants: false, mutations: false, planCatalog: false, fixed: false }, async resolve(privilege) { order.push("resolve"); return { privilege: privilege.key, value: limit, reason: Reason.PLAN, grants: [], staleOverrides: [] }; } };
+    const c = createClient({ catalog: CATALOG, provider: p });
+    await assert.rejects(c.guard("projects.max", 2, acme, { count: () => { order.push("count"); limit = 10; return 0; }, act: () => { order.push("act"); } }), EntitlementLimitExceeded);
+    assert.deepEqual(order, ["resolve", "count"]);
+  });
+});

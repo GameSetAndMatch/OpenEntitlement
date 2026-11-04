@@ -302,6 +302,14 @@ class EntitlementClient:
         if priv is not None and priv.value_type is not ValueType.INTEGER:
             raise TypeMismatch(f"require_within needs an integer privilege; {privilege} is {priv.value_type.value}")
         d = self._evaluate(privilege, ctx, expect=ValueType.INTEGER, fallback=0)
+        return self._check_resolved_limit(privilege, d, current, requested, ctx)
+
+    def _check_resolved_limit(
+        self, privilege: str, d: ResolutionDetails[Limit], current: Usage, requested: int, ctx: ContextArg
+    ) -> ResolutionDetails[Limit]:
+        priv = self.catalog.privilege(privilege)
+        if priv is not None and priv.value_type is not ValueType.INTEGER:
+            raise TypeMismatch(f"require_within needs an integer privilege; {privilege} is {priv.value_type.value}")
         result = check_within(d, current, requested)
         if result.passed:
             return d
@@ -363,7 +371,9 @@ class EntitlementClient:
         domain = getattr(self.lock, "domain", "unknown")
 
         def run(tx: Any) -> GuardResult[R]:
-            details = self.require_within(privilege, count(tx), requested, merged)
+            resolved = self.get_limit_details(privilege, merged)
+            current = count(tx)
+            details = self._check_resolved_limit(privilege, resolved, current, requested, merged)
             return GuardResult(act(tx), details.with_(lock_domain=domain))
 
         return self.lock.run(lock_key(merged.organization_id, privilege), run)
