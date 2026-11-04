@@ -16,7 +16,11 @@ npm run preview
 
 The build generates the specification and glossary pages from `spec/sections/` and `GLOSSARY.md`, copies the OpenAPI contract, creates search indexes, checks internal links and anchors, and creates a sitemap. Edit the canonical source documents rather than generated copies.
 
-## Cloudflare Workers Git integration
+## Wrangler deployment
+
+The Worker currently uses Wrangler deployment, with no Cloudflare Git build trigger connected. `npm run deploy` automatically installs Chromium and rebuilds the site through `build.command` in `wrangler.jsonc`.
+
+## Optional Cloudflare Workers Git integration
 
 Use the existing Worker project `openentitlement`:
 

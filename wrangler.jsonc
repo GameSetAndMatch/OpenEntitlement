@@ -7,5 +7,15 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   },
-  "preview_urls": true
+  "preview_urls": true,
+  "build": {
+    "command": "npx playwright install --with-deps chromium && npm run build",
+    "watch_dir": [
+      "website/src/pages",
+      "website/src/styles",
+      "website/src/content/docs/docs",
+      "spec",
+      "GLOSSARY.md"
+    ]
+  }
 }
