@@ -107,7 +107,7 @@ export type Usage = number | UsageBreakdown;
 export function normalizeUsage(current: unknown): { pool: number; subject: number } {
   let u: { pool: unknown; subject: unknown };
   if (typeof current === "number") u = { pool: current, subject: 0 };
-  else if (current !== null && typeof current === "object") u = { pool: (current as UsageBreakdown).pool ?? 0, subject: (current as UsageBreakdown).subject ?? 0 };
+  else if (current !== null && typeof current === "object" && !Array.isArray(current)) u = { pool: (current as UsageBreakdown).pool, subject: (current as UsageBreakdown).subject === undefined ? 0 : (current as UsageBreakdown).subject };
   else throw new InvalidArgument(`current must be a number or a usage breakdown, got ${String(current)}`);
   if (!isInt(u.pool) || !isInt(u.subject) || u.pool < 0 || u.subject < 0)
     throw new InvalidArgument(`usage must be non-negative integers, got ${JSON.stringify(current)}`);

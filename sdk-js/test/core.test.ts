@@ -229,3 +229,12 @@ describe("read-only inspection", () => {
     assert.equal((await p.inspection.listPlans()).find((p) => p.id === "pro")!.values["seats.max"], UNLIMITED);
   });
 });
+
+describe("usage validation", () => {
+  it("rejects missing or null pool usage instead of assuming zero", async () => {
+    const c = createClient({ catalog: CATALOG, provider: provider(), context: acme });
+    for (const usage of [{}, [], { subject: 1 }, { pool: null }, { pool: 0, subject: null }])
+      await assert.rejects(c.requireWithin("seats.max", usage as any, 1), InvalidArgument);
+    await c.requireWithin("seats.max", { pool: 0 }, 1);
+  });
+});

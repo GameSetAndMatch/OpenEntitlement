@@ -147,7 +147,7 @@ def normalize_usage(current: Any) -> UsageBreakdown:
     elif isinstance(current, UsageBreakdown):
         u = current
     elif isinstance(current, Mapping):
-        u = UsageBreakdown(pool=current.get("pool", 0), subject=current.get("subject", 0))
+        u = UsageBreakdown(pool=current.get("pool"), subject=current.get("subject", 0))
     else:
         raise InvalidArgument(f"current must be an int or a usage breakdown, got {current!r}")
     if not (is_int(u.pool) and is_int(u.subject)) or u.pool < 0 or u.subject < 0:

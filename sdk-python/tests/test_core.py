@@ -281,3 +281,11 @@ def test_invalid_invocation_tenant_does_not_inherit_default():
             d = c.get_details("seats.max", ctx)
             assert d.reason is Reason.ERROR
             assert d.error_code is ErrorCode.INVALID_CONTEXT
+
+
+def test_missing_or_null_pool_usage_is_not_assumed_zero():
+    c = create_client(catalog=CATALOG, provider=InMemoryProvider(), context={"organization_id": "acme"})
+    for usage in ({}, [], {"subject": 1}, {"pool": None}, {"pool": 0, "subject": None}):
+        with pytest.raises(InvalidArgument):
+            c.require_within("seats.max", usage, 1)
+    c.require_within("seats.max", {"pool": 0}, 1)
