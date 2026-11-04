@@ -46,6 +46,6 @@ Flags come before RBAC and entitlements, so unreleased features stay invisible (
 - A flag MAY target on entitlement state (for example "beta for every `enterprise` customer") by reading `planId` from resolution details into the flag context. The reverse MUST NOT happen ([Requirement 9.1.1](#requirement-911)).
 - The hook model is deliberately the same, so one telemetry hook implementation can serve both.
 
-### 9.4. Remote evaluation *(informative, roadmap)*
+### 9.4. Remote evaluation
 
-Flipt shows the cheapest route to many languages: implement OpenFeature's **Remote Evaluation Protocol** ([OFREP](https://github.com/open-feature/protocol)) once on the server, and every OFREP-capable SDK works. OpenEntitlement 0.2 will define the analogous **OEREP**: `POST /oerep/v1/resolve/{privilege}` taking the evaluation context and returning resolution details, with the JSON encodings of this spec. Billing systems (Lago, OpenMeter, Flexprice, Kill Bill) and in-house services could then serve every SDK without a language-specific provider.
+[OEREP v1 (§10)](10-remote-evaluation.md) defines the remote contract, following [OFREP](https://github.com/open-feature/protocol)'s separation between generic SDK providers and compatible servers. OpenEntitlement supplies its own open-source entitlement server, backed by memory or Postgres, and a console for administration. The SDKs use a generic `RemoteProvider`; applications may also embed the reference storage providers.

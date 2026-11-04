@@ -6,7 +6,7 @@ OpenEntitlement defines a vendor-neutral API for answering one question:
 
 > **May this organization do X, and how much of it?**
 
-It plays the role for entitlements that [OpenFeature](https://openfeature.dev/specification/) plays for feature flags. It has one evaluation API, swappable *providers* (in-memory, Postgres, Stripe, or any other billing or entitlement vendor), *hooks* for audit and telemetry, and an *evaluation context*. Application code is written once against the API. Changing vendors means swapping the provider, without rewriting every gate.
+It plays the role for entitlements that [OpenFeature](https://openfeature.dev/specification/) plays for feature flags. It has one evaluation API, a remote evaluation protocol, its own open-source server, and generic SDK providers (with embedded in-memory, Postgres, and fixed implementations), *hooks* for audit and telemetry, and an *evaluation context*. Application code is written once against the API. Changing vendors means swapping the provider, without rewriting every gate.
 
 ## Sections
 
@@ -21,6 +21,7 @@ It plays the role for entitlements that [OpenFeature](https://openfeature.dev/sp
 | 7 | [Hooks and audit](sections/07-hooks-and-audit.md) | evaluation hooks, mutation hooks, the audit event |
 | 8 | [Errors](sections/08-errors.md) | error shapes, HTTP mapping, upsell-friendly UIs |
 | 9 | [Layering and interoperability](sections/09-interoperability.md) | AuthN / RBAC / entitlement / flag separation, OpenFeature |
+| 10 | [Remote evaluation](sections/10-remote-evaluation.md) | OEREP v1 HTTP contract, requests, responses, security and locking |
 | - | [Glossary](glossary.md) | terms |
 | - | [Conformance suite](assets/gherkin/README.md) | Gherkin features any provider can run |
 
@@ -35,7 +36,7 @@ It plays the role for entitlements that [OpenFeature](https://openfeature.dev/sp
 
 These layers are orthogonal. An implementation of this spec MUST NOT read roles, evaluate feature flags, or authenticate (see [§9](sections/09-interoperability.md)).
 
-Out of scope for v0.1: metering and usage aggregation ([§1.7](sections/01-data-model.md#17-usage)), pricing, invoicing, payment, and a remote wire protocol (see [Roadmap](#roadmap)).
+Out of scope for v0.1: metering and usage aggregation ([§1.7](sections/01-data-model.md#17-usage)), pricing, invoicing, payment.
 
 ## Conformance language
 
@@ -60,6 +61,6 @@ The spec follows [SemVer](https://semver.org). Until 1.0.0, minor versions MAY b
 
 ## Roadmap
 
-- **0.2:** an OpenEntitlement Remote Evaluation Protocol (OEREP), an HTTP/JSON wire format modeled on [OFREP](https://github.com/open-feature/protocol). A server (Lago, OpenMeter, Flexprice, Kill Bill, an in-house service) implements it once instead of shipping a provider per language. This is how Flipt reached every OpenFeature SDK.
+- **Implemented (draft):** [OEREP v1](sections/10-remote-evaluation.md), generic Python/TypeScript HTTP providers, and our own [server and console](../console/README.md).
 - **0.2:** add-ons as first-class objects (in 0.1 they are modeled as grants or overrides, see [PRIOR_ART.md](../PRIOR_ART.md)).
 - **0.3:** events (`ENTITLEMENTS_CHANGED`), mirroring OpenFeature's provider events, so caches and UIs can refresh.

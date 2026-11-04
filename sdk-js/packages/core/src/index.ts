@@ -12,3 +12,4 @@ export * from "./fixed.ts";
 export * from "./hooks.ts";
 export * from "./lock.ts";
 export * from "./client.ts";
+export * from "./remote.ts";

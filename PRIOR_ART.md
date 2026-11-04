@@ -38,6 +38,22 @@ None of them is a standard. Every group-2 project could *implement* OpenEntitlem
 
 CNCF landscape: no entitlements, billing, or metering *standard* is listed. OpenMeter events use CloudEvents, which is an event envelope, not an entitlement model. Hacker News: no thread proposing a standard. The closest is ["Ask HN: Managing Entitlement/Billing with Feature Flags – Pros and Cons?"](https://news.ycombinator.com/item?id=38907509) (2024, no replies).
 
+### Lago, read at the code level
+
+The Lago entitlement module lives in [`getlago/lago-api`](https://github.com/getlago/lago-api) (`app/models/entitlement/*`, `app/queries/entitlement/subscription_entitlement_query.rb`, from mid-2025). Its data model is the closest of any vendor to OpenEntitlement:
+
+| Lago (tables) | OpenEntitlement |
+|---|---|
+| `entitlement_features` (code, name, description) | Feature |
+| `entitlement_privileges` (code, `value_type` integer/string/boolean/select, `config.select_options`) | Privilege (`enum` = `select`) |
+| `entitlement_entitlements` + `_values` with `plan_id` | Plan values |
+| the same tables with `subscription_id` | Override, organization scope, *replaces* the plan value |
+| `entitlement_subscription_feature_removals` | Override of the gate to `false` / `0` |
+| resolution: plan ⟗ subscription, `COALESCE(sv.value, pv.value)`, returning `value`, `plan_value`, `subscription_value` | `value`, `planValue`, `overrideId` in resolution details |
+| plan `parent_id` (per-customer plan overrides create child plans) | Plan family |
+
+What Lago doesn't have: `UNLIMITED`, grants (wallets are monetary), dated overrides, a mandatory reason or audit trail, subject- or resource-scoped values, a check API with reasons, and a usage check. A **Lago provider** is therefore straightforward. The subscription is the assignment, the parent plan is the family, and subscription values are organization overrides. It reads `GET /api/v1/subscriptions/{external_id}/entitlements` and writes through `PATCH …/entitlements`. It would talk to Lago over HTTP only: Lago is AGPL-3.0, so no Lago code may be copied into this Apache-2.0 repository.
+
 ### The Flipt lesson
 
 Flipt is a feature-flag server that chose to be **an implementation of the standard instead of a standard of its own**. It maintains its OpenFeature providers in the `open-feature/*-sdk-contrib` repositories for 7 languages, and it was an early adopter of **OFREP**, the OpenFeature Remote Evaluation Protocol, so any OFREP-capable SDK talks to it with no Flipt-specific code. Two consequences for us:
@@ -52,17 +68,17 @@ How each vendor's concepts map onto the OpenEntitlement model. 🟥 marks a plac
 | OpenEntitlement | Stripe Entitlements | Lago | Stigg | Schematic | OpenMeter |
 |---|---|---|---|---|---|
 | **Feature** | `entitlements.feature` (`name`, `lookup_key`) | Feature (`code`, `name`, `description`, `privileges[]`) | Feature (types: Boolean, Configuration, Metered, Enum) | Feature (types: boolean, event-based, trait-based). 🟥 Each feature *is* a flag with the same key | Feature |
-| **Privilege / limit** | none: features are **boolean only**, with no quantity or value | Privilege (`code`, `value_type` ∈ integer/boolean/select, `config.select_options`): **a near-exact match** | Configuration value, `usageLimit`, `hasUnlimitedUsage` flag, enum values | Entitlement value: on/off, a metered allocation, or a trait comparison | Entitlement type: boolean, static (free JSON config), metered (`usagePeriod`, soft limit) |
-| **Unlimited** | n/a | not documented in the CLI reference | `hasUnlimitedUsage: true`, a separate flag | not documented in the pages reviewed | n/a (no allowance means no limit) |
+| **Privilege / limit** | none: features are **boolean only**, with no quantity or value | Privilege (`code`, `value_type` ∈ integer/**string**/boolean/select, `config.select_options`): **a near-exact match**. Values are stored as strings and cast on read (`lago-api` `entitlement_entitlement_values.value`) | Configuration value, `usageLimit`, `hasUnlimitedUsage` flag, enum values | Entitlement value: on/off, a metered allocation, or a trait comparison | Entitlement type: boolean, static (free JSON config), metered (`usagePeriod`, soft limit) |
+| **Unlimited** | n/a | none in the schema: an integer is just an integer | `hasUnlimitedUsage: true`, a separate flag | not documented in the pages reviewed | n/a (no allowance means no limit) |
 | **Plan** | 🟥 Product + Price. Features attach to *products*. There's no plan object independent of what is sold | Plan, with entitlements per plan. 🟥 the plan is also the pricing object | Plan (free / paid / custom) + add-ons. 🟥 a plan bundles entitlements *and prices* | Plan, versioned (draft/published/archived) + add-ons. "Only the newest version can be subscribed" | Plan (in OpenMeter billing) |
 | **Assignment** | 🟥 derived from Subscription status (active, cancelled, failed payment). No subscription means no entitlement | 🟥 Subscription (`external_id`) | 🟥 Subscription. `AccessDeniedReason.NoActiveSubscription` | Company → one plan + add-ons | Customer subscribes to plans |
-| **Per-customer override** | none. Workaround: a custom product per customer | Subscription entitlement override (`update-subscription-entitlements`). 🟥 keyed by *subscription*, not by customer | Promotional entitlements: per customer, time-limited or lifetime. They are **additive**, so they can't lower a limit | Company overrides, time-limited, "more or less". But checks take **"the most generous"** of plan and override, so an override can't cap below the plan | Per-customer entitlement with its own config |
+| **Per-customer override** | none. Workaround: a custom product per customer | Subscription entitlement values that **replace** plan values (`COALESCE(sub_value, plan_value)`, the same rule as ours), plus per-subscription *feature removals*. No dates, no required reason. 🟥 keyed by *subscription*, not by customer | Promotional entitlements: per customer, time-limited or lifetime. They are **additive**, so they can't lower a limit | Company overrides, time-limited, "more or less". But checks take **"the most generous"** of plan and override, so an override can't cap below the plan | Per-customer entitlement with its own config |
 | **Grant / credit** | 🟥 Billing credit grants are *monetary* (invoice credits), not quota | 🟥 Wallets / prepaid credits are monetary | Credit grants: currency, pool, priority, effective/expiry dates, ledger. 🟥 credits are a *currency* consumed through price mappings | Credit grants, burndown soonest-expiring first, ledger, preflight / reservation / lease | Grants: amount, priority, `effectiveAt`, expiration, rollover. **The closest match to our grants** |
 | **Metered usage** | separate product (Billing Meters), not connected to entitlements | 🟥 Billable metrics (usage *is* billing) | Meters (aggregation of events) or app-calculated usage | `track` events (event-based features) or traits | 🟥 OpenMeter meters are required |
 | **Trial** | 🟥 subscription status `trialing` | 🟥 plan `trial_period` (billing) | trial configuration on plans and products. Trial subscriptions contribute entitlements | 🟥 Trial on the plan. Conversion depends on "payment required up front". Trial expiry plan | n/a |
 | **Shared pool / per-user** | n/a | n/a | customer *resources* (workspace/project) with their own entitlements and usage | users inherit company entitlements and can be tracked separately | `subject` (usage key) vs `customer` |
 | **Denial shape** | n/a: you diff a list | n/a | `hasAccess`, `accessDeniedReason` ∈ {`NoActiveSubscription`, `InsufficientCredits`, `BudgetExceeded`, `Revoked`, …}. 🟥 billing states as denial reasons | boolean flag check plus usage and allocation | `hasAccess`, `balance`, `overage` |
-| **Audit** | Stripe event log | n/a | n/a | credit ledger | grant ledger |
+| **Audit** | Stripe event log | soft delete (`deleted_at`) only | n/a | credit ledger | grant ledger |
 | **Self-hosted** | ❌ | ✅ (AGPL server) | ❌ | ❌ | ✅ (Apache server) |
 
 ### Where billing leaks, and what the spec does about it

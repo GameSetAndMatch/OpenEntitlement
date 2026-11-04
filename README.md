@@ -2,11 +2,11 @@
 
 # OpenEntitlement
 
-**A vendor-neutral standard for entitlements: what an organization may do, and how much of it.**
-OpenEntitlement is to entitlements what [OpenFeature](https://openfeature.dev) is to feature flags: one evaluation API, swappable providers, hooks, an evaluation context, and a conformance suite.
+**An open-source entitlement service and protocol: what an organization may do, and how much of it.**
+OpenEntitlement combines its own server and administrative console with OEREP, a remote evaluation protocol modeled on OFREP. Generic Python and TypeScript SDKs use the same contract; the server owns plans, overrides, grants, and resolution.
 
 ```ts
-const client = createClient({ provider: new PostgresProvider({ pool }), catalog });
+const client = createClient({ provider: new RemoteProvider({ baseUrl: "http://localhost:8787" }), catalog });
 
 if (await client.isEnabled("sso", { organizationId })) { /* show SSO settings */ }
 
@@ -16,18 +16,19 @@ await client.guard("projects.max", 1, { organizationId }, {
 }); // throws EntitlementLimitExceeded { limit, current, requested, requiredPlan: "business" }
 ```
 
-Write gates once, then swap Stripe for Stigg, Lago, your own Postgres tables, or a `FixedProvider` on self-hosted installs without touching them.
+Run the [service and local demo](console/README.md), backed by memory or Postgres. SDKs also support embedded storage and a `FixedProvider` for self-hosted installs.
 
 ## What's here
 
 | Path | What |
 |---|---|
-| [`spec/`](spec/README.md) | The specification: 9 sections of numbered RFC 2119 requirements |
+| [`console/`](console/README.md) | Our entitlement server, OEREP API, and administrative web console |
+| [`spec/`](spec/README.md) | Semantic specification and OEREP v1 [OpenAPI](spec/oerep.openapi.json) |
 | [`spec/assets/gherkin/`](spec/assets/gherkin/README.md) | Conformance suite: 11 feature files, tagged by requirement and provider capability |
 | [`sdk-python/`](sdk-python/README.md) | `openentitlement` (core, zero deps), `openentitlement-postgres`, `openentitlement-stripe` |
 | [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core` (zero deps), `@openentitlement/postgres`, `@openentitlement/stripe` |
 | [`PRIOR_ART.md`](PRIOR_ART.md) | What exists, the vendor mapping table, where billing leaks, link check |
-| [`ADR-0001.md`](ADR-0001.md) | Why a spec plus providers, not another service, and how we changed the starting model |
+| [`ADR-0001.md`](ADR-0001.md) | Why an open protocol plus our own entitlement server |
 
 ## The model in one screen
 
@@ -53,7 +54,7 @@ Write gates once, then swap Stripe for Stigg, Lago, your own Postgres tables, or
 
 The Stripe adapter is tested against a fake account built from the response shapes in Stripe's docs, not against live Stripe.
 
-Roadmap: OEREP (a remote evaluation protocol, so billing servers implement it once), add-ons, change events. See [spec/README.md](spec/README.md#roadmap).
+OEREP v1 is implemented in both SDKs and the reference service, with real cross-language HTTP integration tests. Roadmap: add-ons and change events. See [spec/README.md](spec/README.md#roadmap).
 
 ## License
 

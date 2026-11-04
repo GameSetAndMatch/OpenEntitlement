@@ -24,7 +24,10 @@ import {
   FactsProvider,
   newId,
   type AuditEvent,
+  type AuditFilter,
   type Capabilities,
+  type Inspection,
+  type PlanWithValues,
   type GrantInput,
   type MutationMeta,
   type Mutations,
@@ -77,8 +80,9 @@ export interface InMemorySeed {
  */
 export class InMemoryProvider extends FactsProvider {
   readonly metadata = { name: "in-memory" };
-  readonly capabilities: Capabilities = { overrides: true, grants: true, mutations: true, planCatalog: true, fixed: false };
+  readonly capabilities: Capabilities = { overrides: true, grants: true, mutations: true, planCatalog: true, fixed: false, inspection: true };
   readonly mutations: Mutations;
+  readonly inspection: Inspection;
   readonly #store = new Store();
 
   constructor(seed: InMemorySeed = {}) {
@@ -87,7 +91,48 @@ export class InMemoryProvider extends FactsProvider {
     for (const [planId, vals] of Object.entries(seed.values ?? {}))
       for (const [k, v] of Object.entries(vals)) this.#store.values.set(`${planId}\u0000${k}`, v);
     for (const [org, planId] of Object.entries(seed.assignments ?? {})) this.#store.assignments.set(org, { organizationId: org, planId });
-    this.mutations = new MemoryMutations(this.#store);
+    const audit: AuditEvent[] = [];
+    const inner = new MemoryMutations(this.#store);
+    // record every successful mutation so Inspection.listAudit works without a database
+    this.mutations = new Proxy(inner, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver);
+        if (typeof v !== "function") return v;
+        return async (...args: unknown[]) => {
+          const e = (await v.apply(target, args)) as AuditEvent;
+          audit.push(e);
+          return e;
+        };
+      },
+    });
+    const s = this.#store;
+    this.inspection = {
+      async listPlans(): Promise<PlanWithValues[]> {
+        return [...s.plansById.values()].map((p) => {
+          const values: Record<string, unknown> = {};
+          for (const [k, v] of s.values) {
+            const [planId, key] = k.split("\u0000");
+            if (planId === p.id) values[key!] = v;
+          }
+          return { ...p, values };
+        });
+      },
+      async listAssignments() {
+        return [...s.assignments.values()];
+      },
+      async listOverrides(org: string) {
+        return [...s.overridesById.values()].filter((o) => o.scope.organizationId === org);
+      },
+      async listGrants(org: string) {
+        return [...s.grantsById.values()].filter((g) => g.scope.organizationId === org);
+      },
+      async listAudit(f: AuditFilter = {}) {
+        return audit
+          .filter((e) => (f.entity === undefined || e.entity === f.entity) && (f.entityId === undefined || e.entityId === f.entityId))
+          .reverse()
+          .slice(0, f.limit ?? 200);
+      },
+    };
   }
 
   protected facts(): FactSource {

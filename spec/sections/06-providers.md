@@ -2,12 +2,12 @@
 
 ## Overview
 
-A **provider** answers resolution requests from one source of truth: memory, a Postgres schema, Stripe, Stigg, Lago, or an in-house service. The SDK owns the API surface, the checks, hooks, errors, and locking. The provider owns *facts and resolution*.
+A **provider** answers resolution requests from one source of truth: the OpenEntitlement server over OEREP, embedded memory, or a Postgres schema. The SDK owns the API surface, the checks, hooks, errors, and locking. The provider owns *facts and resolution*.
 
 There are two ways to write one:
 
 - **Facts-based:** implement a small *fact source* (assignment, plan, plan value, overrides, grants, plans) and reuse the SDK's `resolveFromFacts`. The in-memory and Postgres reference providers work this way, and conformance mostly comes for free.
-- **Resolving:** implement `resolve` directly, for vendors that compute entitlements themselves (the Stripe adapter, for example).
+- **Resolving:** implement `resolve` directly, for remote resolution (the generic OEREP `RemoteProvider`, for example).
 
 ```ts
 interface Provider {
@@ -42,6 +42,7 @@ interface Provider {
 > | `mutations` | the provider implements the mutation interface ([§6.3](#63-mutations)) |
 > | `planCatalog` | the provider can enumerate plans and implements `suggestPlan` |
 > | `fixed` | the provider is a fixed provider ([§6.4](#64-the-fixed-provider)) |
+> | `inspection` | OPTIONAL: the provider implements the read-only inspection interface ([§6.6](#66-inspection)) |
 
 #### Requirement 6.1.4
 
@@ -129,3 +130,33 @@ Self-hosted and on-premise installs often have no billing system to ask. In that
 #### Requirement 6.5.2
 
 > An adapter MUST document how it maps the vendor's concepts onto this model, including which capabilities it lacks.
+
+### 6.6. Inspection
+
+Admin consoles, support tooling, and migrations need to *list* what a provider holds. Resolution never needs it. Inspection is an optional, read-only capability, added in v0.1 for the [OpenEntitlement Console](../../console/README.md).
+
+```ts
+interface Inspection {
+  listPlans(): Promise<Array<Plan & { values: Record<string, Value> }>>;
+  listAssignments(): Promise<Assignment[]>;
+  listOverrides(organizationId: string): Promise<Override[]>;   // including stale and expired ones
+  listGrants(organizationId: string): Promise<Grant[]>;         // including revoked and expired ones
+  listAudit(filter?: { entity?: string; entityId?: string; limit?: number }): Promise<AuditEvent[]>;  // most recent first
+}
+```
+
+#### Requirement 6.6.1
+
+> A provider that declares `inspection` MUST implement every operation above. Inspection MUST NOT change state.
+
+#### Requirement 6.6.2
+
+> `listOverrides` MUST return stale and expired overrides. `listGrants` MUST return revoked and expired grants. Filtering them is the caller's job, so that history stays visible.
+
+#### Requirement 6.6.3
+
+> A provider that declares both `inspection` and `mutations` MUST return from `listAudit` every audit event its mutations produced, most recent first.
+
+#### Requirement 6.6.4
+
+> Consumers MUST NOT require `inspection` to evaluate. Every evaluation feature of a console or tool MUST keep working, through `getDetails`, on providers without it.

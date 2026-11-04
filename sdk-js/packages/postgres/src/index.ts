@@ -23,7 +23,10 @@ import {
   planToJSON,
   type Assignment,
   type AuditEvent,
+  type AuditFilter,
   type Capabilities,
+  type Inspection,
+  type PlanWithValues,
   type FactSource,
   type Grant,
   type GrantInput,
@@ -144,8 +147,9 @@ async function inTransaction<R>(pool: Pool, fn: (c: PoolClient) => Promise<R>, i
 /** Reference Postgres provider. Full capabilities; durable audit in `oe_audit`. */
 export class PostgresProvider extends FactsProvider {
   readonly metadata = { name: "postgres" };
-  readonly capabilities: Capabilities = { overrides: true, grants: true, mutations: true, planCatalog: true, fixed: false };
+  readonly capabilities: Capabilities = { overrides: true, grants: true, mutations: true, planCatalog: true, fixed: false, inspection: true };
   readonly mutations: Mutations;
+  readonly inspection: Inspection;
   readonly #pool: Pool;
   readonly #autoMigrate: boolean;
 
@@ -154,6 +158,7 @@ export class PostgresProvider extends FactsProvider {
     this.#pool = opts.pool;
     this.#autoMigrate = opts.autoMigrate ?? false;
     this.mutations = new PgMutations(opts.pool);
+    this.inspection = new PgInspection(opts.pool);
   }
 
   async initialize(): Promise<void> {
@@ -319,6 +324,38 @@ class PgMutations implements Mutations {
       const before = rowGrant(rows[0]);
       return { ...meta, entity: "grant", entityId: grantId, action: "revoke", before: grantToJSON(before), after: grantToJSON({ ...before, revokedAt: at }), at } as AuditEvent;
     });
+  }
+}
+
+class PgInspection implements Inspection {
+  readonly #pool: Pool;
+  constructor(pool: Pool) {
+    this.#pool = pool;
+  }
+  async listPlans(): Promise<PlanWithValues[]> {
+    const plans = (await this.#pool.query("select id, name, rank, public, variant_of from oe_plan order by rank nulls last, id")).rows.map(rowPlan);
+    const { rows } = await this.#pool.query("select plan_id, privilege, value from oe_plan_value");
+    return plans.map((p) => ({
+      ...p,
+      values: Object.fromEntries(rows.filter((r) => r.plan_id === p.id).map((r) => [r.privilege, decodeValue(r.value)])),
+    }));
+  }
+  async listAssignments(): Promise<Assignment[]> {
+    const { rows } = await this.#pool.query("select organization_id, plan_id, channel from oe_assignment order by organization_id");
+    return rows.map((r) => ({ organizationId: r.organization_id, planId: r.plan_id, ...(r.channel !== null ? { channel: r.channel } : {}) }));
+  }
+  async listOverrides(org: string): Promise<Override[]> {
+    return (await this.#pool.query(`select ${OVERRIDE_COLS} from oe_override where organization_id = $1 order by created_at`, [org])).rows.map(rowOverride);
+  }
+  async listGrants(org: string): Promise<Grant[]> {
+    return (await this.#pool.query(`select ${GRANT_COLS} from oe_grant where organization_id = $1 order by created_at`, [org])).rows.map(rowGrant);
+  }
+  async listAudit(f: AuditFilter = {}): Promise<AuditEvent[]> {
+    const { rows } = await this.#pool.query(
+      "select at, actor, reason, entity, entity_id, action, before, after from oe_audit where ($1::text is null or entity = $1) and ($2::text is null or entity_id = $2) order by id desc limit $3",
+      [f.entity ?? null, f.entityId ?? null, f.limit ?? 200],
+    );
+    return rows.map((r) => ({ at: toDate(r.at)!, actor: r.actor, reason: r.reason, entity: r.entity, entityId: r.entity_id, action: r.action, before: r.before, after: r.after }));
   }
 }
 

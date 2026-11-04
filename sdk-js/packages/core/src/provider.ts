@@ -3,7 +3,7 @@
 import { validateValue, type PrivilegeDefinition } from "./catalog.ts";
 import type { ResolutionDetails, ResolvedContext } from "./details.ts";
 import { Conflict, InvalidArgument, InvalidValue } from "./errors.ts";
-import { intervalsOverlap, type FactSource, type Override, type Plan, type Scope } from "./facts.ts";
+import { intervalsOverlap, type Assignment, type FactSource, type Grant, type Override, type Plan, type Scope } from "./facts.ts";
 import { resolveFromFacts, suggestPlanFromFacts, type Need } from "./resolver.ts";
 import { encodeJson, isInt } from "./values.ts";
 
@@ -18,6 +18,8 @@ export interface Capabilities {
   readonly mutations: boolean;
   readonly planCatalog: boolean;
   readonly fixed: boolean;
+  /** Optional (spec §6.6): the provider implements the read-only `Inspection` interface. */
+  readonly inspection?: boolean;
 }
 
 export const NO_CAPABILITIES: Capabilities = Object.freeze({ overrides: false, grants: false, mutations: false, planCatalog: false, fixed: false });
@@ -30,6 +32,7 @@ export function capabilityTags(c: Capabilities): Set<string> {
   if (c.mutations) tags.add("mutations");
   if (c.planCatalog) tags.add("plan-catalog");
   if (c.fixed) tags.add("fixed");
+  if (c.inspection) tags.add("inspection");
   return tags;
 }
 
@@ -86,10 +89,32 @@ export interface Mutations {
   revokeGrant(grantId: string, meta: MutationMeta, at: Date): Promise<AuditEvent>;
 }
 
+export interface PlanWithValues extends Plan {
+  /** privilegeKey -> value, only for values the plan sets. */
+  values: Record<string, unknown>;
+}
+
+export interface AuditFilter {
+  entity?: AuditEvent["entity"];
+  entityId?: string;
+  limit?: number;
+}
+
+/** Spec §6.6 (optional): read-only listing for admin consoles. Never used by resolution. */
+export interface Inspection {
+  listPlans(): Promise<PlanWithValues[]>;
+  listAssignments(): Promise<Assignment[]>;
+  listOverrides(organizationId: string): Promise<Override[]>;
+  listGrants(organizationId: string): Promise<Grant[]>;
+  /** Most recent first. */
+  listAudit(filter?: AuditFilter): Promise<AuditEvent[]>;
+}
+
 export interface Provider {
   readonly metadata: ProviderMetadata;
   readonly capabilities: Capabilities;
   readonly mutations?: Mutations;
+  readonly inspection?: Inspection;
   initialize?(): Promise<void>;
   shutdown?(): Promise<void>;
   resolve(privilege: PrivilegeDefinition, ctx: ResolvedContext): Promise<ResolutionDetails>;
