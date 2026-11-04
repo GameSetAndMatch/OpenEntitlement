@@ -2,6 +2,7 @@
 !console/
 !console/**
 !sdk-js/
+!sdk-js/tsconfig.base.json
 !sdk-js/packages/
 !sdk-js/packages/core/
 !sdk-js/packages/core/**

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
+COPY sdk-js/tsconfig.base.json ./sdk-js/tsconfig.base.json
 COPY sdk-js/packages/core/ ./sdk-js/packages/core/
 COPY sdk-js/packages/postgres/ ./sdk-js/packages/postgres/
 COPY console/package*.json ./console/
