@@ -149,6 +149,8 @@ class MemoryMutations implements Mutations {
   async upsertPlan(plan: Plan, meta: MutationMeta, at: Date): Promise<AuditEvent> {
     if (!plan.id || !plan.name) throw new InvalidArgument("plan needs an id and a name");
     if (plan.variantOf !== undefined) {
+      if (plan.variantOf === plan.id || [...this.#s.plansById.values()].some((p) => p.variantOf === plan.id))
+        throw new InvalidArgument("a base plan with variants cannot become a variant (Requirement 1.3.2)");
       const base = this.#s.plansById.get(plan.variantOf);
       if (!base) throw new NotFound(`plan "${plan.variantOf}" (variantOf) not found`);
       if (base.variantOf !== undefined) throw new InvalidArgument("variantOf must not chain (Requirement 1.3.2)");

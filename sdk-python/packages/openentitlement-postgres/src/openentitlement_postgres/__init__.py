@@ -179,8 +179,13 @@ class _Mutations:
             raise InvalidArgument("plan needs an id and a name")
 
         def fn(c: "psycopg.Connection[Any]") -> AuditEvent:
+            # Match the TypeScript SDK's topology lock before reading family relationships.
+            c.execute("lock table oe_plan in share row exclusive mode")
             facts = _Facts(c)
             if plan.variant_of is not None:
+                dependent = c.execute("select 1 from oe_plan where variant_of = %s limit 1", (plan.id,)).fetchone()
+                if plan.variant_of == plan.id or dependent is not None:
+                    raise InvalidArgument("a base plan with variants cannot become a variant (Requirement 1.3.2)")
                 base = facts.plan(plan.variant_of)
                 if base is None:
                     raise NotFound(f"plan {plan.variant_of!r} (variantOf) not found")

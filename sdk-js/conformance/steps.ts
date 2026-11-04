@@ -186,6 +186,10 @@ step("Given", "a mutation hook that vetoes every change", (w) => {
 
 // ---------------------------------------------------------------- When: mutations
 
+step("When", String.raw`I try to make plan "(?<plan>[^"]*)" a variant of "(?<base>[^"]*)"`, (w, g) =>
+  capture(w, () => c(w).admin.upsertPlan({ id: g.plan!, name: g.plan!, variantOf: g.base! }, { actor: "pricing", reason: "plan family update" })),
+);
+
 step("When", String.raw`organization "(?<org>[^"]*)" moves to plan "(?<plan>[^"]*)"`, (w, g) =>
   capture(w, () => w.seeder!.assignPlan(g.org!, g.plan!, { actor: "billing", reason: "plan change" })),
 );

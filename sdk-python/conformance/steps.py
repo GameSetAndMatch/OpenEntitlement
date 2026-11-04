@@ -200,6 +200,12 @@ def _veto(w: World) -> None:
 # ---------------------------------------------------------------- When: mutations
 
 
+@step("When", r'I try to make plan "(?P<plan>[^"]*)" a variant of "(?P<base>[^"]*)"')
+def _reparent(w: World, plan: str, base: str) -> None:
+    capture(w, lambda: w.client.admin.upsert_plan(Plan(id=plan, name=plan, variant_of=base), actor="pricing", reason="plan family update"))
+
+
+
 @step("When", r'organization "(?P<org>[^"]*)" moves to plan "(?P<plan>[^"]*)"')
 def _moves(w: World, org: str, plan: str) -> None:
     capture(w, lambda: w.seeder.assign_plan(org, plan, actor="billing", reason="plan change"))
