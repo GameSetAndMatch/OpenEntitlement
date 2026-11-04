@@ -1,6 +1,6 @@
 ---
 title: Self-host the service
-description: Learn about self-host the service in OpenEntitlement.
+description: Run the entitlement service with Postgres and separate administrative and evaluation credentials.
 ---
 
 The entitlement service is a Node application. The static documentation website is a separate deployment; hosting this website on Cloudflare does not deploy the entitlement API.

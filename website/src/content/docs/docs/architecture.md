@@ -1,6 +1,6 @@
 ---
 title: Architecture & scope
-description: Learn about architecture & scope in OpenEntitlement.
+description: The entitlement model, evaluation protocol, and reference implementations as separate contracts.
 ---
 
 ```text
@@ -25,8 +25,16 @@ The architecture follows OFREP's separation between generic SDK providers and co
 
 [ADR-0001](https://github.com/GameSetAndMatch/openentitlement/blob/main/ADR-0001.md) records the architectural decision.
 
-## Current draft and future work
+## A model that implementations can share
 
-The implemented draft uses `variantOf` for trials and binds overrides to plan families. The proposed refinement—backend-owned plans with stable codes, explicit trial transitions, and exact-plan override binding—needs a separate implementation and specification change.
+The specification defines features, typed privileges, plan values, overrides, grants, and the order in which they resolve. OEREP defines how a client requests a decision and how a server returns the value and explanation. Neither requires a particular billing vendor.
 
-Quota windows, consumption idempotency, and usage storage are deferred. These docs describe current behavior rather than promises of a future metering platform.
+The included service and SDKs make the contract executable. The shared conformance scenarios check implementations against the same requirements. Alternative implementations must demonstrate conformance; sharing an HTTP shape alone is not enough.
+
+## Interoperability
+
+A shared contract lets developers evaluate entitlements without embedding a billing vendor's model throughout the application. Organizations can inspect the rules, test implementations against the same scenarios, and operate the reference service on their own infrastructure.
+
+OpenFeature provides a complementary feature-flag API. OpenEntitlement is an independent project with no Apache or CNCF affiliation. Additional integrations must document their semantic mapping and demonstrate conformance before they can be described as compatible.
+
+See [project status](/docs/project/) for the draft's compatibility and adoption boundaries.

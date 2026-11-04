@@ -12,7 +12,7 @@ export default defineConfig({
     favicon: '/favicon.svg',
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/GameSetAndMatch/openentitlement' }],
     customCss: ['./src/styles/docs.css'],
-    editLink: { baseUrl: 'https://github.com/GameSetAndMatch/openentitlement/edit/main/website/' },
+    editLink: { baseUrl: 'https://github.com/GameSetAndMatch/openentitlement/edit/main/website/src/content/docs/' },
     sidebar: [
       { label: 'Start here', items: [
         { label: 'Introduction', slug: 'docs' },
@@ -33,7 +33,7 @@ export default defineConfig({
       { label: 'Project', items: [
         { label: 'Architecture & scope', slug: 'docs/architecture' },
         { label: 'Contributing', slug: 'docs/contributing' },
-        { label: 'Deploy this website', slug: 'docs/website' },
+        { label: 'Project status', slug: 'docs/project' },
       ] },
     ],
   })],

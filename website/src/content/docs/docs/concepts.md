@@ -1,6 +1,6 @@
 ---
 title: Core concepts
-description: Learn about core concepts in OpenEntitlement.
+description: How plan values, overrides, grants, and defaults produce an explainable entitlement decision.
 ---
 
 ## Definitions in code, values as data

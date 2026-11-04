@@ -1,6 +1,6 @@
 ---
 title: TypeScript SDK
-description: Learn about typescript sdk in OpenEntitlement.
+description: Connect a TypeScript application to an OEREP service with the reference SDK.
 ---
 
 The core SDK uses the platform `fetch` API and has no runtime dependencies. Start from a source checkout; package publication is not assumed here.
