@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://openentitlement.dev/sitemap-index.xml

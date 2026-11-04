@@ -1,0 +1,16 @@
+{
+  "name": "@openentitlement/website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/prepare-docs.mjs && astro dev --host 127.0.0.1",
+    "build": "node scripts/prepare-docs.mjs && astro build && node scripts/check-links.mjs",
+    "check": "node scripts/prepare-docs.mjs && astro check"
+  },
+  "dependencies": {
+    "@astrojs/check": "0.9.12",
+    "@astrojs/starlight": "0.42.8",
+    "astro": "7.4.5",
+    "typescript": "6.0.3"
+  }
+}

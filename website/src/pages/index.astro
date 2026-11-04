@@ -1,0 +1,77 @@
+---
+const example = `const client = createClient({
+  catalog,
+  provider: new RemoteProvider({
+    baseUrl: 'https://entitlements.example.com',
+  }),
+});
+
+await client.isEnabled('sso', { organizationId });
+await client.getLimit('seats.max', { organizationId });`;
+const github = 'https://github.com/GameSetAndMatch/openentitlement';
+import '../styles/landing.css';
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>OpenEntitlement — Know what your customers can do.</title>
+  <meta name="description" content="An open-source entitlement service and protocol. Resolve plans, negotiated overrides, and quota grants through one API, independent of your billing system."/>
+  <link rel="canonical" href="https://openentitlement.dev/"/>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <meta property="og:title" content="OpenEntitlement — Your product. Their plan. One API."/>
+  <meta property="og:description" content="Open-source entitlements, without the billing baggage. Plans, overrides, grants, and explainable decisions."/>
+  <meta property="og:type" content="website"/><meta property="og:url" content="https://openentitlement.dev/"/>
+  <meta name="theme-color" content="#f7f5ef"/>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="header wrap">
+  <a class="brand" href="/" aria-label="OpenEntitlement home"><img src="/logo.svg" alt="" width="30" height="30"/>Open<span>Entitlement</span></a>
+  <nav aria-label="Main navigation"><a href="/docs/">Documentation</a><a href="#how-it-works">How it works</a><a class="nav-source" href={github}>GitHub <span aria-hidden="true">↗</span></a></nav>
+</header>
+<main id="main">
+<section class="hero wrap">
+  <div class="hero-copy"><a class="release" href="/docs/architecture/"><span class="status-dot"></span> Open source · v0.1 draft <span aria-hidden="true">↗</span></a>
+    <h1>Know what your<br/>customers <em>can do.</em></h1>
+    <p class="hero-description">Plans, limits, and the exceptions that make real customers different. One entitlement API, independent of your billing system.</p>
+    <div class="actions"><a class="button primary" href="/docs/quickstart/">Get started <span aria-hidden="true">→</span></a><a class="text-link" href={github}>Explore the source <span aria-hidden="true">↗</span></a></div>
+    <div class="hero-footnote"><span>Apache-2.0</span><span>Self-hostable</span><span>TypeScript + Python</span></div>
+  </div>
+  <div class="hero-visual" aria-label="Illustration of an explainable entitlement decision">
+    <div class="visual-grid"></div><div class="small-label">ONE CUSTOMER. A CLEAR ANSWER.</div>
+    <div class="decision-card"><div class="decision-heading"><span class="customer-mark">A</span><div><strong>Acme</strong><small>Business plan</small></div><span class="live-pill">Resolved</span></div><div class="decision-value"><span>seats.max</span><strong>250<span> seats</span></strong></div><div class="decision-breakdown"><div><span>Plan default</span><span>100</span></div><div class="highlight"><span>Negotiated override</span><span>250</span></div><div><span>Effective entitlement</span><strong>250</strong></div></div><div class="decision-bottom"><span class="tiny-dot"></span> OVERRIDE <span class="separator">/</span> Every decision has a reason.</div></div>
+    <div class="protocol-note"><span class="code-bracket">{ }</span><div><strong>Your terms. Your infrastructure.</strong><small>Delivered through the open OEREP protocol.</small></div></div>
+    <div class="visual-caption">Illustrative data from the included demo.</div>
+  </div>
+</section>
+<div class="principles"><div class="wrap"><span>BUILT FOR THE ENTITLEMENT LAYER</span><span>Features & limits</span><i>✳</i><span>Negotiated contracts</span><i>✳</i><span>Trials & grants</span><i>✳</i><span>Self-hosted products</span></div></div>
+<section class="section wrap" id="how-it-works">
+  <div class="section-heading"><div><p class="eyebrow">A SMALL API. A USEFUL BOUNDARY.</p><h2>Billing knows what they bought.<br/>Your product needs to know<br/><em>what they can use.</em></h2></div><p>Keep commercial terms out of your application logic. Declare capabilities in code. Resolve the values from your own entitlement service.</p></div>
+  <div class="architecture" aria-label="Application uses the SDK, which calls the OEREP service backed by memory or Postgres"><div><span class="arch-index">01</span><strong>Your application</strong><small>Features declared in code</small></div><span class="arrow" aria-hidden="true">→</span><div><span class="arch-index">02</span><strong>One SDK API</strong><small>TypeScript or Python</small></div><span class="arrow" aria-hidden="true">→</span><div class="arch-active"><span class="arch-index">03</span><strong>OpenEntitlement</strong><small>OEREP · your service · your data</small></div></div>
+  <div class="code-section"><div class="code-copy"><h3>Write the gate.<br/>Let the agreement change.</h3><p>Check a feature. Read a limit. Inspect why a decision was made. Your application uses the same API whether a customer is on a standard plan or a negotiated contract.</p><a class="text-link" href="/docs/typescript/">Meet the SDK <span aria-hidden="true">→</span></a><div class="language-tags"><span>TypeScript</span><span>Python</span><span>HTTP / JSON</span></div></div><div class="code-window"><div class="code-toolbar"><span><i></i><i></i><i></i></span><span>your-application.ts</span><span>TS</span></div><pre><code set:text={example}/></pre><div class="code-footer"><span class="tiny-dot"></span> No billing vendor SDK in your application gates.</div></div></div>
+</section>
+<section class="explorer-section" id="model"><div class="wrap"><div class="section-heading"><div><p class="eyebrow">STANDARD PLANS. REAL-WORLD EXCEPTIONS.</p><h2>Same product.<br/><em>Different agreements.</em></h2></div><p>A plan is the starting point. Overrides replace a value. Grants add quota. Switch between demo customers to see how the pieces fit.</p></div>
+  <div class="explorer"><div class="explorer-controls"><span class="eyebrow">EXPLORE THE MODEL</span><div class="org-buttons" role="group" aria-label="Choose an example organization"><button data-org="hooli" aria-pressed="false">Hooli <small>Free</small></button><button data-org="globex" aria-pressed="false">Globex <small>Pro + grant</small></button><button data-org="acme" aria-pressed="true">Acme <small>Business + override</small></button></div><p>Illustrative examples, evaluated locally in this page. Run the quickstart to query the actual service.</p><a class="text-link" href="/docs/quickstart/">Run the live demo →</a></div>
+  <div class="explorer-results" aria-live="polite" aria-atomic="true"><div class="results-top"><div><span class="customer-mark" id="example-mark">A</span><h3 id="example-name">Acme</h3></div><span id="example-plan">Business plan</span></div><div class="result-row"><div><code>seats.max</code><small id="seats-note">Negotiated from 100 to 250</small></div><strong id="seats-value">250</strong><span class="reason" id="seats-reason">OVERRIDE</span></div><div class="result-row"><div><code>projects.max</code><small>Projects the organization may create</small></div><strong id="projects-value">50</strong><span class="reason neutral">PLAN</span></div><div class="result-row"><div><code>api_calls.monthly</code><small id="api-note">No finite cap</small></div><strong id="api-value">Unlimited</strong><span class="reason neutral" id="api-reason">PLAN</span></div><div class="result-row"><div><code>sso.enabled</code><small>Boolean feature gate</small></div><strong id="sso-value">Enabled</strong><span class="reason neutral">PLAN</span></div></div></div>
+</div></section>
+<section class="section wrap"><div class="section-heading"><div><p class="eyebrow">LESS COUPLING. MORE CLARITY.</p><h2>One thing,<br/><em>done deliberately.</em></h2></div><p>OpenEntitlement resolves what an organization may do. Authentication, permissions, release flags, and usage counting stay with the systems that own them.</p></div><div class="feature-grid"><article><span class="feature-number">01 / OPEN CONTRACT</span><h3>A protocol, not a lock-in.</h3><p>OEREP defines the HTTP boundary. Generic providers connect the SDKs to a compatible entitlement server.</p><a href="/docs/oerep/">Read the protocol →</a></article><article><span class="feature-number">02 / EXPLAINABLE VALUES</span><h3>More than yes or no.</h3><p>Return the effective value, plan value, applied grants, stale overrides, and reason. Make decisions support teams can understand.</p><a href="/docs/concepts/">Understand resolution →</a></article><article><span class="feature-number">03 / YOUR INFRASTRUCTURE</span><h3>Host it on your terms.</h3><p>Run the service with Postgres, try it in memory, or embed a provider. No billing account is required.</p><a href="/docs/self-hosting/">Self-host the service →</a></article></div></section>
+<section class="closing wrap"><div><p class="eyebrow">START WITH ONE ENTITLEMENT.</p><h2>Your first decision<br/>is a <em>curl away.</em></h2><p>Run the demo. Read the explanation. Put a gate in your application.</p><a class="button primary" href="/docs/quickstart/">Get started →</a></div><div class="closing-note"><span>OPEN SOURCE, FROM THE START</span><p>The specification, service, SDKs, and conformance suite live together. Early-stage and evolving, with the contract in the open.</p><a class="text-link" href={github}>Build it with us ↗</a></div></section>
+</main>
+<footer class="footer wrap"><div><a class="brand" href="/"><img src="/logo.svg" alt="" width="25" height="25"/>Open<span>Entitlement</span></a><p>An open-source entitlement service and protocol.</p><small>Apache-2.0 · Independent project</small></div><div><strong>Learn</strong><a href="/docs/quickstart/">Quickstart</a><a href="/docs/concepts/">Core concepts</a><a href="/reference/glossary/">Glossary</a></div><div><strong>Build</strong><a href="/docs/typescript/">TypeScript SDK</a><a href="/docs/python/">Python SDK</a><a href="/docs/oerep/">OEREP API</a></div><div><strong>Project</strong><a href={github}>GitHub ↗</a><a href="/docs/architecture/">Architecture</a><a href="/docs/contributing/">Contribute</a></div></footer>
+<script>
+const examples = {
+  hooli: { name: 'Hooli', plan: 'Free plan', seats: '3', seatsNote: 'From the Free plan', seatsReason: 'PLAN', projects: '1', api: '1,000', apiNote: 'From the Free plan', apiReason: 'PLAN', sso: 'Disabled' },
+  globex: { name: 'Globex', plan: 'Pro plan', seats: '20', seatsNote: 'From the Pro plan', seatsReason: 'PLAN', projects: '5', api: '150,000', apiNote: '100,000 plan + 50,000 grant', apiReason: 'GRANT', sso: 'Disabled' },
+  acme: { name: 'Acme', plan: 'Business plan', seats: '250', seatsNote: 'Negotiated from 100 to 250', seatsReason: 'OVERRIDE', projects: '50', api: 'Unlimited', apiNote: 'No finite cap', apiReason: 'PLAN', sso: 'Enabled' },
+};
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-org]')) {
+  button.addEventListener('click', () => {
+    const data = examples[button.dataset.org as keyof typeof examples];
+    for (const item of document.querySelectorAll('[data-org]')) item.setAttribute('aria-pressed', String(item === button));
+    const values = { 'example-name': data.name, 'example-mark': data.name[0], 'example-plan': data.plan, 'seats-value': data.seats, 'seats-note': data.seatsNote, 'seats-reason': data.seatsReason, 'projects-value': data.projects, 'api-value': data.api, 'api-note': data.apiNote, 'api-reason': data.apiReason, 'sso-value': data.sso };
+    for (const [id, text] of Object.entries(values)) { const el = document.getElementById(id); if (el) el.textContent = text ?? ''; }
+  });
+}
+</script>
+</body></html>

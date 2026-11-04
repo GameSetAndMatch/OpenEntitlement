@@ -22,6 +22,7 @@ Run the [service and local demo](console/README.md), backed by memory or Postgre
 
 | Path | What |
 |---|---|
+| [`website/`](website/README.md) | Public landing page and documentation, with Cloudflare static hosting |
 | [`console/`](console/README.md) | Our entitlement server, OEREP API, and administrative web console |
 | [`spec/`](spec/README.md) | Semantic specification and OEREP v1 [OpenAPI](spec/oerep.openapi.json) |
 | [`spec/assets/gherkin/`](spec/assets/gherkin/README.md) | Conformance suite: 11 feature files, tagged by requirement and provider capability |
