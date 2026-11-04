@@ -1,0 +1,97 @@
+name: Python distributions
+
+on:
+  pull_request:
+    paths: ["sdk-python/**", ".github/workflows/publish-python.yml"]
+  push:
+    branches: [main]
+    paths: ["sdk-python/**", ".github/workflows/publish-python.yml"]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'python-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.29"
+          python-version: "3.12"
+      - name: Validate release version and source
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          uv run --no-project python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+          projects = pathlib.Path("sdk-python/packages").glob("*/pyproject.toml")
+          for project in projects:
+              version = tomllib.loads(project.read_text())["project"]["version"]
+              if os.environ["RELEASE_TAG"] != f"python-v{version}":
+                  raise SystemExit(f"Release tag does not match {project}: {version}")
+          PY
+      - name: Build wheels and source distributions
+        run: |
+          for package in openentitlement openentitlement-postgres openentitlement-stripe; do
+            uv build --project sdk-python --package "$package" --out-dir "dist/$package"
+          done
+      - name: Check package metadata and descriptions
+        run: uvx --from twine==6.2.0 twine check --strict dist/*/*
+      - name: Install and smoke-test the built wheels on Python 3.10
+        run: |
+          uv venv --python 3.10 /tmp/oe-wheel-check
+          uv pip install --python /tmp/oe-wheel-check/bin/python dist/*/*.whl
+          cd /tmp
+          /tmp/oe-wheel-check/bin/python - <<'PY'
+          from importlib.metadata import version
+          from importlib.resources import files
+          from openentitlement import Catalog, FixedProvider, create_client, feature, integer
+          from openentitlement_postgres import PostgresProvider
+          from openentitlement_stripe import StripeEntitlementsProvider
+          catalog = Catalog([feature("projects", "Projects", [integer("projects.max")])])
+          client = create_client(FixedProvider(catalog, {"projects.max": 5}), catalog)
+          assert client.get_limit("projects.max", {"organizationId": "demo"}) == 5
+          assert files("openentitlement").joinpath("py.typed").is_file()
+          assert files("openentitlement_postgres").joinpath("schema.sql").is_file()
+          for package in ("openentitlement", "openentitlement-postgres", "openentitlement-stripe"):
+              print(f"{package}=={version(package)}")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'python-v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ matrix.package }}
+    permissions:
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [openentitlement, openentitlement-postgres, openentitlement-stripe]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+      - name: Publish with PyPI Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+        with:
+          packages-dir: dist/${{ matrix.package }}/
