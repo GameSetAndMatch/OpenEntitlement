@@ -18,3 +18,10 @@ sdk-js/packages/*/dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Website generated artifacts
+website/.astro/
+website/src/content/docs/specification/
+website/src/content/docs/reference/glossary.md
+.wrangler/
+website/public/oerep.openapi.json

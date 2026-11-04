@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "openentitlement",
+  "compatibility_date": "2026-11-03",
+  "assets": {
+    "directory": "./website/dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "preview_urls": true
+}
