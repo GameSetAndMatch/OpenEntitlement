@@ -25,3 +25,5 @@ website/src/content/docs/specification/
 website/src/content/docs/reference/glossary.md
 .wrangler/
 website/public/oerep.openapi.json
+
+website/public/diagrams/
