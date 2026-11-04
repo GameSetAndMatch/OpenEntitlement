@@ -10,3 +10,14 @@
 :root[data-theme='light'] .sl-markdown-content p, :root[data-theme='light'] .sl-markdown-content li { color: var(--sl-color-gray-2); }
 .sl-markdown-content table { font-size: .94rem; }
 .sl-markdown-content :is(h2,h3) { scroll-margin-top: 6rem; }
+
+/* Mermaid SVGs use a neutral canvas so labels stay legible in either site theme. */
+.sl-markdown-content img[src^="/diagrams/"] {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  border: 1px solid var(--sl-color-gray-5);
+}

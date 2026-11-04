@@ -5,12 +5,17 @@
   "scripts": {
     "dev": "node scripts/prepare-docs.mjs && astro dev --host 127.0.0.1",
     "build": "node scripts/prepare-docs.mjs && astro build && node scripts/check-links.mjs",
-    "check": "node scripts/prepare-docs.mjs && astro check"
+    "check": "node scripts/prepare-docs.mjs && astro check",
+    "test:diagrams": "node scripts/check-diagrams.mjs"
   },
   "dependencies": {
     "@astrojs/check": "0.9.12",
     "@astrojs/starlight": "0.42.8",
     "astro": "7.4.5",
     "typescript": "6.0.3"
+  },
+  "devDependencies": {
+    "mermaid-isomorphic": "^3.1.0",
+    "playwright": "^1.64.1"
   }
 }
