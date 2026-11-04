@@ -7,11 +7,11 @@ from typing import Any, Optional
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from .catalog import PrivilegeDefinition
+from .catalog import PrivilegeDefinition, ValueType
 from .details import ErrorCode, EvaluationContext, GrantApplied, Reason, ResolutionDetails
 from .provider import AbstractProvider, Capabilities, ProviderMetadata
 from .resolver import Need
-from .values import decode_value, is_int
+from .values import decode_value, is_int, is_unlimited
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -19,7 +19,7 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def decode_remote_details(raw: Any, p: PrivilegeDefinition) -> ResolutionDetails[Any]:
+def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[EvaluationContext] = None) -> ResolutionDetails[Any]:
     """Validate untrusted wire details before quota arithmetic."""
     if not isinstance(raw, dict) or raw.get("privilege") != p.key:
         raise ValueError("invalid OEREP details")
@@ -37,6 +37,12 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition) -> ResolutionDetails
                 or ("subjectId" in g and (not isinstance(g["subjectId"], str) or not g["subjectId"]))):
             raise ValueError("invalid OEREP grant")
         decoded.append(GrantApplied(g["id"], g["amount"], g.get("subjectId")))
+    total = sum(g.amount for g in decoded)
+    if ((decoded and p.value_type is not ValueType.INTEGER)
+            or len({g.id for g in decoded}) != len(decoded) or total > 9007199254740991
+            or any(g.subject_id is not None and g.subject_id != (ctx.subject_id if ctx else None) for g in decoded)
+            or (p.value_type is ValueType.INTEGER and not is_unlimited(value) and total > value)):
+        raise ValueError("inconsistent OEREP grants")
     for key in ("feature", "planId", "overrideId", "requiredPlan", "errorMessage"):
         if key in raw and not isinstance(raw[key], str):
             raise ValueError("invalid OEREP metadata")
@@ -87,7 +93,7 @@ class RemoteProvider(AbstractProvider):
             return json.load(response)
 
     def resolve(self, privilege: PrivilegeDefinition, ctx: EvaluationContext) -> ResolutionDetails[Any]:
-        return decode_remote_details(self._post(f"resolve/{quote(privilege.key, safe='')}", ctx), privilege)
+        return decode_remote_details(self._post(f"resolve/{quote(privilege.key, safe='')}", ctx), privilege, ctx)
 
     def suggest_plan(self, privilege: PrivilegeDefinition, need: Need, ctx: EvaluationContext) -> Optional[str]:
         data = self._post(f"suggest/{quote(privilege.key, safe='')}", ctx, need=need)

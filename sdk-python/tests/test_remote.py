@@ -55,3 +55,40 @@ def test_auth_and_bad_responses_fail_closed(remote):
     for bad in [None, {}, {"privilege": "seats.max", "value": 9, "reason": "PLAN", "grants": [{"id": "x", "amount": -1}], "staleOverrides": []}]:
         with pytest.raises((ValueError, KeyError)):
             decode_remote_details(bad, p)
+
+
+def test_invalid_remote_grants_and_unlimited_never_inflate_quota():
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    payload = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps(payload).encode())
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        catalog = Catalog.from_dict(json.loads((ROOT / "spec/assets/catalog.json").read_text()))
+        c = create_client(catalog=catalog, provider=RemoteProvider(f"http://127.0.0.1:{server.server_port}"))
+        ctx = {"organization_id": "acme", "subject_id": "alice"}
+        for grants in ([{"id": "g", "amount": 100, "subjectId": "bob"}],
+                       [{"id": "g", "amount": 100, "subjectId": "alice"}],
+                       [{"id": "g", "amount": 5}, {"id": "g", "amount": 5}]):
+            payload.update(privilege="seats.max", value=10, reason="GRANT", grants=grants, staleOverrides=[])
+            assert c.get_details("seats.max", ctx).reason is Reason.ERROR
+            with pytest.raises(EntitlementLimitExceeded):
+                c.require_within("seats.max", 0, 100, ctx)
+        payload.update(value={"unlimited": 1}, grants=[])
+        assert c.get_details("seats.max", ctx).reason is Reason.ERROR
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
