@@ -12,6 +12,10 @@ const routes = new Map(files.map((f) => [resolve(root, f.source), `/${f.target.r
 await rm(resolve(docs, 'specification'), { recursive: true, force: true });
 for (const file of files) {
   let content = await readFile(resolve(root, file.source), 'utf8');
+  if (file.source === 'GLOSSARY.md') {
+    content = content.split('## Design and review vocabulary')[0]
+      .replace('Shared language for the service, SDKs, specification, and contributor reviews.', 'Definitions used by the entitlement model, protocol, and SDKs.');
+  }
   const heading = /^# (.+)$/m.exec(content)?.[1] ?? file.title;
   content = content.replace(/^# .+\r?\n/, '');
   content = content.replace(/\]\(([^\s)]+)\)/g, (match, href) => {

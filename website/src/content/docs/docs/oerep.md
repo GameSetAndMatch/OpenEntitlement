@@ -1,6 +1,6 @@
 ---
 title: OEREP HTTP API
-description: Learn about oerep http api in OpenEntitlement.
+description: HTTP endpoints, request context, resolution details, and error behavior in OEREP v1.
 ---
 
 OEREP is the OpenEntitlement Remote Evaluation Protocol. A generic SDK provider speaks HTTP/JSON to a compatible server. Implement the contract once rather than maintaining a provider per language.

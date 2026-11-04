@@ -1,6 +1,6 @@
 ---
 title: Python SDK
-description: Learn about python sdk in OpenEntitlement.
+description: Evaluate entitlements from Python using the synchronous reference SDK.
 ---
 
 The Python SDK is synchronous and uses `urllib` from the standard library for remote evaluation.

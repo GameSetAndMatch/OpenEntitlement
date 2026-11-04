@@ -12,12 +12,13 @@ export default defineConfig({
     favicon: '/favicon.svg',
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/GameSetAndMatch/openentitlement' }],
     customCss: ['./src/styles/docs.css'],
-    editLink: { baseUrl: 'https://github.com/GameSetAndMatch/openentitlement/edit/main/website/' },
+    editLink: { baseUrl: 'https://github.com/GameSetAndMatch/openentitlement/edit/main/website/src/content/docs/' },
     sidebar: [
       { label: 'Start here', items: [
         { label: 'Introduction', slug: 'docs' },
         { label: 'Quickstart', slug: 'docs/quickstart' },
         { label: 'Core concepts', slug: 'docs/concepts' },
+        { label: 'Specification overview', slug: 'docs/specification' },
       ] },
       { label: 'Build with OpenEntitlement', items: [
         { label: 'TypeScript SDK', slug: 'docs/typescript' },
@@ -27,13 +28,14 @@ export default defineConfig({
       ] },
       { label: 'Reference', items: [
         { label: 'OEREP HTTP API', slug: 'docs/oerep' },
+        { label: 'Implementing the contract', slug: 'docs/implementing' },
         { label: 'Glossary', slug: 'reference/glossary' },
         { label: 'Specification', items: [{ autogenerate: { directory: 'specification' } }] },
       ] },
       { label: 'Project', items: [
         { label: 'Architecture & scope', slug: 'docs/architecture' },
         { label: 'Contributing', slug: 'docs/contributing' },
-        { label: 'Deploy this website', slug: 'docs/website' },
+        { label: 'Project status', slug: 'docs/project' },
       ] },
     ],
   })],

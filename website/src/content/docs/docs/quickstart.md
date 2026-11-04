@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Learn about quickstart in OpenEntitlement.
+description: Run the reference service and evaluate your first entitlement over HTTP.
 ---
 
 Run a local service, inspect the demo organizations, and evaluate a real entitlement.

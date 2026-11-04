@@ -1,6 +1,6 @@
 ---
 title: Guards & usage
-description: Learn about guards & usage in OpenEntitlement.
+description: Serialize resolve, count, check, and act around application-owned usage.
 ---
 
 OpenEntitlement resolves limits. Your application stores and counts consumption. A separate count followed by an insert can race, so a production check-and-act must use a lock shared by all competing callers.
