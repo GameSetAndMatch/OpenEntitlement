@@ -30,6 +30,8 @@ Run the [service and local demo](console/README.md), backed by memory or Postgre
 | [`PRIOR_ART.md`](PRIOR_ART.md) | What exists, the vendor mapping table, where billing leaks, link check |
 | [`ADR-0001.md`](ADR-0001.md) | Why an open protocol plus our own entitlement server |
 
+See the [glossary](GLOSSARY.md) for shared domain and review terminology.
+
 ## The model in one screen
 
 - **Layers stay separate.** Authentication (401), RBAC (403), **entitlement (403 `entitlement_required` + `requiredPlan`)**, and feature flags (404). This spec covers only the entitlement layer.
