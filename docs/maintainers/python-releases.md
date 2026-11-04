@@ -9,12 +9,14 @@ In [PyPI account publishing](https://pypi.org/manage/account/publishing/), add a
 | PyPI project name | GitHub owner | Repository | Workflow filename | Environment |
 |---|---|---|---|---|
 | `openentitlement` | `GameSetAndMatch` | `openentitlement` | `publish-python.yml` | `pypi` |
-| `openentitlement-postgres` | `GameSetAndMatch` | `openentitlement` | `publish-python.yml` | `pypi` |
-| `openentitlement-stripe` | `GameSetAndMatch` | `openentitlement` | `publish-python.yml` | `pypi` |
+| `openentitlement-postgres` | `GameSetAndMatch` | `openentitlement` | `publish-python.yml` | `pypi-postgres` |
+| `openentitlement-stripe` | `GameSetAndMatch` | `openentitlement` | `publish-python.yml` | `pypi-stripe` |
 
 For a project already owned by your account, configure its publisher in that project's settings instead. Pending publishers do not reserve names. Verify availability before the first release. No PyPI password or API token belongs in repository secrets.
 
-Create a GitHub environment named `pypi` under repository Settings → Environments. Restrict deployments to the `python-v*` **tag** pattern and configure required reviewers if appropriate for the repository. The environment name must match PyPI exactly.
+PyPI rejects reusing the same pending publisher identity for multiple new project names. Separate environments distinguish the three publishers while keeping the repository and workflow fixed.
+
+Create GitHub environments named `pypi`, `pypi-postgres`, and `pypi-stripe` under repository Settings → Environments. Restrict deployments to the `python-v*` **tag** pattern and configure required reviewers if appropriate for the repository. Each environment name must match its PyPI publisher exactly.
 
 Official references: [creating a project through Trusted Publishing](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/), [publishing with a trusted publisher](https://docs.pypi.org/trusted-publishers/using-a-publisher/).
 
