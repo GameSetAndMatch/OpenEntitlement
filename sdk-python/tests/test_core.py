@@ -269,3 +269,46 @@ def test_guard_releases_lock_on_error() -> None:
         c.guard("projects.max", 1, {"organizationId": "acme"}, count=lambda tx: 0, act=lambda tx: 1 / 0)
     r = c.guard("projects.max", 1, {"organizationId": "acme"}, count=lambda tx: 0, act=lambda tx: "ok")
     assert r.result == "ok" and r.details.lock_domain == "process"
+
+
+def test_invalid_invocation_tenant_does_not_inherit_default():
+    from openentitlement import EvaluationContext
+    c = create_client(catalog=CATALOG, provider=InMemoryProvider(), context={"organization_id": "acme"})
+    assert c.get_details("seats.max", {"subject_id": "alice"}).reason is not Reason.ERROR
+    assert c.get_details("seats.max", EvaluationContext(subject_id="alice")).reason is not Reason.ERROR
+    for organization_id in ("", None, False, 0):
+        for ctx in ({"organization_id": organization_id}, EvaluationContext(organization_id=organization_id)):
+            d = c.get_details("seats.max", ctx)
+            assert d.reason is Reason.ERROR
+            assert d.error_code is ErrorCode.INVALID_CONTEXT
+
+
+def test_missing_or_null_pool_usage_is_not_assumed_zero():
+    c = create_client(catalog=CATALOG, provider=InMemoryProvider(), context={"organization_id": "acme"})
+    for usage in ({}, [], {"subject": 1}, {"pool": None}, {"pool": 0, "subject": None}):
+        with pytest.raises(InvalidArgument):
+            c.require_within("seats.max", usage, 1)
+    c.require_within("seats.max", {"pool": 0}, 1)
+
+
+def test_guard_resolves_once_before_count_and_checks_same_snapshot():
+    order = []
+
+    class ChangingProvider(AbstractProvider):
+        limit = 1
+
+        def resolve(self, privilege, ctx):
+            order.append("resolve")
+            return ResolutionDetails(privilege=privilege.key, value=self.limit, reason=Reason.PLAN)
+
+    provider = ChangingProvider()
+    c = create_client(catalog=CATALOG, provider=provider)
+
+    def count(tx):
+        order.append("count")
+        provider.limit = 10
+        return 0
+
+    with pytest.raises(EntitlementLimitExceeded):
+        c.guard("projects.max", 2, {"organization_id": "acme"}, count=count, act=lambda tx: order.append("act"))
+    assert order == ["resolve", "count"]

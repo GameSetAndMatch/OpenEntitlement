@@ -89,7 +89,7 @@ def encode_value(value: Any) -> Any:
 def decode_value(raw: Any) -> Any:
     """Inverse of :func:`encode_value`."""
     if isinstance(raw, dict):
-        if raw == {"unlimited": True}:
+        if len(raw) == 1 and raw.get("unlimited") is True:
             return UNLIMITED
         raise ValueError(f"not an OpenEntitlement value: {raw!r}")
     return raw

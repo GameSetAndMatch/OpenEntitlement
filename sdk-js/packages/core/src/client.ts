@@ -232,6 +232,12 @@ export class EntitlementClient {
     const priv = this.catalog.privilege(privilege);
     if (priv && priv.valueType !== "integer") throw new TypeMismatch(`requireWithin needs an integer privilege; ${privilege} is ${priv.valueType}`);
     let d = await this.getLimitDetails(privilege, ctx);
+    return this.#checkResolvedLimit(privilege, d, current, requested, ctx);
+  }
+
+  async #checkResolvedLimit(privilege: string, d: ResolutionDetails<Limit>, current: Usage, requested: number, ctx?: EvaluationContext): Promise<ResolutionDetails<Limit>> {
+    const priv = this.catalog.privilege(privilege);
+    if (priv && priv.valueType !== "integer") throw new TypeMismatch(`requireWithin needs an integer privilege; ${privilege} is ${priv.valueType}`);
     const result = checkWithin(d, current, requested);
     if (result.passed) return d;
     let requiredPlan: string | undefined;
@@ -279,7 +285,9 @@ export class EntitlementClient {
     const problem = contextProblem(merged);
     if (problem) throw new InvalidArgument(problem);
     return this.lock.run(lockKey(merged.organizationId!, privilege), async (tx: Tx) => {
-      const details = await this.requireWithin(privilege, await fns.count(tx), requested, merged);
+      const resolved = await this.getLimitDetails(privilege, merged);
+      const current = await fns.count(tx);
+      const details = await this.#checkResolvedLimit(privilege, resolved, current, requested, merged);
       const result = await fns.act(tx);
       return { result, details: { ...details, lockDomain: this.lock.domain } };
     });

@@ -110,3 +110,13 @@ test("malformed requests return protocol errors without terminating the service"
   assert.equal((await raw(JSON.stringify({ context: { organizationId: "acme" }, padding: "a".repeat(1_000_001) }), "application/json")).status, 413);
   assert.equal((await post("resolve", { context: { organizationId: "acme" } })).status, 200);
 });
+
+test("remote quota checks reject grants for another subject or above the resolved total", async () => {
+  for (const grants of [[{ id: "g", amount: 100, subjectId: "bob" }], [{ id: "g", amount: 100, subjectId: "alice" }], [{ id: "g", amount: 5 }, { id: "g", amount: 5 }]]) {
+    const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seats.max", value: 10, reason: "GRANT", grants, staleOverrides: [] })) }) });
+    const ctx = { organizationId: "acme", subjectId: "alice" };
+    const details = await c.getDetails("seats.max", ctx);
+    assert.equal(details.reason, Reason.ERROR);
+    await assert.rejects(c.requireWithin("seats.max", 0, 100, ctx));
+  }
+});

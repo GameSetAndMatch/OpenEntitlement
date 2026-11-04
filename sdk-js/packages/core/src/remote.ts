@@ -3,7 +3,7 @@ import { validateValue, type PrivilegeDefinition } from "./catalog.ts";
 import { ErrorCode, Reason, type ResolvedContext, type ResolutionDetails } from "./details.ts";
 import type { Provider } from "./provider.ts";
 import type { Need } from "./resolver.ts";
-import { decodeValue, isInt } from "./values.ts";
+import { decodeValue, isInt, isUnlimited } from "./values.ts";
 
 export interface RemoteProviderOptions {
   baseUrl: string;
@@ -13,7 +13,7 @@ export interface RemoteProviderOptions {
 }
 
 /** Validate untrusted wire details before they reach quota calculations. */
-export function decodeRemoteDetails(raw: unknown, p: PrivilegeDefinition): ResolutionDetails {
+export function decodeRemoteDetails(raw: unknown, p: PrivilegeDefinition, ctx?: Pick<ResolvedContext, "subjectId">): ResolutionDetails {
   if (!raw || typeof raw !== "object") throw new Error("invalid OEREP details");
   const d = raw as ResolutionDetails;
   if (d.privilege !== p.key || !Object.values(Reason).includes(d.reason) ||
@@ -26,6 +26,12 @@ export function decodeRemoteDetails(raw: unknown, p: PrivilegeDefinition): Resol
     if (d[k] !== undefined && typeof d[k] !== "string") throw new Error(`invalid OEREP ${k}`);
   const value = decodeValue(d.value);
   if (validateValue(p, value)) throw new Error("OEREP value does not match local catalog");
+  const total = d.grants.reduce((sum, g) => sum + g.amount, 0);
+  if ((d.grants.length > 0 && p.valueType !== "integer") ||
+      new Set(d.grants.map((g) => g.id)).size !== d.grants.length || !isInt(total) ||
+      d.grants.some((g) => g.subjectId !== undefined && g.subjectId !== ctx?.subjectId) ||
+      (!isUnlimited(value) && p.valueType === "integer" && total > (value as number)))
+    throw new Error("inconsistent OEREP grants");
   if ((d.errorCode !== undefined && !Object.values(ErrorCode).includes(d.errorCode)) ||
       (d.reason === Reason.ERROR && (!d.errorCode || d.requiredPlan !== undefined)))
     throw new Error("invalid OEREP error");
@@ -63,7 +69,7 @@ export class RemoteProvider implements Provider {
     return response.json();
   }
   async resolve(p: PrivilegeDefinition, ctx: ResolvedContext): Promise<ResolutionDetails> {
-    return decodeRemoteDetails(await this.#post(`resolve/${encodeURIComponent(p.key)}`, { context: ctx }), p);
+    return decodeRemoteDetails(await this.#post(`resolve/${encodeURIComponent(p.key)}`, { context: ctx }), p, ctx);
   }
   async suggestPlan(p: PrivilegeDefinition, need: Need, ctx: ResolvedContext): Promise<string | undefined> {
     const d = await this.#post(`suggest/${encodeURIComponent(p.key)}`, { context: ctx, need });

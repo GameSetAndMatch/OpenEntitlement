@@ -81,3 +81,17 @@ Feature: Mutations, hooks and audit
     And no audit event was recorded
     When I resolve "seats.max" for organization "acme"
     Then the value is 20
+
+  @spec-1.3.2 @spec-6.3.4
+  Scenario: A plan cannot become its own variant
+    When I try to make plan "pro" a variant of "pro"
+    Then the operation fails with "INVALID_ARGUMENT"
+    When I read the limit of "seats.max" for organization "acme"
+    Then the value is 20
+
+  @spec-1.3.2 @spec-6.3.4
+  Scenario: A base plan with variants cannot become a variant
+    When I try to make plan "pro" a variant of "business"
+    Then the operation fails with "INVALID_ARGUMENT"
+    When I read the limit of "seats.max" for organization "acme"
+    Then the value is 20

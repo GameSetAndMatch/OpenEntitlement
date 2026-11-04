@@ -193,3 +193,59 @@ describe("guard", () => {
     assert.equal(r.details.lockDomain, "process");
   });
 });
+
+describe("context precedence", () => {
+  it("rejects explicit invalid tenant IDs instead of inheriting the client's tenant", async () => {
+    const c = createClient({ catalog: CATALOG, provider: provider(), context: acme });
+    assert.equal(await c.getLimit("seats.max", { subjectId: "alice" }), 3);
+    for (const organizationId of ["", null, false, 0]) {
+      const d = await c.getDetails("seats.max", { organizationId } as any);
+      assert.equal(d.reason, Reason.ERROR);
+      assert.equal(d.errorCode, ErrorCode.INVALID_CONTEXT);
+      assert.equal(d.value, 1);
+    }
+  });
+});
+
+describe("read-only inspection", () => {
+  it("returns detached facts and audit records that cannot change entitlement state", async () => {
+    const p = provider();
+    const c = createClient({ catalog: CATALOG, provider: p, context: acme });
+    const meta = { actor: "support", reason: "contract" };
+    const event = await c.admin.createOverride({ organizationId: "acme", privilege: "seats.max", value: 5, expiresAt: new Date("2050-01-01T00:00:00Z") }, meta);
+    await c.admin.createGrant({ organizationId: "acme", privilege: "seats.max", amount: 2 }, meta);
+    (await p.inspection.listAssignments())[0]!.planId = "pro";
+    const o = (await p.inspection.listOverrides("acme"))[0]!;
+    o.value = 999; o.scope.organizationId = "other"; o.expiresAt!.setUTCFullYear(2000);
+    (await p.inspection.listGrants("acme"))[0]!.amount = 1000;
+    const audit = await p.inspection.listAudit();
+    audit[0]!.reason = "rewritten";
+    (audit[0]!.after as any).amount = 1000;
+    event.reason = "rewritten by mutation caller";
+    assert.equal(await c.getLimit("seats.max"), 7);
+    const retained = await p.inspection.listAudit();
+    assert.ok(retained.every((e) => e.reason === "contract"));
+    assert.equal((retained[0]!.after as any).amount, 2);
+    assert.equal((await p.inspection.listPlans()).find((p) => p.id === "pro")!.values["seats.max"], UNLIMITED);
+  });
+});
+
+describe("usage validation", () => {
+  it("rejects missing or null pool usage instead of assuming zero", async () => {
+    const c = createClient({ catalog: CATALOG, provider: provider(), context: acme });
+    for (const usage of [{}, [], { subject: 1 }, { pool: null }, { pool: 0, subject: null }])
+      await assert.rejects(c.requireWithin("seats.max", usage as any, 1), InvalidArgument);
+    await c.requireWithin("seats.max", { pool: 0 }, 1);
+  });
+});
+
+describe("guard ordering", () => {
+  it("resolves once before counting and checks that same entitlement snapshot", async () => {
+    const order: string[] = [];
+    let limit = 1;
+    const p: Provider = { metadata: { name: "changing" }, capabilities: { overrides: false, grants: false, mutations: false, planCatalog: false, fixed: false }, async resolve(privilege) { order.push("resolve"); return { privilege: privilege.key, value: limit, reason: Reason.PLAN, grants: [], staleOverrides: [] }; } };
+    const c = createClient({ catalog: CATALOG, provider: p });
+    await assert.rejects(c.guard("projects.max", 2, acme, { count: () => { order.push("count"); limit = 10; return 0; }, act: () => { order.push("act"); } }), EntitlementLimitExceeded);
+    assert.deepEqual(order, ["resolve", "count"]);
+  });
+});

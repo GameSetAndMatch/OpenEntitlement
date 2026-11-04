@@ -121,6 +121,8 @@ class _Mutations:
             if not plan.id or not plan.name:
                 raise InvalidArgument("plan needs an id and a name")
             if plan.variant_of is not None:
+                if plan.variant_of == plan.id or any(p.variant_of == plan.id for p in self._s.plan_map.values()):
+                    raise InvalidArgument("a base plan with variants cannot become a variant (Requirement 1.3.2)")
                 base = self._s.plan_map.get(plan.variant_of)
                 if base is None:
                     raise NotFound(f"plan {plan.variant_of!r} (variantOf) not found")

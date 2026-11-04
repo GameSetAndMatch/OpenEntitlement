@@ -200,8 +200,13 @@ class PgMutations implements Mutations {
   upsertPlan(plan: Plan, meta: MutationMeta, at: Date) {
     if (!plan.id || !plan.name) throw new InvalidArgument("plan needs an id and a name");
     return this.#tx(async (c) => {
+      // Serialize topology changes across both SDKs before checking parent/dependent plans.
+      await c.query("lock table oe_plan in share row exclusive mode");
       const f = new Facts(c);
       if (plan.variantOf !== undefined) {
+        const { rows } = await c.query("select 1 from oe_plan where variant_of = $1 limit 1", [plan.id]);
+        if (plan.variantOf === plan.id || rows.length > 0)
+          throw new InvalidArgument("a base plan with variants cannot become a variant (Requirement 1.3.2)");
         const base = await f.plan(plan.variantOf);
         if (!base) throw new NotFound(`plan "${plan.variantOf}" (variantOf) not found`);
         if (base.variantOf !== undefined) throw new InvalidArgument("variantOf must not chain (Requirement 1.3.2)");
