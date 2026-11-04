@@ -44,7 +44,7 @@ jobs:
         run: |
           docker run -d --name oe-test -p 127.0.0.1:8787:8787 openentitlement:test
           trap 'docker logs oe-test; docker rm -f oe-test' EXIT
-          curl --fail --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:8787/ -o /tmp/oe-index.html
+          curl --fail --retry 20 --retry-delay 1 --retry-connrefused --retry-all-errors http://127.0.0.1:8787/ -o /tmp/oe-index.html
           grep -q '<html' /tmp/oe-index.html
           node --input-type=module - <<'JS'
           for (const [organizationId, expected] of [["hooli", 3], ["acme", 250]]) {
@@ -61,7 +61,7 @@ jobs:
         run: |
           docker run -d --name oe-postgres --network host -e PORT=8788 -e OE_PROVIDER=postgres -e DATABASE_URL=postgresql://oe:oe@127.0.0.1:5432/oe -e OE_ADMIN_TOKEN=test-admin -e OE_EVAL_TOKEN=test-eval openentitlement:test
           trap 'docker logs oe-postgres; docker rm -f oe-postgres' EXIT
-          curl --fail --retry 20 --retry-delay 1 --retry-connrefused -H 'Authorization: Bearer test-admin' http://127.0.0.1:8788/api/meta -o /tmp/oe-meta.json
+          curl --fail --retry 20 --retry-delay 1 --retry-connrefused --retry-all-errors -H 'Authorization: Bearer test-admin' http://127.0.0.1:8788/api/meta -o /tmp/oe-meta.json
           node --input-type=module - <<'JS'
           for (const token of [undefined, 'test-eval']) {
             const r = await fetch('http://127.0.0.1:8788/api/meta', {headers: token ? {authorization: `Bearer ${token}`} : {}});
