@@ -22,6 +22,7 @@ COPY --from=build /app/console/server ./server
 COPY --from=build /app/console/web/dist ./web/dist
 COPY --from=build /app/sdk-js/packages/core /app/sdk-js/packages/core
 COPY --from=build /app/sdk-js/packages/postgres /app/sdk-js/packages/postgres
+RUN ln -s ../console/node_modules /app/sdk-js/node_modules
 COPY spec/assets/catalog.json spec/assets/plans.json /app/spec/assets/
 COPY LICENSE /app/LICENSE
 USER node
