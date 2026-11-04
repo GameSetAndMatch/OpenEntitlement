@@ -6,6 +6,7 @@ export default defineConfig({
   trailingSlash: 'always',
   integrations: [starlight({
     title: 'OpenEntitlement',
+    disable404Route: true,
     description: 'An open-source entitlement service and protocol. Learn to resolve what an organization may do, and how much of it.',
     logo: { src: './public/logo.svg', replacesTitle: false },
     favicon: '/favicon.svg',
@@ -27,7 +28,7 @@ export default defineConfig({
       { label: 'Reference', items: [
         { label: 'OEREP HTTP API', slug: 'docs/oerep' },
         { label: 'Glossary', slug: 'reference/glossary' },
-        { label: 'Specification', autogenerate: { directory: 'specification' } },
+        { label: 'Specification', items: [{ autogenerate: { directory: 'specification' } }] },
       ] },
       { label: 'Project', items: [
         { label: 'Architecture & scope', slug: 'docs/architecture' },

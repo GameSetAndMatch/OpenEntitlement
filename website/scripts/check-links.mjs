@@ -1,6 +1,6 @@
 /** Check built local links, including anchors, and emit a sitemap from actual output. */
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { resolve, relative, dirname, join } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { resolve, relative, join } from 'node:path';
 const dist = resolve(import.meta.dirname, '../dist');
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -32,8 +32,4 @@ for (const [file, content] of cache) {
   }
 }
 if (errors.length) throw new Error('Broken site links:\n' + [...new Set(errors)].join('\n'));
-const routes = html.filter((f) => !f.endsWith('/404.html')).map(routeFor).sort();
-const xml = '<?xml version="1.0" encoding="UTF-8"?>';
-await writeFile(join(dist, 'sitemap.xml'), xml + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + routes.map((r) => `<url><loc>${origin}${r}</loc></url>`).join('') + '</urlset>');
-await writeFile(join(dist, 'sitemap-index.xml'), xml + `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>${origin}/sitemap.xml</loc></sitemap></sitemapindex>`);
-console.log(`Verified local links and anchors across ${html.length} HTML pages; sitemap includes ${routes.length} routes.`);
+console.log(`Verified local links and anchors across ${html.length} HTML pages.`);

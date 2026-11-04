@@ -1,6 +1,6 @@
 /** Publish canonical spec sources without maintaining a second copy. */
 import { readFile, writeFile, mkdir, readdir, cp, rm } from 'node:fs/promises';
-import { resolve, dirname, relative, extname } from 'node:path';
+import { resolve, dirname, relative } from 'node:path';
 const root = resolve(import.meta.dirname, '../..');
 const docs = resolve(root, 'website/src/content/docs');
 const repo = 'https://github.com/GameSetAndMatch/openentitlement/blob/main/';

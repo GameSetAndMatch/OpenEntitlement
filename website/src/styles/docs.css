@@ -1,5 +1,5 @@
-:root { --sl-color-accent-low: #15352d; --sl-color-accent: #55bf94; --sl-color-accent-high: #b5efd4; --sl-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-:root[data-theme='light'] { --sl-color-accent-low: #e0f4e9; --sl-color-accent: #187b59; --sl-color-accent-high: #164d3b; }
+:root { --sl-color-accent-low: #3f241b; --sl-color-accent: #e99165; --sl-color-accent-high: #ffd4bb; --sl-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+:root[data-theme='light'] { --sl-color-accent-low: #ffeadc; --sl-color-accent: #bf4b20; --sl-color-accent-high: #7c3117; }
 .site-title { font-weight: 700; letter-spacing: -.045em; }
 .site-title img { height: 1.8rem; }
 .sl-markdown-content h1, .sl-markdown-content h2 { letter-spacing: -.035em; }

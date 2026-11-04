@@ -14,6 +14,8 @@ Follow the [quickstart](/docs/quickstart/). Memory is useful for examples and te
 The server uses the shared `oe_*` schema and migrates it on startup. Use a dedicated database and retain backups.
 
 ```sh
+# From the repository root, install the storage SDK workspace too.
+npm ci --prefix sdk-js
 cd console
 npm ci
 npm run build
