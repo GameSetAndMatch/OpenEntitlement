@@ -9,7 +9,15 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "psycopg[binary]>=3.2", "mypy>=1.11", "ruff>=0.6"]
+dev = [
+    "pytest>=8",
+    "psycopg[binary]>=3.2",
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "pre-commit>=4.6.2",
+    "commitizen>=4.19.3",
+    "deptry>=0.25.1",
+]
 
 [tool.uv]
 package = false
@@ -38,3 +46,6 @@ ignore_missing_imports = true
 [tool.ruff.lint]
 select = ["E", "F", "B", "W"]
 ignore = ["E501", "B008"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"

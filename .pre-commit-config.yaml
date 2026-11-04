@@ -1,0 +1,30 @@
+# Based on https://github.com/superlinear-ai/substrate
+# Run tools from this repository's locked Python development environment.
+default_install_hook_types: [commit-msg, pre-commit]
+default_stages: [pre-commit, manual]
+fail_fast: true
+repos:
+  - repo: local
+    hooks:
+      - id: commitizen
+        name: commitizen
+        entry: uv run --project sdk-python --locked cz --config sdk-python/pyproject.toml check
+        args: [--commit-msg-file]
+        require_serial: true
+        language: system
+        stages: [commit-msg]
+      - id: uv-lock-check
+        name: uv lock check
+        entry: uv lock --project sdk-python
+        args: [--check]
+        require_serial: true
+        language: system
+        pass_filenames: false
+        files: ^(sdk-python/|\.pre-commit-config\.yaml$)
+      - id: deptry
+        name: deptry (each Python distribution)
+        entry: uv run --project sdk-python --locked python sdk-python/scripts/check_dependencies.py
+        require_serial: true
+        language: system
+        pass_filenames: false
+        files: ^(sdk-python/|\.pre-commit-config\.yaml$)

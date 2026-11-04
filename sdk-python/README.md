@@ -94,3 +94,17 @@ uv run ruff check packages
 ```
 
 The conformance runner ([`conformance/`](conformance)) has no dependencies: a small Gherkin parser, step definitions, and one `Target` per provider. To certify your own provider, add a `Target` in `conformance/targets.py`.
+
+## Commit hooks and dependency checks
+
+From the repository root:
+
+```bash
+uv sync --project sdk-python --locked
+uv run --project sdk-python pre-commit install
+uv run --project sdk-python pre-commit run --all-files
+```
+
+Installation enables both `pre-commit` and `commit-msg` hooks. Following [Substrate](https://github.com/superlinear-ai/substrate), Commitizen checks Conventional Commit messages (for example `feat(python): add remote provider`) and `uv lock --check` detects stale dependency locks. We also run [Deptry](https://deptry.com/) separately for each Python distribution, so an adapter's dependencies cannot hide a missing dependency in core. Tools run from the locked development environment; they are not SDK runtime dependencies. CI runs the lock and dependency hooks too.
+
+Deptry scans package source against each package's metadata. It does not replace tests or verify all dynamic imports. Commitizen runs for new commit messages, not the repository's historical commits.
