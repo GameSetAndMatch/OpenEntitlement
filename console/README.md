@@ -68,6 +68,10 @@ Both clients use the application's catalog and validate remote values against it
 
 The administrative API supports plans (`/api/plans`), organizations and plan assignments (`/api/organizations`), overrides and grants, evaluation (`/api/evaluate`, `/api/require`), and audit (`/api/audit`). Mutations go through SDK audit hooks and require a reason. `/api/meta` exposes the catalog and storage capabilities. Administration is not standardized by OEREP v1.
 
+## Customer contracts
+
+The console can attach private agreement/SLA PDFs and link them to negotiated overrides and grants. This service-only feature requires an admin token and does not change OEREP. See [contracts and PDF evidence](CONTRACTS.md) for setup, storage, and access details.
+
 ## Validation
 
 ```sh

@@ -105,3 +105,18 @@ export function formatValue(v: Json): string {
   if (typeof v === "number") return v.toLocaleString();
   return String(v);
 }
+
+/** Binary document requests use the same admin credential, never a token in a URL. */
+export async function documentRequest(path: string, method = "GET", body?: File, reason?: string): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (token.get()) headers.authorization = `Bearer ${token.get()}`;
+  if (actor.get()) headers["x-oe-actor"] = actor.get();
+  if (body) headers["content-type"] = "application/pdf";
+  if (reason) headers["x-oe-reason"] = encodeURIComponent(reason);
+  const res = await fetch(path, { method, headers, body });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, error.error ?? "HTTP_ERROR", error.message ?? res.statusText);
+  }
+  return res;
+}

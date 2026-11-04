@@ -6,9 +6,15 @@ import { HttpError } from "./http.ts";
 export class ContractStore {
   private records = new Map<string, Contract>();
   private documents = new Map<string, Buffer>();
-  constructor(private pool?: Pool) {}
+  private pool?: Pool;
+  constructor(pool?: Pool) { this.pool = pool; }
   async initialize() {
-    if (this.pool) await this.pool.query(`
+    if (!this.pool) return;
+    const tx = await this.pool.connect();
+    try {
+      await tx.query("BEGIN");
+      await tx.query("SELECT pg_advisory_xact_lock(hashtext('oe_console_contracts_schema'))");
+      await tx.query(`
       CREATE TABLE IF NOT EXISTS oe_console_contracts (
         id uuid PRIMARY KEY, organization_id text NOT NULL, data jsonb NOT NULL
       );
@@ -16,6 +22,9 @@ export class ContractStore {
       CREATE TABLE IF NOT EXISTS oe_console_contract_documents (
         id uuid PRIMARY KEY, contract_id uuid NOT NULL REFERENCES oe_console_contracts(id), content bytea NOT NULL
       );`);
+      await tx.query("COMMIT");
+    } catch (error) { await tx.query("ROLLBACK"); throw error; }
+    finally { tx.release(); }
   }
   async list(org: string): Promise<Contract[]> {
     if (!this.pool) return structuredClone([...this.records.values()].filter(c => c.organizationId === org));

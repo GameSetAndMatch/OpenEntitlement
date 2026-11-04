@@ -54,8 +54,8 @@ export function createContractsApi(cfg: ConsoleConfig, rt: Runtime) {
     }
     if (req.method === "POST" && id && section === "documents" && !docId) {
       if (req.headers["content-type"]?.split(";")[0] !== "application/pdf") throw new HttpError(415, "INVALID_DOCUMENT", "upload must be application/pdf");
-      const event = audit(req.headers["x-oe-reason"], "attach_pdf");
-      const filename = text(url.searchParams.get("filename"), "filename", true, 160).replace(/[\x00-\x1f\x7f/\\]/g, "_");
+      const event = audit(decodeURIComponent(String(req.headers["x-oe-reason"] ?? "")), "attach_pdf");
+      const filename = Array.from(text(url.searchParams.get("filename"), "filename", true, 160), ch => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 || ch === "/" || ch === "\\" ? "_" : ch).join("");
       if (!filename.toLowerCase().endsWith(".pdf")) throw new HttpError(400, "INVALID_DOCUMENT", "filename must end in .pdf");
       if (Number(req.headers["content-length"]) > MAX_PDF) { req.resume(); throw new HttpError(413, "PAYLOAD_TOO_LARGE", "PDF exceeds 10 MiB"); }
       const chunks: Buffer[] = []; let size = 0;
