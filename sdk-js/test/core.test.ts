@@ -206,3 +206,26 @@ describe("context precedence", () => {
     }
   });
 });
+
+describe("read-only inspection", () => {
+  it("returns detached facts and audit records that cannot change entitlement state", async () => {
+    const p = provider();
+    const c = createClient({ catalog: CATALOG, provider: p, context: acme });
+    const meta = { actor: "support", reason: "contract" };
+    const event = await c.admin.createOverride({ organizationId: "acme", privilege: "seats.max", value: 5, expiresAt: new Date("2050-01-01T00:00:00Z") }, meta);
+    await c.admin.createGrant({ organizationId: "acme", privilege: "seats.max", amount: 2 }, meta);
+    (await p.inspection.listAssignments())[0]!.planId = "pro";
+    const o = (await p.inspection.listOverrides("acme"))[0]!;
+    o.value = 999; o.scope.organizationId = "other"; o.expiresAt!.setUTCFullYear(2000);
+    (await p.inspection.listGrants("acme"))[0]!.amount = 1000;
+    const audit = await p.inspection.listAudit();
+    audit[0]!.reason = "rewritten";
+    (audit[0]!.after as any).amount = 1000;
+    event.reason = "rewritten by mutation caller";
+    assert.equal(await c.getLimit("seats.max"), 7);
+    const retained = await p.inspection.listAudit();
+    assert.ok(retained.every((e) => e.reason === "contract"));
+    assert.equal((retained[0]!.after as any).amount, 2);
+    assert.equal((await p.inspection.listPlans()).find((p) => p.id === "pro")!.values["seats.max"], UNLIMITED);
+  });
+});

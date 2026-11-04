@@ -1,5 +1,6 @@
 /** The in-memory reference provider: full capabilities, no persistence. */
 
+import { isUnlimited } from "./values.ts";
 import type { PrivilegeDefinition } from "./catalog.ts";
 import { InvalidArgument, NotFound } from "./errors.ts";
 import {
@@ -33,6 +34,16 @@ import {
   type Mutations,
   type OverrideInput,
 } from "./provider.ts";
+
+/** Detach mutable records while preserving the UNLIMITED singleton and Date values. */
+function snapshot<T>(value: T): T {
+  if (isUnlimited(value)) return value;
+  if (value instanceof Date) return new Date(value.getTime()) as T;
+  if (Array.isArray(value)) return value.map(snapshot) as T;
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, snapshot(item)])) as T;
+  return value;
+}
 
 class Store implements FactSource {
   plansById = new Map<string, Plan>();
@@ -100,7 +111,7 @@ export class InMemoryProvider extends FactsProvider {
         if (typeof v !== "function") return v;
         return async (...args: unknown[]) => {
           const e = (await v.apply(target, args)) as AuditEvent;
-          audit.push(e);
+          audit.push(snapshot(e));
           return e;
         };
       },
@@ -118,19 +129,19 @@ export class InMemoryProvider extends FactsProvider {
         });
       },
       async listAssignments() {
-        return [...s.assignments.values()];
+        return snapshot([...s.assignments.values()]);
       },
       async listOverrides(org: string) {
-        return [...s.overridesById.values()].filter((o) => o.scope.organizationId === org);
+        return snapshot([...s.overridesById.values()].filter((o) => o.scope.organizationId === org));
       },
       async listGrants(org: string) {
-        return [...s.grantsById.values()].filter((g) => g.scope.organizationId === org);
+        return snapshot([...s.grantsById.values()].filter((g) => g.scope.organizationId === org));
       },
       async listAudit(f: AuditFilter = {}) {
         return audit
           .filter((e) => (f.entity === undefined || e.entity === f.entity) && (f.entityId === undefined || e.entityId === f.entityId))
           .reverse()
-          .slice(0, f.limit ?? 200);
+          .slice(0, f.limit ?? 200).map(snapshot);
       },
     };
   }
