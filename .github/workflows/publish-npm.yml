@@ -1,0 +1,95 @@
+name: npm distributions
+
+on:
+  pull_request:
+    paths: ["sdk-js/**", "console/**", ".github/workflows/publish-npm.yml"]
+  push:
+    branches: [main]
+    paths: ["sdk-js/**", "console/**", ".github/workflows/publish-npm.yml"]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'npm-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --prefix sdk-js
+      - run: npm ci --prefix console
+      - run: node sdk-js/scripts/check-quality.mjs
+      - name: Validate release source and versions
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          node --input-type=module - <<'JS'
+          import { readFileSync } from 'node:fs';
+          for (const name of ['core', 'postgres', 'stripe']) {
+            const p = JSON.parse(readFileSync(`sdk-js/packages/${name}/package.json`, 'utf8'));
+            if (process.env.RELEASE_TAG !== `npm-v${p.version}`) throw Error(`Tag mismatch: ${p.name}`);
+          }
+          JS
+      - run: npm test --prefix sdk-js
+      - run: npm test --prefix console
+      - run: npm run build --prefix sdk-js
+      - name: Pack distributions
+        run: |
+          mkdir npm-dist
+          for package in core postgres stripe; do
+            npm pack --workspace "@openentitlement/$package" --prefix sdk-js --pack-destination "$GITHUB_WORKSPACE/npm-dist"
+          done
+      - name: Test installed tarballs outside the workspace
+        run: |
+          temp_dir=$(mktemp -d)
+          npm install --prefix "$temp_dir" --ignore-scripts "$GITHUB_WORKSPACE"/npm-dist/*.tgz pg@8
+          cd "$temp_dir"
+          node --input-type=module - <<'JS'
+          import { Catalog, FixedProvider, createClient, feature, integer } from '@openentitlement/core';
+          import { PostgresProvider } from '@openentitlement/postgres';
+          import { StripeEntitlementsProvider } from '@openentitlement/stripe';
+          const catalog = new Catalog([feature('projects', 'Projects', [integer('projects.max')])]);
+          const client = createClient({ catalog, provider: new FixedProvider(catalog, {'projects.max': 5}) });
+          if (await client.getLimit('projects.max', {organizationId: 'demo'}) !== 5) throw Error('Incorrect limit');
+          if (!PostgresProvider || !StripeEntitlementsProvider) throw Error('Adapter export missing');
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-distributions
+          path: npm-dist/*.tgz
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'npm-v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [core, postgres, stripe]
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --global npm@12.2.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-distributions
+          path: npm-dist
+      - name: Publish tested tarball with npm Trusted Publishing
+        env:
+          NPM_TAG: ${{ github.event.release.prerelease && 'next' || 'latest' }}
+        run: npm publish npm-dist/openentitlement-${{ matrix.package }}-*.tgz --access public --ignore-scripts --tag "$NPM_TAG"

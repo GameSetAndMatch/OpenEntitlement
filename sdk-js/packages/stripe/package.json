@@ -5,9 +5,29 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": { "source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
-  "files": ["dist", "src"],
-  "scripts": { "build": "tsc -p tsconfig.json" },
-  "dependencies": { "@openentitlement/core": "0.1.0" }
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@openentitlement/core": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GameSetAndMatch/openentitlement.git",
+    "directory": "sdk-js/packages/stripe"
+  },
+  "homepage": "https://openentitlement.dev/docs/"
 }

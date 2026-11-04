@@ -2,16 +2,33 @@
   "name": "openentitlement-js",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/core", "packages/postgres", "packages/stripe"],
+  "workspaces": [
+    "packages/core",
+    "packages/postgres",
+    "packages/stripe"
+  ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "npm run build --workspaces",
-    "test": "node --conditions=source --test 'test/**/*.test.ts' 'conformance/**/*.test.ts'"
+    "test": "node --conditions=source --test 'test/**/*.test.ts' 'conformance/**/*.test.ts'",
+    "lint": "eslint .",
+    "check:dependencies": "knip --dependencies"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.11.0",
-    "typescript": "^5.8.0"
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "knip": "^6.44.1",
+    "pg": "^8.23.1",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.72.1"
   },
-  "engines": { "node": ">=22.18" }
+  "engines": {
+    "node": ">=22.18"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  }
 }
