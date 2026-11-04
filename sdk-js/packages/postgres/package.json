@@ -1,0 +1,16 @@
+{
+  "name": "@openentitlement/postgres",
+  "version": "0.1.0",
+  "description": "Postgres provider and advisory lock for OpenEntitlement (node-postgres).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": { "source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./schema.sql": "./schema.sql"
+  },
+  "files": ["dist", "src", "schema.sql"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@openentitlement/core": "0.1.0" },
+  "peerDependencies": { "pg": "^8.11.0" },
+  "devDependencies": { "pg": "^8.13.0" }
+}

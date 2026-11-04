@@ -1,0 +1,35 @@
+{
+  "name": "@openentitlement/console",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenEntitlement service: OEREP evaluation API, audited administration, and console.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev:server": "node --conditions=source --watch server/main.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "build": "vite build --config web/vite.config.ts",
+    "start": "node --conditions=source server/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --conditions=source --test 'test/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@openentitlement/core": "file:../sdk-js/packages/core",
+    "@openentitlement/postgres": "file:../sdk-js/packages/postgres",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

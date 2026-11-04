@@ -1,0 +1,15 @@
+{
+  "name": "@openentitlement/core",
+  "version": "0.1.0",
+  "description": "Vendor-neutral entitlements API: features, limits, plans, overrides, grants. Reference SDK for the OpenEntitlement spec.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": { "source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+  },
+  "files": ["dist", "src"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": {},
+  "keywords": ["entitlements", "plans", "limits", "quotas", "billing", "openfeature"],
+  "engines": { "node": ">=20" }
+}

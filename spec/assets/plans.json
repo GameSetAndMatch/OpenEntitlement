@@ -1,0 +1,23 @@
+{
+  "$comment": "The standard plans seeded by the step 'Given the standard plans'. 'legacy' has no rank and sets no sso.connections.max.",
+  "plans": [
+    { "id": "free", "name": "Free", "rank": 0, "values": {
+      "seats.max": 3, "projects.max": 1, "api_calls.monthly": 1000,
+      "sso.enabled": false, "sso.connections.max": 0, "reports.enabled": false, "reports.retention": "7d" } },
+    { "id": "pro", "name": "Pro", "rank": 10, "values": {
+      "seats.max": 20, "projects.max": 5, "api_calls.monthly": 100000,
+      "sso.enabled": false, "sso.connections.max": 0, "reports.enabled": true, "reports.retention": "90d" } },
+    { "id": "pro_trial", "name": "Pro (trial)", "variantOf": "pro", "public": false, "values": {
+      "seats.max": 20, "projects.max": 5, "api_calls.monthly": 100000,
+      "sso.enabled": false, "sso.connections.max": 0, "reports.enabled": true, "reports.retention": "90d" } },
+    { "id": "business", "name": "Business", "rank": 20, "values": {
+      "seats.max": 100, "projects.max": 50, "api_calls.monthly": { "unlimited": true },
+      "sso.enabled": true, "sso.connections.max": 3, "reports.enabled": true, "reports.retention": "365d" } },
+    { "id": "enterprise", "name": "Enterprise", "rank": 30, "public": false, "values": {
+      "seats.max": { "unlimited": true }, "projects.max": 1000, "api_calls.monthly": { "unlimited": true },
+      "sso.enabled": true, "sso.connections.max": 50, "reports.enabled": true, "reports.retention": "365d" } },
+    { "id": "legacy", "name": "Legacy", "values": {
+      "seats.max": 10, "projects.max": 3, "api_calls.monthly": 5000,
+      "sso.enabled": true, "reports.enabled": false, "reports.retention": "7d" } }
+  ]
+}

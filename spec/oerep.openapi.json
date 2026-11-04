@@ -1,0 +1,575 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenEntitlement Remote Evaluation Protocol",
+    "version": "1.0.0-draft"
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/oerep/v1/resolve/{privilege}": {
+      "post": {
+        "operationId": "resolvePrivilege",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evaluation result",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "privilege",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/oerep/v1/resolve": {
+      "post": {
+        "operationId": "resolveAll",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evaluation result",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bulk"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oerep/v1/suggest/{privilege}": {
+      "post": {
+        "operationId": "suggestPlan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evaluation result",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Transport or request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "privilege",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Value": {
+        "oneOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "unlimited"
+            ],
+            "properties": {
+              "unlimited": {
+                "const": true
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Context": {
+        "type": "object",
+        "required": [
+          "organizationId"
+        ],
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subjectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Request": {
+        "type": "object",
+        "required": [
+          "context"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/Context"
+          }
+        }
+      },
+      "SuggestionRequest": {
+        "type": "object",
+        "required": [
+          "context",
+          "need"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/Context"
+          },
+          "need": {
+            "oneOf": [
+              {
+                "const": true
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      "ResolutionDetails": {
+        "type": "object",
+        "required": [
+          "privilege",
+          "value",
+          "reason",
+          "grants",
+          "staleOverrides"
+        ],
+        "properties": {
+          "privilege": {
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "reason": {
+            "enum": [
+              "PLAN",
+              "OVERRIDE",
+              "GRANT",
+              "FIXED",
+              "DEFAULT",
+              "ERROR"
+            ]
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "amount"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "subjectId": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "staleOverrides": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "feature": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "overrideId": {
+            "type": "string"
+          },
+          "requiredPlan": {
+            "type": "string"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "planValue": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "errorCode": {
+            "enum": [
+              "PROVIDER_NOT_READY",
+              "PRIVILEGE_NOT_FOUND",
+              "FEATURE_NOT_FOUND",
+              "TYPE_MISMATCH",
+              "INVALID_CONTEXT",
+              "GENERAL"
+            ]
+          }
+        }
+      },
+      "Bulk": {
+        "type": "object",
+        "required": [
+          "privileges"
+        ],
+        "properties": {
+          "privileges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolutionDetails"
+            }
+          }
+        }
+      },
+      "Suggestion": {
+        "type": "object",
+        "required": [
+          "requiredPlan"
+        ],
+        "properties": {
+          "requiredPlan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
