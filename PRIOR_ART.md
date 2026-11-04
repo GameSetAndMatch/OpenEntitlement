@@ -1,5 +1,7 @@
 # Prior art
 
+> Historical discovery notes. For a narrower, re-verified model comparison, use the [vendor data-model matrix](docs/research/vendor-data-model-matrix.md) (2026-11-04). It distinguishes evidence from unknowns and corrects earlier categorical statements about Lago unlimited values, Stigg promotional semantics, and direct OpenMeter/Schematic provisioning.
+
 *Researched 2026-11-03.* Sources: web search; GitHub search (`gh search repos`) for `entitlements spec`, `entitlement specification`, `open entitlements`, `openentitlement`, `entitlements sdk provider`, `plan limits sdk`, `entitlements openfeature`, `entitlements`, `entitlements billing`; Hacker News search through the Algolia API for `open entitlements`, `entitlements spec`, `entitlements standard`, `entitlements open source`, `plan limits sdk`, `openfeature entitlements`, `entitlement service open source`; and a CNCF landscape search. Web search returned no relevant Reddit threads, and Reddit was not queried directly.
 
 ## Verdict: no open entitlements *standard* exists, so we proceed
