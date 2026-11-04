@@ -23,7 +23,8 @@ jobs:
         with: { node-version: 24 }
       - run: npm ci --prefix ../console
       - run: uv sync --locked --python 3.12
-      - run: uv run pre-commit run --all-files
+      - run: uv run pre-commit run uv-lock-check --all-files
+      - run: uv run pre-commit run deptry --all-files
       - run: uv run ruff check packages
       - run: uv run pytest -q
 

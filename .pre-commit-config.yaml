@@ -28,3 +28,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^(sdk-python/|\.pre-commit-config\.yaml$)
+      - id: typescript-quality
+        name: TypeScript lint, types and dependencies
+        entry: node sdk-js/scripts/check-quality.mjs
+        language: system
+        pass_filenames: false
+        require_serial: true
+        files: ^(sdk-js/|console/|\.pre-commit-config\.yaml$)

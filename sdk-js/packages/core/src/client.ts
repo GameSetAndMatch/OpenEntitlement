@@ -231,7 +231,7 @@ export class EntitlementClient {
     normalizeUsage(current); // validates (Requirement 3.3.2)
     const priv = this.catalog.privilege(privilege);
     if (priv && priv.valueType !== "integer") throw new TypeMismatch(`requireWithin needs an integer privilege; ${privilege} is ${priv.valueType}`);
-    let d = await this.getLimitDetails(privilege, ctx);
+    const d = await this.getLimitDetails(privilege, ctx);
     return this.#checkResolvedLimit(privilege, d, current, requested, ctx);
   }
 
