@@ -6,6 +6,7 @@ From the repository root:
 
 ```sh
 npm ci
+npx playwright install chromium
 npm run check
 npm run build
 npm run preview
@@ -21,7 +22,7 @@ Use the existing Worker project `openentitlement`:
 
 - Root: repository root
 - Production branch: `main`
-- Build command: `npm run build`
+- Build command: `npx playwright install --with-deps chromium && npm run build`
 - Deploy command: `npx wrangler deploy`
 - Preview command: `npx wrangler versions upload`
 - Build environment: Node 24
@@ -29,3 +30,5 @@ Use the existing Worker project `openentitlement`:
 The root lockfile installs both the website and Wrangler. `wrangler.jsonc` serves `website/dist` as static assets with proper 404 routing. No backend service, database, API keys, or customer data is deployed.
 
 After the first deployment, attach `openentitlement.dev` in the Worker's Settings → Domains & Routes → Add → Custom Domain. This is an account-level setting and is intentionally not hardcoded into branch previews.
+
+Mermaid fences in the canonical specification render to SVG during documentation preparation. Chromium is a build dependency only; diagram display needs no client JavaScript. CI installs Chromium with its Linux dependencies and runs `npm run test:diagrams --workspace website` against the built pages in both themes and at desktop/mobile widths. Invalid diagram syntax fails the build.
