@@ -9,11 +9,13 @@ It defines a vendor-neutral entitlement model and evaluation contract. OEREP spe
 
 ## Choose your path
 
+- [Read the specification overview](/docs/specification/).
+
 - [Run the demo in five minutes](/docs/quickstart/).
 - [Understand plans, overrides, and grants](/docs/concepts/).
 - [Connect a TypeScript application](/docs/typescript/) or [Python application](/docs/python/).
 - [Host the service with Postgres](/docs/self-hosting/).
-- [Implement the remote protocol](/docs/oerep/).
+- [Implement the contract and demonstrate compatibility](/docs/implementing/).
 
 ## What the model covers
 
