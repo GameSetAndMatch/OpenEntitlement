@@ -47,11 +47,11 @@ jobs:
             uv build --project sdk-python --package "$package" --out-dir "dist/$package"
           done
       - name: Check package metadata and descriptions
-        run: uvx --from twine==6.2.0 twine check --strict dist/*/*
+        run: uvx --from twine==7.0.0 twine check --strict dist/*/*
       - name: Install and smoke-test the built wheels on Python 3.10
         run: |
           uv venv --python 3.10 /tmp/oe-wheel-check
-          uv pip install --python /tmp/oe-wheel-check/bin/python dist/*/*.whl
+          uv pip install --python /tmp/oe-wheel-check/bin/python dist/*/*.whl "psycopg[binary]>=3.1"
           cd /tmp
           /tmp/oe-wheel-check/bin/python - <<'PY'
           from importlib.metadata import version
