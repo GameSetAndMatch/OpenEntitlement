@@ -25,6 +25,10 @@ Open http://localhost:8787. The default memory backend seeds five example organi
 
 Use Organizations to inspect values and reasons, Plans to compare limits, and Evaluate to check a feature or test current usage against a limit. Memory data resets on restart.
 
+## Docker
+
+See the [container setup and publishing guide](../docs/maintainers/docker-releases.md) to build locally, run the demo, configure PostgreSQL, and publish to Docker Hub through GitHub Actions.
+
 ## Persistent service
 
 ```sh
