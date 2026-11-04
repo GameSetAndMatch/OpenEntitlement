@@ -20,7 +20,7 @@ The shared Commitizen hook checks new commit messages. The TypeScript hook runs 
 
 Create an npm account and obtain publishing rights to the `@openentitlement` scope (normally an npm organization named `openentitlement`). The GitHub organization does not automatically grant the npm scope. If the scope is unavailable, choose a different scope and update all package names/dependencies/imports before release.
 
-npm Trusted Publishing is configured in each existing package's settings. For packages that do not yet exist, an authorized maintainer must first bootstrap each package from the tested packed artifact using their own npm login/2FA, or an explicitly configured supported npm onboarding process. Do not assume PyPI's pending-publisher setup applies to npm. Never upload empty placeholder packages or store a maintainer's password in GitHub.
+npm Trusted Publishing is configured in each existing package's settings. For packages that do not yet exist, an authorized maintainer must first bootstrap each package from the tested packed artifact using their own npm login/2FA. Do not assume PyPI's pending-publisher setup applies to npm. Never upload empty placeholder packages or store a maintainer's password in GitHub.
 
 For all three packages, configure GitHub Actions as the Trusted Publisher:
 
