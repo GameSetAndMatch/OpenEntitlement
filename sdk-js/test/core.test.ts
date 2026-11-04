@@ -193,3 +193,16 @@ describe("guard", () => {
     assert.equal(r.details.lockDomain, "process");
   });
 });
+
+describe("context precedence", () => {
+  it("rejects explicit invalid tenant IDs instead of inheriting the client's tenant", async () => {
+    const c = createClient({ catalog: CATALOG, provider: provider(), context: acme });
+    assert.equal(await c.getLimit("seats.max", { subjectId: "alice" }), 3);
+    for (const organizationId of ["", null, false, 0]) {
+      const d = await c.getDetails("seats.max", { organizationId } as any);
+      assert.equal(d.reason, Reason.ERROR);
+      assert.equal(d.errorCode, ErrorCode.INVALID_CONTEXT);
+      assert.equal(d.value, 1);
+    }
+  });
+});

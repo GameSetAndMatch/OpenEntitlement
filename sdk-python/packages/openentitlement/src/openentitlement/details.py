@@ -5,12 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generic, Mapping, Optional, TypeVar, Union
+from typing import Any, Generic, Mapping, Optional, TypeVar, Union, cast
 
 from .errors import InvalidArgument
 from .values import encode_value, is_int
 
 T = TypeVar("T")
+
+# Distinguish an omitted tenant from an explicitly invalid tenant during merging.
+_UNSET_ORGANIZATION = cast(str, object())
 
 
 class Reason(str, Enum):
@@ -35,7 +38,7 @@ class ErrorCode(str, Enum):
 class EvaluationContext:
     """Spec §2. ``now`` is filled from the client's clock when absent."""
 
-    organization_id: str = ""
+    organization_id: str = _UNSET_ORGANIZATION
     subject_id: Optional[str] = None
     resource_id: Optional[str] = None
     now: Optional[datetime] = None
@@ -45,7 +48,7 @@ class EvaluationContext:
         if other is None:
             return self
         return EvaluationContext(
-            organization_id=other.organization_id or self.organization_id,
+            organization_id=self.organization_id if other.organization_id is _UNSET_ORGANIZATION else other.organization_id,
             subject_id=other.subject_id if other.subject_id is not None else self.subject_id,
             resource_id=other.resource_id if other.resource_id is not None else self.resource_id,
             now=other.now if other.now is not None else self.now,

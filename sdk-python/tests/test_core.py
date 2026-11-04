@@ -269,3 +269,15 @@ def test_guard_releases_lock_on_error() -> None:
         c.guard("projects.max", 1, {"organizationId": "acme"}, count=lambda tx: 0, act=lambda tx: 1 / 0)
     r = c.guard("projects.max", 1, {"organizationId": "acme"}, count=lambda tx: 0, act=lambda tx: "ok")
     assert r.result == "ok" and r.details.lock_domain == "process"
+
+
+def test_invalid_invocation_tenant_does_not_inherit_default():
+    from openentitlement import EvaluationContext
+    c = create_client(catalog=CATALOG, provider=InMemoryProvider(), context={"organization_id": "acme"})
+    assert c.get_details("seats.max", {"subject_id": "alice"}).reason is not Reason.ERROR
+    assert c.get_details("seats.max", EvaluationContext(subject_id="alice")).reason is not Reason.ERROR
+    for organization_id in ("", None, False, 0):
+        for ctx in ({"organization_id": organization_id}, EvaluationContext(organization_id=organization_id)):
+            d = c.get_details("seats.max", ctx)
+            assert d.reason is Reason.ERROR
+            assert d.error_code is ErrorCode.INVALID_CONTEXT

@@ -43,7 +43,7 @@ export interface ResolvedContext {
 export function mergeContext(base: EvaluationContext, invocation?: EvaluationContext): EvaluationContext {
   if (!invocation) return { ...base };
   const out: EvaluationContext = { ...base };
-  const org = invocation.organizationId || base.organizationId;
+  const org = invocation.organizationId !== undefined ? invocation.organizationId : base.organizationId;
   if (org !== undefined) out.organizationId = org;
   if (invocation.subjectId !== undefined) out.subjectId = invocation.subjectId;
   if (invocation.resourceId !== undefined) out.resourceId = invocation.resourceId;

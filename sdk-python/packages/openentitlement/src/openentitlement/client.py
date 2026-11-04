@@ -76,7 +76,8 @@ def to_context(ctx: ContextArg) -> Optional[EvaluationContext]:
         return ctx
     get = lambda *names: next((ctx[n] for n in names if n in ctx), None)  # noqa: E731
     return EvaluationContext(
-        organization_id=get("organization_id", "organizationId") or "",
+        **({"organization_id": get("organization_id", "organizationId")}
+           if "organization_id" in ctx or "organizationId" in ctx else {}),
         subject_id=get("subject_id", "subjectId"),
         resource_id=get("resource_id", "resourceId"),
         now=get("now"),
