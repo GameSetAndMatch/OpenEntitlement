@@ -2,6 +2,7 @@
 name = "openentitlement-postgres"
 version = "0.1.0"
 description = "Postgres provider and advisory lock for OpenEntitlement."
+readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = ["openentitlement==0.1.0", "psycopg>=3.1"]
