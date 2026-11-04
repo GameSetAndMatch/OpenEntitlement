@@ -42,7 +42,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ConsoleConf
     host: env.OE_HOST ?? "127.0.0.1",
     provider,
     catalogPath: env.OE_CATALOG ?? new URL("../../spec/assets/catalog.json", here).pathname,
-    seedDemo: (env.OE_SEED ?? (provider === "memory" ? "demo" : "none")) === "demo",
+    seedDemo: env.OE_SEED === "demo",
     ...(env.OE_ADMIN_TOKEN ? { adminToken: env.OE_ADMIN_TOKEN } : {}),
     ...(env.OE_EVAL_TOKEN ? { evalToken: env.OE_EVAL_TOKEN } : {}),
     ...(env.DATABASE_URL ? { databaseUrl: env.DATABASE_URL } : {}),
