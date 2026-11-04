@@ -78,14 +78,21 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment:
-      name: pypi
+      name: ${{ matrix.environment }}
       url: https://pypi.org/p/${{ matrix.package }}
     permissions:
       id-token: write
     strategy:
       fail-fast: false
       matrix:
-        package: [openentitlement, openentitlement-postgres, openentitlement-stripe]
+        # PyPI requires unique pending publisher identities for new projects.
+        include:
+          - package: openentitlement
+            environment: pypi
+          - package: openentitlement-postgres
+            environment: pypi-postgres
+          - package: openentitlement-stripe
+            environment: pypi-stripe
     steps:
       - uses: actions/download-artifact@v4
         with:
