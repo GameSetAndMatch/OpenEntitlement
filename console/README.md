@@ -10,10 +10,10 @@ Requires Node >=22.18 (Node 24 recommended).
 cd console
 npm ci
 npm run build
-npm start
+OE_SEED=demo npm start
 ```
 
-Open http://localhost:8787. The default memory backend seeds five example organizations:
+Open http://localhost:8787. Without `OE_SEED=demo`, the memory backend starts empty and the console shows a setup screen. With it, the console loads five example organizations:
 
 | Organization | Plan | Example entitlement |
 |---|---|---|

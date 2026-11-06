@@ -1,0 +1,15 @@
+# OpenEntitlement in memory: an empty workspace that resets on every restart.
+# Good for trying the console and the OEREP API. For persistent data, use compose.postgres.yaml.
+#
+#   docker compose -f deploy/compose.memory.yaml up
+#   open http://localhost:8787
+#
+# Add OE_SEED=demo to start with the sample organizations instead of the setup screen.
+services:
+  openentitlement:
+    image: olivierbelhumeur/openentitlement:${OE_VERSION:-latest}
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      OE_PROVIDER: memory
+      OE_SEED: ${OE_SEED:-none}
