@@ -1,5 +1,6 @@
 /** Console configuration: which provider sits behind the console, chosen by environment. */
 
+import { ContractStore } from "./contracts-store.ts";
 import { readFileSync } from "node:fs";
 import {
   AuditLog,
@@ -55,6 +56,7 @@ export interface Runtime {
   catalog: Catalog;
   /** In-process audit forwarder (mirrors what reaches mutation hooks). */
   audit: AuditLog;
+  contracts: ContractStore;
   close(): Promise<void>;
 }
 
@@ -64,6 +66,7 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
   let provider: Provider;
   let lock: Lock<any> | undefined;
   let close = async () => {};
+  let contracts = new ContractStore();
 
   switch (cfg.provider) {
     case "memory":
@@ -74,6 +77,7 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
       const { default: pg } = await import("pg");
       const { PostgresProvider, PostgresAdvisoryLock } = await import("@openentitlement/postgres");
       const pool = new pg.Pool({ connectionString: cfg.databaseUrl });
+      contracts = new ContractStore(pool);
       provider = new PostgresProvider({ pool, autoMigrate: true });
       lock = new PostgresAdvisoryLock({ pool });
       close = () => pool.end();
@@ -89,10 +93,10 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
       throw new Error(`unknown OE_PROVIDER "${cfg.provider}" (memory | postgres | fixed)`);
   }
 
-  try { await provider.initialize?.(); } catch (error) { await close(); throw error; }
+  try { await provider.initialize?.(); await contracts.initialize(); } catch (error) { await close(); throw error; }
   const client = createClient({ provider, catalog, mutationHooks: [audit], ...(lock ? { lock } : {}) });
   if (cfg.seedDemo) await seedDemo(client);
-  return { client, catalog, audit, close };
+  return { client, catalog, audit, contracts, close };
 }
 
 /** Demo data: the conformance plans plus a few customers in interesting states. */

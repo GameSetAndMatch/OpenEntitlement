@@ -18,17 +18,9 @@ import {
   type Override,
   type Grant,
 } from "@openentitlement/core";
+import { HttpError, send, readJson } from "./http.ts";
+import { createContractsApi } from "./contracts-api.ts";
 import type { ConsoleConfig, Runtime } from "./config.ts";
-
-class HttpError extends Error {
-  readonly status: number;
-  readonly code: string;
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
 
 const STATUS_BY_CODE: Record<string, number> = {
   INVALID_ARGUMENT: 400,
@@ -38,28 +30,6 @@ const STATUS_BY_CODE: Record<string, number> = {
   CONFLICT: 409,
   NOT_SUPPORTED: 501,
 };
-
-function send(res: ServerResponse, status: number, body: unknown, type = "application/json"): void {
-  const text = JSON.stringify(body);
-  res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
-  res.end(text);
-}
-
-async function readJson(req: IncomingMessage): Promise<any> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const c of req) {
-    size += (c as Buffer).length;
-    if (size > 1_000_000) throw new HttpError(413, "PAYLOAD_TOO_LARGE", "body over 1 MB");
-    chunks.push(c as Buffer);
-  }
-  if (chunks.length === 0) return {};
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    throw new HttpError(400, "INVALID_JSON", "request body is not valid JSON");
-  }
-}
 
 const date = (v: unknown): Date | undefined => {
   if (v === undefined || v === null || v === "") return undefined;
@@ -79,6 +49,7 @@ type Handler = (ctx: { req: IncomingMessage; params: Record<string, string>; bod
 
 export function createApi(cfg: ConsoleConfig, rt: Runtime) {
   const { client, catalog } = rt;
+  const contractsApi = createContractsApi(cfg, rt);
   const provider = client.provider;
   const routes: Array<{ method: string; pattern: RegExp; keys: string[]; handler: Handler }> = [];
   const route = (method: string, path: string, handler: Handler) => {
@@ -242,6 +213,7 @@ export function createApi(cfg: ConsoleConfig, rt: Runtime) {
     try {
       const token = cfg.adminToken;
       if (token && bearer(req) !== token) throw new HttpError(401, "UNAUTHORIZED", "missing or invalid bearer token");
+      if (await contractsApi(req, res)) return true;
       for (const r of routes) {
         if (r.method !== req.method) continue;
         const m = r.pattern.exec(url.pathname);

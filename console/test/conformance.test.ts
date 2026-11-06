@@ -1,3 +1,4 @@
+import { ContractStore } from "../server/contracts-store.ts";
 /** Execute the shared semantic scenarios across an actual HTTP boundary. */
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -16,7 +17,7 @@ for (const scenario of scenarios) {
   if (scenario.tags.has("mutations") || scenario.tags.has("fixed")) continue;
   test(`OEREP conformance: ${scenario.id}`, async () => {
     const storage = createClient({ catalog, provider: new InMemoryProvider() });
-    const handler = createOerep({ client: storage, catalog, audit: new AuditLog(), close: async () => {} });
+    const handler = createOerep({ client: storage, catalog, audit: new AuditLog(), contracts: new ContractStore(), close: async () => {} });
     const server = createServer(async (req, res) => { if (!await handler(req, res)) res.writeHead(404).end(); });
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const port = (server.address() as { port: number }).port;
