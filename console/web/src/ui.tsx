@@ -44,7 +44,7 @@ export function ValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
   if (def.valueType === "boolean") return <Toggle checked={value === true} onChange={onChange} disabled={disabled} label={def.key} />;
   if (def.valueType === "enum")
     return (
-      <select className="input" value={value ?? ""} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+      <select aria-label={def.key} className="input" value={value ?? ""} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
         {value === undefined && <option value="">—</option>}
         {def.options.map((o) => (
           <option key={o}>{o}</option>
@@ -57,6 +57,7 @@ export function ValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
       <input
         className="input"
         type="number"
+        aria-label={def.key}
         min={0}
         step={1}
         disabled={disabled || unlimited}
@@ -85,8 +86,9 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{ title: string; detail?: ReactNode; resolve: (v: string | null) => void } | null>(null);
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (state) setTimeout(() => ref.current?.focus(), 0);
+    if (state) { dialog.current?.showModal(); ref.current?.focus(); }
   }, [state]);
   const ask: Ask = (title, detail) => new Promise((resolve) => (setText(""), setState({ title, detail, resolve })));
   const close = (v: string | null) => {
@@ -97,7 +99,7 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
     <ReasonCtx.Provider value={ask}>
       {children}
       {state && (
-        <div className="modal-backdrop" onMouseDown={() => close(null)}>
+        <dialog ref={dialog} className="modal-backdrop" aria-labelledby="reason-title" onCancel={() => close(null)}>
           <form
             className="modal"
             onMouseDown={(e) => e.stopPropagation()}
@@ -106,10 +108,10 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
               if (text.trim()) close(text.trim());
             }}
           >
-            <h3>{state.title}</h3>
+            <h3 id="reason-title">{state.title}</h3>
             {state.detail && <div className="modal-detail">{state.detail}</div>}
-            <label className="label">Reason (recorded in the audit log)</label>
-            <textarea ref={ref} className="input" rows={3} value={text} placeholder="e.g. MSA #42, signed 2026-11-01" onChange={(e) => setText(e.target.value)} />
+            <label htmlFor="change-reason" className="label">Reason (recorded in change history)</label>
+            <textarea id="change-reason" name="reason" ref={ref} className="input" rows={3} value={text} placeholder="e.g. MSA #42, signed 2026-11-01" onChange={(e) => setText(e.target.value)} />
             <div className="row end">
               <button type="button" className="btn ghost" onClick={() => close(null)}>
                 Cancel
@@ -119,7 +121,7 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
               </button>
             </div>
           </form>
-        </div>
+        </dialog>
       )}
     </ReasonCtx.Provider>
   );
@@ -140,7 +142,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="toasts">
+      <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.tone}`}>
             {t.text}
