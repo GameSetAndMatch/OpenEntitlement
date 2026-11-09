@@ -34,3 +34,14 @@ test("past-due grace has a stable deadline and ended status bypasses grace", () 
   assert.equal(resolve(d,"acme","access_enabled").value,true);
   d.organizations[0] = organization(d, { ...input, status: "ended" }); assert.equal(resolve(d, "acme", "access_enabled").readOnly, true);
 });
+
+
+test("variant identity cannot move Organizations between tiers or lifecycle purposes",()=>{
+  const d=emptyData();
+  d.tiers.push(tier({id:"pro",name:"Pro",rank:1}),tier({id:"enterprise",name:"Enterprise",rank:2}));
+  d.variants.push(variant(d,{id:"pro",name:"Pro",tierId:"pro",kind:"standard"}));
+  d.organizations.push(organization(d,{id:"acme",name:"Acme",variantId:"pro"}));
+  assert.throws(()=>variant(d,{...d.variants[0],tierId:"enterprise"}),/tier and purpose cannot change/);
+  assert.throws(()=>variant(d,{...d.variants[0],kind:"grace"}),/tier and purpose cannot change/);
+  assert.equal(variant(d,{...d.variants[0],name:"Pro revised"}).name,"Pro revised");
+});

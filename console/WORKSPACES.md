@@ -27,7 +27,7 @@ Open <http://localhost:18789/app/>. The loopback development identity provider a
 
 Define groups and features in **Catalog**, then add typed privileges with flat keys such as `max_exports`. Group nesting changes presentation, never the evaluation key. Boolean, integer and string values (including string enums) use the same validator in the browser and server. Integer limits can explicitly allow unlimited.
 
-A privilege either supplies a catalog default or requires an explicit value in every variant. For an existing catalog, set that value in all existing variants before removing its default. Create a tier, add its standard/trial/grace variants, then assign an Organization. Organization terms replace inherited values. Every mutation requires a reason and records the authenticated account in audit history.
+A privilege either supplies a catalog default or requires an explicit value in every variant. For an existing catalog, set that value in all existing variants before removing its default. Create a tier, add its standard/trial/grace variants, then assign an Organization. A variant’s tier and purpose are fixed after creation; create a new variant to change either. Organization terms replace inherited values. Every mutation requires a reason and records the authenticated account in audit history.
 
 **Configuration** displays a downloadable YAML snapshot of the selected workspace. It excludes memberships, credentials and sessions. It is an export, not a startup configuration import.
 

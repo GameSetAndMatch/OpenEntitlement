@@ -99,6 +99,8 @@ export function variant(data: WorkspaceData, input: unknown): Variant {
   const b = object(input); only(b,["id","name","tierId","kind","values"]);
   if (!data.tiers.some(t => t.id === b.tierId) || !["standard","trial","grace"].includes(b.kind)) throw new WorkspaceError("Select a tier and variant purpose");
   const id = identifier(b.id);
+  const existing=data.variants.find(v=>v.id===id);
+  if(existing&&(existing.tierId!==b.tierId||existing.kind!==b.kind))throw new WorkspaceError("A variant’s tier and purpose cannot change. Create a new variant instead.",409);
   if (data.variants.some(v => v.id !== id && v.tierId === b.tierId && v.kind === b.kind)) throw new WorkspaceError("This tier already has a variant with that purpose", 409);
   const explicit=values(data,b.values??{});
   for(const p of data.privileges)if(!Object.hasOwn(p,"default")&&!Object.hasOwn(explicit,p.key))throw new WorkspaceError(`${p.key}: a value is required in this variant`,422);
