@@ -6,7 +6,7 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Py
 
 | Package | Depends on | Contents |
 |---|---|---|
-| `openentitlement` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
+| `openentitlement-sdk` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
 | `openentitlement-postgres` | `psycopg>=3.1` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, [`schema.sql`](packages/openentitlement-postgres/src/openentitlement_postgres/schema.sql) |
 | `openentitlement-stripe` | nothing (stdlib HTTPS) | `StripeEntitlementsProvider`, `verify_webhook` |
 

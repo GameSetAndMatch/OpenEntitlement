@@ -43,7 +43,7 @@ jobs:
           PY
       - name: Build wheels and source distributions
         run: |
-          for package in openentitlement openentitlement-postgres openentitlement-stripe; do
+          for package in openentitlement-sdk openentitlement-postgres openentitlement-stripe; do
             uv build --project sdk-python --package "$package" --out-dir "dist/$package"
           done
       - name: Check package metadata and descriptions
@@ -59,12 +59,12 @@ jobs:
           from openentitlement import Catalog, FixedProvider, create_client, feature, integer
           from openentitlement_postgres import PostgresProvider
           from openentitlement_stripe import StripeEntitlementsProvider
-          catalog = Catalog([feature("projects", "Projects", [integer("projects.max")])])
-          client = create_client(FixedProvider(catalog, {"projects.max": 5}), catalog)
-          assert client.get_limit("projects.max", {"organizationId": "demo"}) == 5
+          catalog = Catalog([feature("projects", "Projects", [integer("project_max")])])
+          client = create_client(FixedProvider(catalog, {"project_max": 5}), catalog)
+          assert client.get_limit("project_max", {"organizationId": "demo"}) == 5
           assert files("openentitlement").joinpath("py.typed").is_file()
           assert files("openentitlement_postgres").joinpath("schema.sql").is_file()
-          for package in ("openentitlement", "openentitlement-postgres", "openentitlement-stripe"):
+          for package in ("openentitlement-sdk", "openentitlement-postgres", "openentitlement-stripe"):
               print(f"{package}=={version(package)}")
           PY
       - uses: actions/upload-artifact@v4
@@ -87,7 +87,7 @@ jobs:
       matrix:
         # PyPI requires unique pending publisher identities for new projects.
         include:
-          - package: openentitlement
+          - package: openentitlement-sdk
             environment: pypi
           - package: openentitlement-postgres
             environment: pypi-postgres
