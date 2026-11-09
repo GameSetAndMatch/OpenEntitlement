@@ -67,10 +67,11 @@ export function createApi(cfg: ConsoleConfig, rt: Runtime) {
   const catalogJSON = () =>
     catalog.features.map((f) => ({
       code: f.code,
+      hidden:rt.catalogSource?.features.find((sf:any)=>sf.code===f.code)?.hidden,
       name: f.name,
       description: f.description ?? "",
       gate: gateKey(f),
-      privileges: f.privileges.map((p) => ({ key: p.key, valueType: p.valueType, default: p.default, unlimitedAllowed: p.unlimitedAllowed, options: p.options })),
+      privileges: f.privileges.map((p) => ({ key: p.key, valueType: p.valueType, default: p.default, unlimitedAllowed: p.unlimitedAllowed, options: p.options, environment:rt.environment?.[p.key], envVariable:rt.environment?.[p.key]?.variable, hidden:rt.catalogSource?.features.find((sf:any)=>sf.code===f.code)?.privileges.find((sp:any)=>sp.key===p.key)?.hidden, frozen:Boolean(rt.catalogSource?.features.find((sf:any)=>sf.code===f.code)?.frozen||rt.catalogSource?.features.find((sf:any)=>sf.code===f.code)?.privileges.find((sp:any)=>sp.key===p.key)?.frozen) })),
     }));
 
   async function evaluateAll(ctx: EvaluationContext) {

@@ -1,5 +1,8 @@
 /** Console configuration: which provider sits behind the console, chosen by environment. */
 
+import {environmentOverride,type EnvironmentOverrides} from "./environment.ts";
+import {withEnvironmentOverrides} from "./environment-provider.ts";
+import {parseDocument} from "yaml";
 import { ContractStore } from "./contracts-store.ts";
 import { readFileSync } from "node:fs";
 import {
@@ -9,6 +12,7 @@ import {
   decodeValue,
   FixedProvider,
   InMemoryProvider,
+  validateValue,
   type EntitlementClient,
   type Lock,
   type Provider,
@@ -29,6 +33,8 @@ export interface ConsoleConfig {
   databaseUrl?: string;
   /** JSON {privilegeKey: value} for the fixed provider. */
   fixedValues?: Record<string, unknown>;
+  environment?:EnvironmentOverrides;
+  env?:NodeJS.ProcessEnv;
   staticDir: string;
 }
 
@@ -51,6 +57,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ConsoleConf
         ? { databaseUrl: `postgresql://${encodeURIComponent(env.PGUSER ?? "oe")}:${encodeURIComponent(env.PGPASSWORD ?? "")}@${env.PGHOST}:${env.PGPORT ?? "5432"}/${encodeURIComponent(env.PGDATABASE ?? "oe")}` }
         : {}),
     ...(env.OE_FIXED_VALUES ? { fixedValues: JSON.parse(env.OE_FIXED_VALUES) } : {}),
+    env:{...env},
     staticDir: env.OE_STATIC_DIR ?? new URL("../web/dist/", here).pathname,
   };
 }
@@ -61,11 +68,24 @@ export interface Runtime {
   /** In-process audit forwarder (mirrors what reaches mutation hooks). */
   audit: AuditLog;
   contracts: ContractStore;
+  environment?:EnvironmentOverrides;
+  catalogSource?:any;
   close(): Promise<void>;
 }
 
 export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
-  const catalog = Catalog.fromJSON(JSON.parse(readFileSync(cfg.catalogPath, "utf8")));
+  const document=parseDocument(readFileSync(cfg.catalogPath,"utf8"),{uniqueKeys:true});
+  if(document.errors.length)throw new Error("Invalid Catalog YAML/JSON");
+  const source=document.toJS({maxAliasCount:0});
+  const catalog = Catalog.fromJSON(source);
+  const environment:EnvironmentOverrides={...cfg.environment};
+  const frozen:Record<string,unknown>={};
+  for(const f of source.features)for(const p of f.privileges){
+    if(p.hidden!==undefined&&typeof p.hidden!=="boolean"||f.hidden!==undefined&&typeof f.hidden!=="boolean")throw new Error("Catalog hidden must be a boolean");
+    if(p.frozen!==undefined&&typeof p.frozen!=="boolean"||f.frozen!==undefined&&typeof f.frozen!=="boolean")throw new Error("Catalog frozen must be a boolean");
+    if(p.frozen||f.frozen)frozen[p.key]=catalog.privilege(p.key)!.default;
+    if(p.envVariable!==undefined){const def=catalog.privilege(p.key)!;environment[p.key]=environmentOverride(p.key,p.envVariable,def.valueType,value=>validateValue(def,value),cfg.env??process.env);}
+  }
   const audit = new AuditLog();
   let provider: Provider;
   let lock: Lock<any> | undefined;
@@ -98,9 +118,9 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
   }
 
   try { await provider.initialize?.(); await contracts.initialize(); } catch (error) { await close(); throw error; }
-  const client = createClient({ provider, catalog, mutationHooks: [audit], ...(lock ? { lock } : {}) });
+  const client = createClient({ provider:withEnvironmentOverrides(provider,environment,frozen), catalog, mutationHooks: [audit], ...(lock ? { lock } : {}) });
   if (cfg.seedDemo) await seedDemo(client);
-  return { client, catalog, audit, contracts, close };
+  return { client, catalog, audit, contracts, environment, catalogSource:source, close };
 }
 
 /** Demo data: the conformance plans plus a few customers in interesting states. */

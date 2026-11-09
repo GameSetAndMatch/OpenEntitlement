@@ -69,3 +69,29 @@ Use `OE_HOST=0.0.0.0` for container networking and terminate HTTPS at a reverse 
 Evaluation tokens cover every organization in the service instance. They are for trusted backend services, not per-tenant browser access. Your application authenticates users and authorizes organization access before evaluating entitlements. Use separate admin and evaluation credentials.
 
 OEREP does not lock your application's usage database. Use a shared application lock for multiple application instances.
+
+## Environment-controlled, frozen and hidden Catalog values
+
+Link a boolean environment prerequisite directly to a boolean value in your Catalog. The self-hosted service accepts YAML or JSON at `OE_CATALOG`:
+
+```yaml
+features:
+  - code: mcp
+    name: MCP
+    gate: mcp_enabled
+    privileges:
+      - key: mcp_enabled
+        valueType: boolean
+        default: false
+        envVariable: MCP_INSTALLED
+      - key: max_connections
+        valueType: integer
+        default: 3
+        frozen: true
+```
+
+Access requires both the resolved entitlement and the environment variable to be true. The console locks the affected control. A frozen value without an environment binding uses its Catalog default. Set `hidden: true` on a feature or privilege to omit it from normal console controls while keeping its backend evaluation. Hidden, frozen and environment-linked workspace values need a Catalog default.
+
+Only boolean environment bindings are supported. `false` vetoes access; `true` preserves the customer’s existing entitlement and never grants additional access. Invalid or missing bound variables are errors; restart after changing the environment. Integer and string settings remain normal Catalog values.
+
+See the [Catalog environment guide](https://github.com/GameSetAndMatch/openentitlement/blob/main/console/ENVIRONMENT-OVERRIDES.md) for supported types, Compose examples and workspace administration.

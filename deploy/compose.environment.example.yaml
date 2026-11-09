@@ -1,0 +1,8 @@
+# Combine with compose.memory.yaml or compose.postgres.yaml.
+services:
+  openentitlement:
+    volumes:
+      - ./catalog.environment.example.yaml:/config/catalog.yaml:ro
+    environment:
+      OE_CATALOG: /config/catalog.yaml
+      MCP_INSTALLED: '${MCP_INSTALLED:-false}'

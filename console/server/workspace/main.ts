@@ -8,11 +8,11 @@ import { workspaceApi } from "./api.ts";
 import { WorkspaceError } from "./model.ts";
 import { HttpError, send } from "../http.ts";
 
-export async function startWorkspaceServer(options: { databaseUrl: string; auth: AuthConfig; port?: number; host?: string; staticDir?: string }) {
+export async function startWorkspaceServer(options: { databaseUrl: string; auth: AuthConfig; port?: number; host?: string; staticDir?: string; env?:NodeJS.ProcessEnv }) {
   const store=new WorkspaceStore(options.databaseUrl);
   try {
     await store.initialize();
-    const auth=await Authentication.create(options.auth,store),api=workspaceApi(auth,store);
+    const auth=await Authentication.create(options.auth,store),api=workspaceApi(auth,store,{...(options.env??process.env)});
     const root=resolve(options.staticDir ?? fileURLToPath(new URL("../../web/dist/",import.meta.url)));
     const server=createServer(async(req,res) => {
       try {

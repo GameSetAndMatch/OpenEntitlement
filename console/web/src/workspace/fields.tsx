@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from "react";
 import { valueError, type Privilege, type Value } from "../../../server/workspace/model.ts";
-import { Toggle } from "../ui.tsx";
+import type {EnvironmentOverrides} from "../../../server/environment.ts";
+import {EnvironmentNotice, Toggle } from "../ui.tsx";
 
 export function Field({def,value,onChange}: {def:Privilege;value:Value|undefined;onChange:(value:Value|undefined)=>void}) {
   const id=useId(),ref=useRef<HTMLInputElement>(null);
@@ -17,10 +18,13 @@ export function Field({def,value,onChange}: {def:Privilege;value:Value|undefined
     {def.type==="integer"&&def.unlimited&&<label className="unlimited-control"><input type="checkbox" checked={unlimited} aria-label={`Unlimited ${def.key}`} onChange={e=>onChange(e.target.checked?{unlimited:true}:typeof previous.current==="object"?def.minimum??0:previous.current??def.minimum??0)}/>Unlimited</label>}
   </div>;
 }
-export function ValuesEditor({definitions,base,values,onChange}: {definitions:Privilege[];base:Record<string,Value>;values:Record<string,Value>;onChange:(values:Record<string,Value>)=>void}) {
-  return <div className="workspace-values">{definitions.map(def=>{
-    const required=!Object.hasOwn(base,def.key)&&!Object.hasOwn(def,"default");
-    const explicit=Object.hasOwn(values,def.key)||required,inherited=Object.hasOwn(base,def.key)?base[def.key]!:def.default;
-    return <div className="setup-value" key={def.key}><div><strong>{def.name}</strong><code>{def.key}</code><p>{def.description}</p>{required?<small>Required in every tier variant</small>:<label className="unlimited-control"><input type="checkbox" checked={explicit} aria-label={`Override ${def.key}`} onChange={e=>{const next={...values};if(e.target.checked && inherited!==undefined)next[def.key]=inherited;else delete next[def.key];onChange(next);}}/>Override inherited value</label>}</div><div>{explicit?<Field def={def} value={values[def.key]} onChange={v=>onChange({...values,[def.key]:v as Value})}/>:<div className="inherited-value"><strong>{inherited===undefined?"Required":typeof inherited==="object"?"∞":typeof inherited==="boolean"?(inherited?"Enabled":"Disabled"):String(inherited)}</strong><small>Inherited</small></div>}</div></div>;
-  })}</div>;
+export function ValuesEditor({definitions,base,values,onChange,environment={},frozenFeatures=[]}: {environment?:EnvironmentOverrides;frozenFeatures?:string[];definitions:Privilege[];base:Record<string,Value>;values:Record<string,Value>;onChange:(values:Record<string,Value>)=>void}) {
+ return <div className="workspace-values">{definitions.map(def=>{
+  const binding=Object.hasOwn(environment,def.key)?environment[def.key]:undefined;
+  const defaultFrozen=Boolean(def.frozen||frozenFeatures.includes(def.featureId??""));
+  const frozen=Boolean(binding||defaultFrozen);
+  const required=!def.envVariable&&!Object.hasOwn(base,def.key)&&!Object.hasOwn(def,"default");
+  const explicit=Object.hasOwn(values,def.key)||required||frozen,inherited=Object.hasOwn(base,def.key)?base[def.key]!:def.default;
+  return <fieldset disabled={frozen} className={`setup-value ${frozen?"environment-frozen":""}`} key={def.key}><legend className="sr-only">{def.name}</legend><div><strong>{def.name}</strong><code>{def.key}</code><p>{def.description}</p><EnvironmentNotice binding={binding} frozen={frozen}/>{frozen?null:required?<small>Required in every tier variant</small>:<label className="unlimited-control"><input type="checkbox" checked={explicit} aria-label={`Override ${def.key}`} onChange={e=>{const next={...values};if(e.target.checked&&inherited!==undefined)next[def.key]=inherited;else delete next[def.key];onChange(next);}}/>Override inherited value</label>}</div><div>{explicit?<Field def={def} value={binding?(defaultFrozen?def.default:Object.hasOwn(values,def.key)?values[def.key]:inherited)===true&&binding.value:defaultFrozen?def.default:values[def.key]} onChange={v=>onChange({...values,[def.key]:v as Value})}/>:<div className="inherited-value"><strong>{inherited===undefined?"Required":typeof inherited==="object"?"∞":typeof inherited==="boolean"?(inherited?"Enabled":"Disabled"):String(inherited)}</strong><small>Inherited</small></div>}</div></fieldset>;
+ })}</div>;
 }

@@ -2,9 +2,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readJson, send } from "../http.ts";
 import { Authentication } from "./auth.ts";
 import { WorkspaceStore } from "./store.ts";
-import { WorkspaceError, object, text, group, feature, privilege, tier, variant, organization, resolve, type StatusPolicy } from "./model.ts";
+import { WorkspaceError, object, text, group, feature, privilege, tier, variant, organization, resolve, catalogEnvironment, type StatusPolicy } from "./model.ts";
 
-export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
+export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:NodeJS.ProcessEnv={...process.env}) {
   return async (req: IncomingMessage,res: ServerResponse) => {
     const url=new URL(req.url ?? "/",auth.config.appUrl),path=url.pathname,method=req.method;
     if (path === "/auth/login" && method === "GET") { await auth.login(res); return true; }
@@ -17,7 +17,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
       const b=object(await readJson(req));
       const now=b.now === undefined ? new Date() : new Date(b.now);
       if (!Number.isFinite(now.getTime())) throw new WorkspaceError("Invalid evaluation time");
-      send(res,200,resolve(await store.keyData(key.workspace_id),text(b.organizationId,"Organization"),text(b.privilege,"Privilege"),now));return true;
+      const data=await store.keyData(key.workspace_id);send(res,200,resolve(data,text(b.organizationId,"Organization"),text(b.privilege,"Privilege"),now,catalogEnvironment(data,env)));return true;
     }
     const session=await auth.session(req),account=session.account;
     if (method !== "GET") auth.csrf(req,session);
@@ -31,7 +31,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
     const match=/^\/api\/workspaces\/([^/]+)(?:\/(groups|features|privileges|tiers|variants|organizations|policy|audit|members|invitations|keys|evaluate))?(?:\/([^/]+))?$/.exec(path);
     if (!match) throw new WorkspaceError("Endpoint not found",404);
     const [,id,section,target]=match;
-    if (!section && method === "GET") { send(res,200,await store.read(account,id!));return true; }
+    if (!section && method === "GET") { const workspace=await store.read(account,id!);send(res,200,{...workspace,environment:catalogEnvironment(workspace.data,env)});return true; }
     if (section === "audit" && method === "GET") { send(res,200,await store.history(account,id!));return true; }
     if (section === "invitations" && method === "POST") {
       if (!["Owner","Manager","User"].includes(body.role))throw new WorkspaceError("Invalid role");
@@ -51,7 +51,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
       send(res,201,await store.createKey(account,id!,text(body.name,"Key name"),body.scope,reason()));return true;
     }
     if (section === "keys" && target && method === "DELETE") { if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target))throw new WorkspaceError("API key not found",404); await store.revokeKey(account,id!,target,reason());send(res,200,{});return true; }
-    if (section === "evaluate" && method === "POST") { const workspace=await store.read(account,id!);send(res,200,resolve(workspace.data,text(body.organizationId,"Organization"),text(body.privilege,"Privilege")));return true; }
+    if (section === "evaluate" && method === "POST") { const workspace=await store.read(account,id!);send(res,200,resolve(workspace.data,text(body.organizationId,"Organization"),text(body.privilege,"Privilege"),new Date(),catalogEnvironment(workspace.data,env)));return true; }
     if (method !== "PUT" || !["groups","features","privileges","tiers","variants","organizations","policy"].includes(section ?? "")) throw new WorkspaceError("Method not allowed",405);
     if (!Number.isSafeInteger(body.revision) || body.revision < 1) throw new WorkspaceError("Current workspace revision is required");
     const action=section === "groups" || section === "features" || section === "privileges" ? "catalog:write" : section === "organizations" ? "contracts:write" : section === "policy" ? "contracts:write" : "tiers:write";
@@ -60,7 +60,11 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
       const upsert=<T>(list: T[],value: T,key: (v: T) => string) => { const index=list.findIndex(v => key(v) === key(value));if(index<0)list.push(value);else list[index]=value; };
       if (section === "groups") upsert(data.groups,group(data,entry),v => v.id);
       if (section === "features") upsert(data.features,feature(data,entry),v=>v.id);
-      if (section === "privileges") upsert(data.privileges,privilege(data,entry),v => v.key);
+      if (section === "privileges") {
+        const def=privilege(data,entry),previous=data.privileges.find(p=>p.key===def.key);
+        if(def.envVariable!==previous?.envVariable&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change server environment bindings",403);
+        upsert(data.privileges,def,v=>v.key);
+      }
       if (section === "tiers") upsert(data.tiers,tier(entry),v => v.id);
       if (section === "variants") upsert(data.variants,variant(data,entry),v => v.id);
       if (section === "organizations") upsert(data.organizations,organization(data,entry),v => v.id);
@@ -75,7 +79,8 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
         }
         data.statusPolicy=result;
       }
+      catalogEnvironment(data,env);
     });
-    send(res,200,changed);return true;
+    send(res,200,{...changed,environment:catalogEnvironment(changed.data,env)});return true;
   };
 }

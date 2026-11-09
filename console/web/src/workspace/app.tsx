@@ -7,7 +7,7 @@ import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
 import type { WorkspaceData } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import "./style.css";
-export interface Workspace {id:string;name:string;role:string;data:WorkspaceData;revision:number}
+export interface Workspace {id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 export type Save=(section:string,entry:unknown,title:string)=>Promise<boolean>;
 const pages=["Catalog","Tiers","Organizations","Configuration","Audit","Settings"];
 function currentPage(){const hash=location.hash.slice(1);return pages.find(p=>p.toLowerCase()===hash)??"Catalog";}
