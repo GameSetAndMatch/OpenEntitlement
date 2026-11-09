@@ -7,8 +7,8 @@ import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
 import type { WorkspaceData } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import "./style.css";
-export interface Workspace {id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
-export type Save=(section:string,entry:unknown,title:string)=>Promise<boolean>;
+export interface Workspace {hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
 const pages=["Privilege Catalog","Tiers","Organizations","Configuration","Audit","Settings"];
 function currentPage(){const hash=location.hash.slice(1);if(hash==="catalog")return "Privilege Catalog";return pages.find(p=>p.toLowerCase()===hash)??"Privilege Catalog";}
 export function WorkspaceApp(){
@@ -25,10 +25,10 @@ export function WorkspaceApp(){
   useEffect(()=>{if(!selected)return;let active=true;setWorkspace(undefined);request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active)setWorkspace(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[selected]);
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main")setPage(currentPage());};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);
-  const save:Save=async(section,entry,title)=>{
+  const save:Save=async(section,entry,title,method="PUT")=>{
     if(!workspace)return false;const reason=await ask(title);if(!reason)return false;
     setBusy(true);setError("");
-    try{const result=await request(`/api/workspaces/${workspace.id}/${section}`,"PUT",{entry,revision:workspace.revision,reason});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
+    try{const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,reason});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
     catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}
   };
   async function create(){const reason=await ask("Create workspace");if(!reason)return;setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name,reason});await loadList();setSelected(value.id);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}

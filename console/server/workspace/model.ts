@@ -2,7 +2,7 @@ import {environmentOverride,type EnvironmentOverrides} from "../environment.ts";
 /** Workspace data is independent of deployment identity and OEREP transport. */
 export type Value = boolean | number | string | { unlimited: true };
 export type Role = "Owner" | "Manager" | "User";
-export type Action = "catalog:write" | "tiers:write" | "organizations:write" | "contracts:write" | "members:manage" | "api_keys:manage";
+export type Action = "catalog:write" | "tiers:write" | "organizations:write" | "contracts:write" | "members:manage" | "api_keys:manage" | "hosting:write";
 export interface Group { id: string; name: string; description: string; parentId?: string; legacyFeatureId?:string }
 export interface Tag {id:string;name:string;description:string}
 export interface Feature { id: string; name: string; description: string; groupId?: string; hidden?:boolean; frozen?:boolean }
@@ -10,9 +10,10 @@ export interface Privilege { key: string; name: string; description: string; gro
 export interface Tier { id: string; name: string; rank: number; gracePeriodDays: number }
 export interface Variant { id: string; name: string; tierId: string; kind: "standard" | "trial" | "grace"; values: Record<string, Value> }
 export interface Organization { id: string; name: string; variantId: string; terms: Record<string, Value>; status: "active" | "past_due" | "ended"; graceEndsAt?: string }
-export interface WorkspaceData { groups: Group[]; tags:Tag[]; features: Feature[]; privileges: Privilege[]; tiers: Tier[]; variants: Variant[]; organizations: Organization[]; statusPolicy: { past_due: StatusPolicy; ended: StatusPolicy } }
+export interface SubjectEntitlement { organizationId: string; subjectId: string; name: string; variantId: string; terms: Record<string, Value>; grants: Record<string, number> }
+export interface WorkspaceData { hostedTier?: "pro" | "enterprise"; subjects: SubjectEntitlement[]; groups: Group[]; tags:Tag[]; features: Feature[]; privileges: Privilege[]; tiers: Tier[]; variants: Variant[]; organizations: Organization[]; statusPolicy: { past_due: StatusPolicy; ended: StatusPolicy } }
 export type StatusPolicy = { action: "readOnly" } | { action: "fallback"; variantId: string };
-export const emptyData = (): WorkspaceData => ({ groups: [], tags:[], features: [], privileges: [], tiers: [], variants: [], organizations: [], statusPolicy: { past_due: { action: "readOnly" }, ended: { action: "readOnly" } } });
+export const emptyData = (): WorkspaceData => ({ subjects: [], groups: [], tags:[], features: [], privileges: [], tiers: [], variants: [], organizations: [], statusPolicy: { past_due: { action: "readOnly" }, ended: { action: "readOnly" } } });
 export const actions: Action[] = ["catalog:write", "tiers:write", "organizations:write", "contracts:write", "members:manage", "api_keys:manage"];
 export class WorkspaceError extends Error {
   status: number;
@@ -99,7 +100,7 @@ export function privilege(data: WorkspaceData, input: unknown): Privilege {
   if (Object.hasOwn(result,"default")) { const error = valueError(result,result.default);if(error)throw new WorkspaceError(error,422); }
   else if(data.variants.some(v=>!Object.hasOwn(v.values,key)))throw new WorkspaceError(`Set ${key} in every existing variant before requiring tier values`,409);
   // Updating a definition may not invalidate existing negotiated or variant values.
-  for (const row of [...data.variants.map(v => v.values), ...data.organizations.map(o => o.terms)]) if (Object.hasOwn(row, key)) { const e = valueError(result, row[key]); if (e) throw new WorkspaceError(`Existing value would become invalid: ${e}`, 409); }
+  for (const row of [...data.variants.map(v => v.values), ...data.organizations.map(o => o.terms), ...(data.subjects??[]).map(s=>s.terms)]) if (Object.hasOwn(row, key)) { const e = valueError(result, row[key]); if (e) throw new WorkspaceError(`Existing value would become invalid: ${e}`, 409); }
   return result;
 }
 export function tier(input: unknown): Tier {
@@ -131,7 +132,7 @@ export function organization(data: WorkspaceData, input: unknown, now = new Date
   }
   return result;
 }
-export function resolve(data: WorkspaceData, orgId: string, key: string, now = new Date(), environment:EnvironmentOverrides = {}) {
+export function resolve(data: WorkspaceData, orgId: string, key: string, now = new Date(), environment:EnvironmentOverrides = {}, subjectId?: string) {
   const org = data.organizations.find(o => o.id === orgId), def = data.privileges.find(p => p.key === key);
   if (!org || !def) throw new WorkspaceError("Organization or privilege not found", 404);
   let assigned = data.variants.find(v => v.id === org.variantId)!;
@@ -147,12 +148,21 @@ export function resolve(data: WorkspaceData, orgId: string, key: string, now = n
     else { assigned = data.variants.find(v => v.id === policy.variantId)!; fallback = true; }
   }
   const contract = !fallback && !grace && Object.hasOwn(org.terms, key), explicit = Object.hasOwn(assigned.values, key);
-  const effective=contract?org.terms[key]:explicit?assigned.values[key]:def.default;
+  let effective=contract?org.terms[key]:explicit?assigned.values[key]:def.default;
+  const scoped=subjectId===undefined?undefined:(data.subjects??[]).find(s=>s.organizationId===orgId&&s.subjectId===subjectId);
+  const subjectActive=Boolean(scoped&&scoped.variantId===org.variantId&&!fallback&&!grace);
+  const subjectTerm=subjectActive&&Object.hasOwn(scoped!.terms,key);
+  if(subjectTerm)effective=scoped!.terms[key];
+  const grant=subjectActive?scoped!.grants[key]??0:0;
+  if(grant&&typeof effective==='number'){
+    effective+=grant;
+    const error=valueError(def,effective);if(error)throw new WorkspaceError(error,422);
+  }
   const binding=Object.hasOwn(environment,key)?environment[key]:undefined;
   const defaultFrozen=Boolean(def.frozen||data.features.find(f=>f.id===def.featureId)?.frozen);
   const frozen=Boolean(binding||defaultFrozen);
   if(effective===undefined)throw new WorkspaceError(`${key}: variant has no value`,422);
-  return { privilege: key, environment:binding, frozen, value:binding?(defaultFrozen?def.default:effective)===true&&binding.value:defaultFrozen?def.default:effective, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
+  return { privilege: key, environment:binding, frozen, value:binding?(defaultFrozen?def.default:effective)===true&&binding.value:defaultFrozen?def.default:effective, subjectId, subjectState:scoped?(subjectActive?"active":scoped.variantId!==org.variantId?"stale":"suspended"):"inherited", grantApplied:!frozen&&typeof effective==="number"?grant:0, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":grant&&typeof effective==="number"?"SUBJECT_GRANT":subjectTerm?"SUBJECT":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
 }
 export function catalogEnvironment(data:WorkspaceData,env:NodeJS.ProcessEnv):EnvironmentOverrides {
  const result:EnvironmentOverrides={};

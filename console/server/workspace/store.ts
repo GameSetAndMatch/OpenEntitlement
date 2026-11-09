@@ -70,6 +70,7 @@ export class WorkspaceStore {
     catch (e) { await db.query("ROLLBACK"); throw e; } finally { db.release(); }
   }
   private async authorize(db: pg.PoolClient, account: Account, id: string, action?: Action) {
+    if(action==="hosting:write"&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change Cloud service tiers",403);
     const row = (await db.query("SELECT d.name,m.role FROM oe_cp_directory d LEFT JOIN oe_cp_members m ON m.workspace_id=d.id AND m.account_id=$2 WHERE d.id=$1",[id,account.id])).rows[0];
     if (!row || (!account.platformAdmin && !row.role)) throw new WorkspaceError("Workspace not found",404);
     if (action && !account.platformAdmin && row.role !== "Owner" && !(row.role === "Manager" && action === "members:manage")) throw new WorkspaceError("Your role does not allow this action",403);
