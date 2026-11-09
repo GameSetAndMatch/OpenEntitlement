@@ -18,5 +18,6 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   if(story==='boolean-access')await page.getByRole('switch',{checked:true}).waitFor();
   assert.equal(await page.locator('#error-stack').isVisible(),false,`Story ${story} must render without errors`);
  }
- assert.deepEqual(failures,[]);console.log('Eight compiled Storybook stories rendered successfully in Chromium');
+ for(const story of ['grouped-and-tagged','authoring']){await page.goto(`${origin}/iframe.html?id=privilege-catalog--${story}&viewMode=story`);await page.getByLabel('Filter by tag').waitFor();assert.equal(await page.getByText('Internal privilege',{exact:true}).count(),0);if(story==='grouped-and-tagged')await page.waitForFunction(()=>document.querySelector('select')?.value==='integration');}
+ assert.deepEqual(failures,[]);console.log('Ten compiled Storybook stories rendered successfully in Chromium');
 }finally{await browser?.close();await new Promise(ok=>server.close(ok));}

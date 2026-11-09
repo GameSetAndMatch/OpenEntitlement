@@ -96,7 +96,15 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
       assert.equal((await direct.query("SELECT * FROM oe_cp_state WHERE workspace_id=$1",[wb.data.id])).rows.length,0);
       await assert.rejects(direct.query("UPDATE oe_cp_state SET workspace_id=$1 WHERE workspace_id=$2",[wb.data.id,wa.data.id]),/row-level security/);
       await direct.query("ROLLBACK");
-    }finally{direct.release();}
+      await put("tags",{id:"enterprise",title:"Enterprise"});await put("tags",{id:"integration",title:"Integration"});
+    const canonical={key:"canonical_limit",title:"Canonical limit",description:"A grouped and tagged privilege",type:"integer",default:2,visibility:"read_only",group_id:"product",tags:["enterprise","integration"]};
+    await put("catalog",canonical);
+    await put("catalog",{...canonical,key:"bad_environment",env_override:"MCP_INSTALLED"},422);
+    await put("catalog",{...canonical,key:"bad_tags",tags:["missing"]},400);
+    await put("catalog",{...canonical,key:"many_groups",group_ids:["product","exports"]},422);
+    const publicCatalog=(await call(path+"/catalog",a)).data;assert.deepEqual(publicCatalog.privileges.find((p:any)=>p.key==="canonical_limit"),canonical);assert.equal(publicCatalog.groups.find((g:any)=>g.id==="product").title,"Product");assert.equal(publicCatalog.tags.length,2);
+    const oldOrg=(await call(path,a)).data.data.organizations[0];await put("organizations",{...oldOrg,terms:{...oldOrg.terms,canonical_limit:200}});assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"canonical_limit"})).data.value,2);
+  }finally{direct.release();}
     const parallel=await Promise.all(Array.from({length:12},(_,n)=>store.read(n%2?owner:other,n%2?wa.data.id:wb.data.id)));
     for(let n=0;n<parallel.length;n++)assert.equal(parallel[n]!.id,n%2?wa.data.id:wb.data.id);
     const history=await call(path+"/audit",a);assert.ok(history.data.some((e:any)=>e.actor===owner.id&&e.action==="catalog:write"));

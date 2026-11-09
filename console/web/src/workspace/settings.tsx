@@ -1,4 +1,5 @@
 import { useEffect,useRef,useState } from "react";
+import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
 import { stringify } from "yaml";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
@@ -28,7 +29,7 @@ export function WorkspaceConfiguration({workspace:w}:{workspace:Workspace}){
   const toast=useToast();
   const hidden=new Set(w.data.privileges.filter(p=>p.hidden||w.data.features.find(f=>f.id===p.featureId)?.hidden).map(p=>p.key));
   const visibleValues=(values:Record<string,unknown>)=>Object.fromEntries(Object.entries(values).filter(([key])=>!hidden.has(key)));
-  const yaml=stringify({format:"openentitlement-workspace-snapshot",formatVersion:1,workspace:{id:w.id,name:w.name},...w.data,features:w.data.features.filter(f=>!f.hidden),privileges:w.data.privileges.filter(p=>!hidden.has(p.key)),variants:w.data.variants.map(v=>({...v,values:visibleValues(v.values)})),organizations:w.data.organizations.map(o=>({...o,terms:visibleValues(o.terms)}))});
+  const yaml=stringify({format:"openentitlement-workspace-snapshot",formatVersion:1,workspace:{id:w.id,name:w.name},...w.data,features:undefined,groups:w.data.groups.map(({legacyFeatureId:_legacy,...g})=>({id:g.id,title:g.name,description:g.description,...(g.parentId?{parent_id:g.parentId}:{})})),tags:w.data.tags.map(t=>({id:t.id,title:t.name,description:t.description})),privileges:w.data.privileges.filter(p=>!hidden.has(p.key)).map(p=>catalogDefinition(p,w.data)),variants:w.data.variants.map(v=>({...v,values:visibleValues(v.values)})),organizations:w.data.organizations.map(o=>({...o,terms:visibleValues(o.terms)}))});
   function download(){const url=URL.createObjectURL(new Blob([yaml],{type:"application/yaml"})),a=document.createElement("a");a.href=url;a.download="workspace.yaml";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   return <section className="panel configuration-panel"><div className="section-title"><h2>Workspace YAML</h2><div className="row"><button className="btn" onClick={()=>void navigator.clipboard.writeText(yaml).then(()=>toast("YAML copied")).catch(()=>toast("Copy failed. Select the text or download the file.","err"))}>Copy YAML</button><button className="btn" onClick={download}>Download YAML</button></div></div><p>This read-only snapshot includes the workspace catalog, tier variants, and Organization terms. It excludes hidden definitions, resolved environment values, membership credentials and API keys. Import is not supported yet.</p><pre className="configuration-code" tabIndex={0} aria-label="Workspace YAML"><code>{yaml}</code></pre></section>;
 }

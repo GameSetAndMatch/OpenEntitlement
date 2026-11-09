@@ -38,3 +38,11 @@ A shared contract lets developers evaluate entitlements without embedding a bill
 OpenFeature provides a complementary feature-flag API. OpenEntitlement is an independent project with no Apache or CNCF affiliation. Additional integrations must document their semantic mapping and demonstrate conformance before they can be described as compatible.
 
 See [project status](/docs/project/) for the draft's compatibility and adoption boundaries.
+
+## Protocol portability and hosted service
+
+OpenEntitlement Cloud is intended as an economical hosted implementation, rather than a mandatory backend or a claim of enterprise compliance certification. The specification, SDK contract and conformance scenarios remain independent of its pricing, infrastructure and commercial tiers.
+
+Organizations should be able to choose an implementation that meets their operational and compliance requirements while retaining application-facing entitlement checks. Switching providers requires verified semantic mappings, compatible evaluation behavior and portable Catalog/contract data; a similar API shape alone is insufficient. Publish actual provider capabilities and compatibility results rather than implying certification or guaranteed portability.
+
+The hosted implementation's operating costs and commercial policies belong to that service. They do not define what another provider must charge or how it must deploy.

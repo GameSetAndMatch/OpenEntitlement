@@ -1,5 +1,6 @@
 /** Console configuration: which provider sits behind the console, chosen by environment. */
 
+import {standaloneCatalog} from "./workspace/privilege-definition.ts";
 import {environmentOverride,type EnvironmentOverrides} from "./environment.ts";
 import {withEnvironmentOverrides} from "./environment-provider.ts";
 import {parseDocument} from "yaml";
@@ -76,7 +77,7 @@ export interface Runtime {
 export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
   const document=parseDocument(readFileSync(cfg.catalogPath,"utf8"),{uniqueKeys:true});
   if(document.errors.length)throw new Error("Invalid Catalog YAML/JSON");
-  const source=document.toJS({maxAliasCount:0});
+  const source=standaloneCatalog(document.toJS({maxAliasCount:0})) as {features:Array<Record<string,any>>};
   const catalog = Catalog.fromJSON(source);
   const environment:EnvironmentOverrides={...cfg.environment};
   const frozen:Record<string,unknown>={};

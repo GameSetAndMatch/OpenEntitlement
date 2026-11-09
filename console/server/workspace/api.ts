@@ -1,8 +1,10 @@
+import {parsePrivilege} from "./privilege-definition.ts";
+import {storedDefinition,catalogDefinition} from "./catalog-adapter.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readJson, send } from "../http.ts";
 import { Authentication } from "./auth.ts";
 import { WorkspaceStore } from "./store.ts";
-import { WorkspaceError, object, text, group, feature, privilege, tier, variant, organization, resolve, catalogEnvironment, type StatusPolicy } from "./model.ts";
+import { WorkspaceError, object, text, group, feature, privilege, tag, tier, variant, organization, resolve, catalogEnvironment, type StatusPolicy } from "./model.ts";
 
 export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:NodeJS.ProcessEnv={...process.env}) {
   return async (req: IncomingMessage,res: ServerResponse) => {
@@ -28,10 +30,11 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     const reason=() => text(body.reason,"Reason",2000);
     if (path === "/api/workspaces" && method === "POST") { send(res,201,await store.create(account,text(body.name,"Workspace name"),reason()));return true; }
     if (path === "/api/invitations/accept" && method === "POST") { send(res,200,await store.acceptInvite(account,text(body.token,"Invitation token")));return true; }
-    const match=/^\/api\/workspaces\/([^/]+)(?:\/(groups|features|privileges|tiers|variants|organizations|policy|audit|members|invitations|keys|evaluate))?(?:\/([^/]+))?$/.exec(path);
+    const match=/^\/api\/workspaces\/([^/]+)(?:\/(groups|tags|catalog|features|privileges|tiers|variants|organizations|policy|audit|members|invitations|keys|evaluate))?(?:\/([^/]+))?$/.exec(path);
     if (!match) throw new WorkspaceError("Endpoint not found",404);
     const [,id,section,target]=match;
     if (!section && method === "GET") { const workspace=await store.read(account,id!);send(res,200,{...workspace,environment:catalogEnvironment(workspace.data,env)});return true; }
+    if(section==="catalog"&&method==="GET"){const workspace=await store.read(account,id!);send(res,200,{privileges:workspace.data.privileges.map(p=>catalogDefinition(p,workspace.data)),groups:workspace.data.groups.map(g=>({id:g.id,title:g.name,description:g.description,...(g.parentId?{parent_id:g.parentId}:{})})),tags:workspace.data.tags.map(t=>({id:t.id,title:t.name,description:t.description}))});return true;}
     if (section === "audit" && method === "GET") { send(res,200,await store.history(account,id!));return true; }
     if (section === "invitations" && method === "POST") {
       if (!["Owner","Manager","User"].includes(body.role))throw new WorkspaceError("Invalid role");
@@ -52,15 +55,18 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     }
     if (section === "keys" && target && method === "DELETE") { if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target))throw new WorkspaceError("API key not found",404); await store.revokeKey(account,id!,target,reason());send(res,200,{});return true; }
     if (section === "evaluate" && method === "POST") { const workspace=await store.read(account,id!);send(res,200,resolve(workspace.data,text(body.organizationId,"Organization"),text(body.privilege,"Privilege"),new Date(),catalogEnvironment(workspace.data,env)));return true; }
-    if (method !== "PUT" || !["groups","features","privileges","tiers","variants","organizations","policy"].includes(section ?? "")) throw new WorkspaceError("Method not allowed",405);
+    if (method !== "PUT" || !["groups","tags","catalog","features","privileges","tiers","variants","organizations","policy"].includes(section ?? "")) throw new WorkspaceError("Method not allowed",405);
     if (!Number.isSafeInteger(body.revision) || body.revision < 1) throw new WorkspaceError("Current workspace revision is required");
-    const action=section === "groups" || section === "features" || section === "privileges" ? "catalog:write" : section === "organizations" ? "contracts:write" : section === "policy" ? "contracts:write" : "tiers:write";
+    const action=section === "groups" || section === "tags" || section === "catalog" || section === "features" || section === "privileges" ? "catalog:write" : section === "organizations" ? "contracts:write" : section === "policy" ? "contracts:write" : "tiers:write";
     const changed=await store.change(account,id!,action,reason(),body.revision,data => {
-      const entry=body.entry;
+      let entry=body.entry;
+      if((section==="groups"||section==="tags")&&entry&&typeof entry==="object"&&"title" in entry){const {title,parent_id,...rest}=entry as Record<string,unknown>;entry={...rest,name:title,...(parent_id?{parentId:parent_id}:{})};}
+      if(section==="catalog"){try{entry=storedDefinition(parsePrivilege(entry));}catch(e){throw new WorkspaceError((e as Error).message,422);}}
       const upsert=<T>(list: T[],value: T,key: (v: T) => string) => { const index=list.findIndex(v => key(v) === key(value));if(index<0)list.push(value);else list[index]=value; };
       if (section === "groups") upsert(data.groups,group(data,entry),v => v.id);
+      if(section==="tags")upsert(data.tags,tag(entry),v=>v.id);
       if (section === "features") upsert(data.features,feature(data,entry),v=>v.id);
-      if (section === "privileges") {
+      if (section === "privileges"||section==="catalog") {
         const def=privilege(data,entry),previous=data.privileges.find(p=>p.key===def.key);
         if(def.envVariable!==previous?.envVariable&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change server environment bindings",403);
         upsert(data.privileges,def,v=>v.key);

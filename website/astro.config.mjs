@@ -18,6 +18,7 @@ export default defineConfig({
         { label: 'Introduction', slug: 'docs' },
         { label: 'Quickstart', slug: 'docs/quickstart' },
         { label: 'Core concepts', slug: 'docs/concepts' },
+        { label: 'Privilege Catalog', slug: 'docs/privilege-catalog' },
         { label: 'Specification overview', slug: 'docs/specification' },
       ] },
       { label: 'Build with OpenEntitlement', items: [

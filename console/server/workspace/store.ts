@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
+import {normalizeCatalog} from "./catalog-adapter.ts";
 import { emptyData, WorkspaceError, type Action, type Role, type WorkspaceData } from "./model.ts";
 
 export interface Account { id: string; email: string; platformAdmin: boolean }
@@ -88,7 +89,7 @@ export class WorkspaceStore {
     return this.transaction(id,async db => {
       const meta = await this.authorize(db,account,id);
       const row = (await db.query("SELECT data,revision FROM oe_cp_state WHERE workspace_id=$1",[id])).rows[0];
-      return { id,...meta,data: row.data as WorkspaceData,revision: Number(row.revision) };
+      return { id,...meta,data: normalizeCatalog(row.data as WorkspaceData),revision: Number(row.revision) };
     });
   }
   async change(account: Account,id: string,action: Action,reason: string,revision: number,change: (d: WorkspaceData) => void) {
@@ -96,7 +97,7 @@ export class WorkspaceStore {
       await this.authorize(db,account,id,action);
       const row = (await db.query("SELECT data,revision FROM oe_cp_state WHERE workspace_id=$1 FOR UPDATE",[id])).rows[0];
       if (Number(row.revision) !== revision) throw new WorkspaceError("Workspace changed elsewhere. Refresh before saving.",409);
-      const before = structuredClone(row.data); change(row.data);
+      const before = structuredClone(row.data); row.data=normalizeCatalog(row.data);change(row.data);
       if (JSON.stringify(row.data).length > 900000) throw new WorkspaceError("Workspace configuration is too large",413);
       await db.query("UPDATE oe_cp_state SET data=$2,revision=revision+1 WHERE workspace_id=$1",[id,row.data]);
       await this.audit(db,id,account,action,reason,before,row.data);
@@ -165,6 +166,6 @@ export class WorkspaceStore {
     return this.transaction(id,async db => { await this.authorize(db,account,id,"api_keys:manage"); const result=await db.query("UPDATE oe_cp_keys SET revoked=true WHERE id=$1 AND workspace_id=$2",[keyId,id]); if(!result.rowCount)throw new WorkspaceError("API key not found",404); await this.audit(db,id,account,"api_keys:revoke",reason,null,{ id: keyId }); });
   }
   async key(value: string) { return (await this.pool.query("SELECT workspace_id,scope,created_by FROM oe_cp_keys WHERE hash=$1 AND NOT revoked",[hash(value)])).rows[0]; }
-  async keyData(id: string) { return this.transaction(id,async db => (await db.query("SELECT data FROM oe_cp_state WHERE workspace_id=$1",[id])).rows[0]?.data as WorkspaceData); }
+  async keyData(id:string){return this.transaction(id,async db=>normalizeCatalog((await db.query("SELECT data FROM oe_cp_state WHERE workspace_id=$1",[id])).rows[0].data));}
   async close() { await this.pool.end(); }
 }
