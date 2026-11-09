@@ -41,13 +41,13 @@ The **contract** is the only link between payment and entitlements:
 
 | Data | Where | Who changes it, and how |
 |---|---|---|
-| Privilege definitions | the application's code | developers, in a release |
-| Tier variant defaults | **one versioned file** in the repository (`tier_variants.yaml`) | a reviewed PR and a release. **This is the only way.** No API and no migration changes a default. |
+| Privilege definitions | Workspace catalog, consumed by application code and SDK validation | authorized Workspace catalog authors; reviewed files for fixed installations |
+| Tier variant values | Workspace control-plane data in SaaS; reviewed `tier_variants.yaml` for fixed installations | authorized Workspace authors in SaaS; a reviewed release for fixed installations |
 | Contracts and their terms | database | Sales and ops in the admin (SaaS); the install file (self-hosted) |
 | Grants | database | ops, in the admin |
 | History | database for Organization changes; git history for defaults | automatic |
 
-Changing a default for everyone is rare and should be reviewed, so a release is the right path. Changing what one Organization gets is frequent and should not need a release, so it happens on that Organization's contract.
+Catalog defaults are shared within a Workspace. Tier variants inherit them unless explicitly replaced; a customer-specific exception belongs on the Organization's contract. Publishing changes must validate the complete effective variants and preserve audit history. Do not expose two independent writable sources for the same Workspace.
 
 ## 3. Privilege definitions: a JSON Schema subset
 
@@ -89,7 +89,7 @@ A name never contains a tier or a price. A capability that every tier has gets n
 
 ## 4. Values: three layers in V1
 
-1. **The tier variant's default**, from the file.
+1. **The effective tier variant default**: its explicit value, otherwise the Workspace catalog default. Fixed installations publish this configuration through reviewed files.
 2. **The contract's terms**, per Organization, with an end date.
 3. **Grants**, which add to allowances and add up.
 
@@ -173,9 +173,9 @@ These are decisions for the initial implementation, not open requests for more t
 
 | v0.1 (current spec and SDKs) | Proposed behavior |
 |---|---|
-| Plan, with `variantOf` for trials | Tier variant (`tier`, `trial`), with defaults read only from `tier_variants.yaml` |
-| Plan values edited through the admin API and console | Read-only at runtime. The admin API refuses default writes. |
-| Partial plan values, falling back to the catalog default | Every variant values every privilege, checked at startup |
+| Plan, with `variantOf` for trials | Tier variant (`tier`, `trial`), with catalog-default inheritance and explicit variant values |
+| Plan values edited through the admin API and console | Workspace-authorized catalog/tier authoring in SaaS; read-only at runtime for fixed installations |
+| Partial plan values, falling back to the catalog default | Every effective variant values every privilege after inheritance, validated before publication/startup |
 | Assignment (Organization → plan) | The contract's `tier_variant` |
 | Overrides (plan-family bound, stale when the family changes; Organization, subject or resource scope) | Contract terms, Organization scope only. Subject and resource overrides are removed in V1. |
 | Grants (additive, optional subject) | Unchanged |
@@ -199,7 +199,7 @@ The application flow is:
 3. **Create tiers and variants.** Each privilege inherits its catalog default unless the tier variant explicitly replaces it. The UI distinguishes inherited defaults from explicit values. Resolve and validate a complete effective variant before assignment.
 4. **Assign a tier variant to an Organization**, then apply negotiated Organization-level contract terms where needed. Preserve the source and effective value in the read model.
 
-The latest catalog-first UI requirement supersedes the earlier assumption in this proposal that all default authoring is release-file-only and the console can never author definitions or tiers. Workspace-authorized administrators need the catalog/tier authoring workflow. Definitions and values must use the same validation as the server and SDK contract. A reviewed export/release remains a possible deployment workflow, not a second competing source of truth. Fixed installations remain read-only at runtime. Existing dotted keys require an explicit migration preserving assignments and negotiated values; do not merely strip dots in the UI or rewrite identifiers without migrating references.
+The latest catalog-first UI requirement replaces the release-file-only restriction in earlier revisions. Workspace-authorized administrators need the catalog/tier authoring workflow. Definitions and values must use the same validation as the server and SDK contract. A reviewed export/release remains a possible deployment workflow, not a second competing source of truth. Fixed installations remain read-only at runtime. Existing dotted keys require an explicit migration preserving assignments and negotiated values; do not merely strip dots in the UI or rewrite identifiers without migrating references.
 
 ### Platform administration
 
