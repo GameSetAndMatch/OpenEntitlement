@@ -17,13 +17,14 @@ export default defineConfig({
       { label: 'Start here', items: [
         { label: 'Introduction', slug: 'docs' },
         { label: 'Quickstart', slug: 'docs/quickstart' },
+        { label: 'ACME Workspace walkthrough', slug: 'docs/acme-workspace' },
         { label: 'Core concepts', slug: 'docs/concepts' },
         { label: 'Privilege Catalog', slug: 'docs/privilege-catalog' },
         { label: 'Specification overview', slug: 'docs/specification' },
       ] },
       { label: 'Build with OpenEntitlement', items: [
-        { label: 'TypeScript SDK', slug: 'docs/typescript' },
         { label: 'Python SDK', slug: 'docs/python' },
+        { label: 'TypeScript SDK', slug: 'docs/typescript' },
         { label: 'Self-host the service', slug: 'docs/self-hosting' },
         { label: 'Guards & usage', slug: 'docs/guards' },
       ] },

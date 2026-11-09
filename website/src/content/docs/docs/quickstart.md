@@ -7,10 +7,13 @@ Run a local service, inspect the demo organizations, and evaluate a real entitle
 
 ## 1. Start the service
 
-This walkthrough uses the sample organizations, so start a disposable instance with demo data:
+This walkthrough uses the current source Catalog (`seat_max`, `project_max`, and other flat keys). Until a Docker release containing these keys is published, build the image from this checkout; older published images retain their previous Catalog keys:
 
 ```sh
-docker run --rm -p 127.0.0.1:8787:8787 -e OE_SEED=demo olivierbelhumeur/openentitlement
+git clone https://github.com/GameSetAndMatch/OpenEntitlement.git
+cd OpenEntitlement
+docker build -t openentitlement:local .
+docker run --rm -p 127.0.0.1:8787:8787 -e OE_SEED=demo openentitlement:local
 ```
 
 Or, from source (requires Git, npm, and **Node 24**; Node ≥22.18 also supports the source runner):
@@ -28,7 +31,7 @@ Open **http://localhost:8787** for the administrative console. The memory backen
 ## 2. Resolve an entitlement
 
 ```sh
-curl http://localhost:8787/oerep/v1/resolve/seats.max \
+curl http://localhost:8787/oerep/v1/resolve/seat_max \
   -H 'Content-Type: application/json' \
   -d '{"context":{"organizationId":"acme"}}'
 ```
@@ -51,6 +54,6 @@ In the console, choose Hooli, set current project usage to 1, and request anothe
 
 ## 4. Connect your application
 
-Use the [TypeScript](/docs/typescript/) or [Python](/docs/python/) remote provider. The application's catalog must agree with the server's catalog.
+Use the [Python](/docs/python/) or [TypeScript](/docs/typescript/) remote provider. The application's catalog must agree with the server's catalog.
 
 For deployments, use the [Postgres hosting guide](/docs/self-hosting/) and configure separate administrative and evaluation credentials. The local demo permits anonymous access by default.

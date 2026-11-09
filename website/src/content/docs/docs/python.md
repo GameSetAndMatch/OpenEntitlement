@@ -5,6 +5,16 @@ description: Evaluate entitlements from Python using the synchronous reference S
 
 The Python SDK is synchronous and uses `urllib` from the standard library for remote evaluation.
 
+## Install
+
+```sh
+pip install openentitlement-sdk
+# Optional validated Catalog authoring:
+pip install 'openentitlement-sdk[authoring]>=0.2.0'
+```
+
+The distribution name is `openentitlement-sdk`; Python imports remain `openentitlement`. The authoring extra provides Pydantic models from `openentitlement.authoring`; the runtime alone needs no third-party dependencies. Follow the [ACME Workspace walkthrough](/docs/acme-workspace/) for typed Privileges, Groups, Tags, Tiers, Organizations and user exceptions. New authoring APIs described here require the corresponding released SDK version; use the source checkout until it is published.
+
 ## Use the source workspace
 
 Requires Python ≥3.10 and [uv](https://docs.astral.sh/uv/). From the repository root:
@@ -34,9 +44,9 @@ client = create_client(
     ),
 )
 context = {'organization_id': 'acme'}
-print(client.get_limit('seats.max', context))  # 250
+print(client.get_limit('seat_max', context))  # 250
 print(client.is_enabled('sso', context))      # True
-print(client.get_details('seats.max', context).to_dict())
+print(client.get_details('seat_max', context).to_dict())
 ```
 
 ## Use idiomatic names
@@ -44,7 +54,7 @@ print(client.get_details('seats.max', context).to_dict())
 Python uses snake_case: `get_limit`, `is_enabled`, `get_enum`, `get_details`, `require_within`, and `required_plan`. Wire JSON retains the specification's camelCase names.
 
 ```python
-client.require_within('projects.max', 4, 1, {'organization_id': 'globex'})
+client.require_within('project_max', 4, 1, {'organization_id': 'globex'})
 ```
 
 For a shared pool with a subject allowance, usage is `{'pool': 4, 'subject': 0}`. The `pool` count is required. Invalid input raises `InvalidArgument`.

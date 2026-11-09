@@ -10,7 +10,7 @@ OEREP is the OpenEntitlement Remote Evaluation Protocol. A generic SDK provider 
 ## Resolve one privilege
 
 ```http
-POST /oerep/v1/resolve/seats.max
+POST /oerep/v1/resolve/seat_max
 Content-Type: application/json
 Authorization: Bearer <evaluation-token>
 
@@ -19,7 +19,7 @@ Authorization: Bearer <evaluation-token>
 
 ```json
 {
-  "privilege": "seats.max",
+  "privilege": "seat_max",
   "value": 250,
   "reason": "OVERRIDE",
   "planId": "business",

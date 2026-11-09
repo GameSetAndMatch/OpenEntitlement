@@ -27,7 +27,7 @@ For all three packages, configure GitHub Actions as the Trusted Publisher:
 | Field | Value |
 |---|---|
 | GitHub owner | `GameSetAndMatch` |
-| Repository | `openentitlement` |
+| Repository | `OpenEntitlement` |
 | Workflow filename | `publish-npm.yml` |
 | Environment | `npm` |
 | Allowed action | direct `npm publish` |

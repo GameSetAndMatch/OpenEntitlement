@@ -23,7 +23,7 @@ release lock
 The following callbacks are application-specific. With `PostgresAdvisoryLock`, `tx` is the `PoolClient` of a transaction holding an advisory lock.
 
 ```ts
-await client.guard('projects.max', 1, { organizationId }, {
+await client.guard('project_max', 1, { organizationId }, {
   count: async (tx) => {
     const { rows } = await tx.query(
       'select count(*)::integer as n from projects where organization_id = $1',
