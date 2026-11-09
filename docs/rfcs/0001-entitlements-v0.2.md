@@ -6,6 +6,8 @@
 - **Replaces:** the drafts in PR #17 and PR #18.
 - **Examples:** [`tier_variants.yaml`](examples/tier_variants.yaml), [`entitlements.yaml`](examples/entitlements.yaml)
 
+> Authoring update: [RFC-0002](0002-privilege-catalog.md) and [ADR-0003](../../ADR-0003.md) supersede the older authoring terminology and release-file-only default rule. The remaining contract refinement is still a proposal; it does not supersede released OEREP behavior.
+
 This revision comes from running an entitlement layer in production: two tiers, trials, deals negotiated by Sales, card payments, and a self-hosted install. It keeps what worked and simplifies the rest. Sections 1 to 8 are the proposal. Sections 9 to 11 map it onto OpenEntitlement's current terms and behavior, and list what must still be settled.
 
 In this document, **Organization** is the entitled party: the customer using the application, identified by `organizationId` (see [GLOSSARY.md](../../GLOSSARY.md)). Some source notes call this party a "tenant". In OpenEntitlement, Tenant means a customer of the hosted OpenEntitlement service. The two are different.

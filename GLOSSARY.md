@@ -1,76 +1,74 @@
 # OpenEntitlement glossary
 
-Shared language for the service, SDKs, specification, and contributor reviews.
+Shared domain language for the authoring model and service. Compatibility terms identify older protocol concepts without redefining their released behavior.
 
 ## Entitlement model
 
 | Term | Definition |
 |---|---|
-| **Organization** | The entitled party: one of a Tenant's own customers, the account that has a plan. Identified by `organizationId`. Not to be confused with a Tenant. |
-| **Subject** | An optional actor within an organization (a user or service account). Identified by `subjectId`. |
-| **Resource** | An optional object within an organization (a project or workspace) that can carry its own overrides. Identified by `resourceId`. |
-| **Feature** | A named product capability, declared in code, made of one or more privileges. |
-| **Privilege** | One typed dimension of a feature (`seats.max`, `sso.enabled`), declared in code. |
-| **Gate** | The privilege that decides `isEnabled(feature)`. |
-| **Catalog** | The set of features and privileges an application declares. |
-| **Plan** | A named set of privilege values. Values are data, not code. |
-| **Variant** | A plan with `variantOf` set (a trial, for example). It shares the base plan's family. |
-| **Family** | `variantOf ?? id`. Overrides bind to families. |
-| **Assignment** | The link between an organization and its current plan, plus an opaque payment `channel`. |
-| **Override** | A per-scope value that *replaces* the plan value, bound to a plan family, dated, with a mandatory reason. |
-| **Stale override** | An override whose family no longer matches the organization's plan. It is inert, but kept. |
-| **Grant** | An additive amount of an integer privilege for a scope, dated, independent of the plan. |
-| **Pool** | The organization-wide quota: the base value plus organization-scoped grants. |
-| **Subject allowance** | The sum of grants scoped to one subject. Only that subject draws from it, before the pool. |
-| **UNLIMITED** | A distinct value meaning "no limit". It is not an integer and not null. |
-| **Resolution details** | The full answer to an evaluation: value, reason, plan value, override, grants, stale overrides, and error. |
-| **Provider** | The adapter that resolves values from a source of truth. |
-| **Fixed provider** | A provider for installs with no commercial terms (self-hosted): everything on, nothing overridable. |
-| **Lock** | Serializes `guard` calls per `(organizationId, privilege)`. |
-| **Hook** | Code that runs at the `before`, `after`, `error`, and `finally` stages of an evaluation or a mutation. |
+| **Privilege** | One typed entitlement value: a boolean permission, integer allowance or string-enum choice. |
+| **Privilege Catalog** | The definitions, defaults and metadata of a product's Privileges. Preferred over Feature Catalog for the authoring surface. |
+| **Group** | A hierarchical container for Privileges. A Privilege can belong to at most one Group. |
+| **Tag** | A reusable label independent of Group hierarchy. A Privilege may have several Tags. |
+| **Visibility** | Whether a Privilege is editable, read-only or hidden in normal controls. |
+| **Read-only Privilege** | A visible, locked Privilege whose Catalog default supplies its value. |
+| **Hidden Privilege** | A Privilege omitted from normal controls that still has an effective value. |
+| **Environment prerequisite** | An install condition that can veto a boolean Privilege but cannot grant it. |
+| **Tier** | A reusable commercial level, such as Basic, Business or Enterprise. Preferred over Plan in new authoring language. |
+| **Tier variant** | A Tier's standard, trial or grace conditions and default Privilege values. |
+| **Trial** | A time-limited variant of a Tier, not a commercial Tier itself. |
+| **Grace period** | A bounded period of defined rights after a qualifying contract-status change. |
+| **Organization** | An entitled customer managed within a Workspace. Distinct from the Workspace, Account and technical Tenant. |
+| **Subject** | A person, service account or other actor to whom an entitlement may apply. |
+| **Resource** | An application object that may be subject to an entitlement. |
+| **Contract** | The link between agreed commercial terms and an Organization's entitled rights. |
+| **Assignment** | The association between an Organization and its current commercial offer. |
+| **Override** | A scoped replacement for an inherited commercial value. Distinct from a restrictive environment prerequisite. |
+| **Grant** | An additive allowance for a scope, rather than a replacement value. |
+| **Unlimited** | An explicit absence of a numeric cap, not a missing value, null or an arbitrary large number. |
+| **Resolved value** | The effective entitlement value after applying the relevant precedence rules. |
+| **Usage** | Consumption measured by the application or a metering system. |
+| **Consumption dashboard** | A view combining entitlement limits with reported usage and its freshness. |
 
-
-## Hosted service
-
-| Term | Definition |
-|---|---|
-| **Tenant** | A customer of the hosted OpenEntitlement service. It owns its own catalog, plans, Organizations, and records, isolated from every other Tenant. |
-| **Account** | A person's sign-in identity. One Account can be a Member of several Tenants and can create new Tenants. |
-| **Member** | An Account's membership in one Tenant, with exactly one Role there. |
-| **Role** | What a Member is in a Tenant: Owner, Manager, or User. A Role is a named bundle of Permissions. |
-| **Owner** | The Role that pays for the Tenant's subscription to the service, and can do everything in the Tenant. |
-| **Manager** | The Role that invites Accounts into the Tenant and removes Members from it. |
-| **User** | The Role that can navigate the Tenant without changing it, except where a Permission says otherwise. |
-| **Permission** | The right to perform one kind of action in a Tenant, such as reading plans or overriding a plan value. |
-| **Permission scope** | The part of a Tenant a Permission covers: everything, or only specific Plans or specific Organizations. |
-
-## Protocol and service
+## Control plane and identity
 
 | Term | Definition |
 |---|---|
-| **OEREP** | OpenEntitlement Remote Evaluation Protocol: the HTTP/JSON contract between generic SDK providers and entitlement servers. See [§10](spec/sections/10-remote-evaluation.md). |
-| **Remote provider** | The SDK implementation that sends evaluation requests over OEREP and validates the returned details before using them. |
-| **Data plane** | The `/oerep/v1/` evaluation endpoints. Reads entitlement decisions; does not mutate plans or consume application quota. |
-| **Administrative API** | The separate `/api/` endpoints for inspection and audited changes to plans, assignments, overrides, and grants. |
-| **Inspection** | Optional read-only listing of plans, assignments, overrides, grants, and audit events. Listing must not let a caller mutate stored facts. |
-| **Usage** | Consumption measured by the application. An integer for a single pool, or a breakdown with required `pool` usage and optional `subject` allowance usage. |
-| **Guard** | A locked resolve → count → check → act operation over application usage. The lock belongs to the application, not the remote server. |
-| **Fail closed** | On evaluation failure, use the privilege's declared default, clear applied grants, and suppress upgrade suggestions. A default may itself permit access; choose defaults deliberately. |
-| **Audit event** | A record of a successful mutation with actor, reason, entity, action, before/after state, and time. |
+| **Workspace** | A business's control plane for its Catalog, Tiers, Organizations, members and records. |
+| **Tenant** | A technical isolation context in shared infrastructure. Not the preferred name for a Workspace or an Organization. |
+| **Account** | A person's sign-in identity, which may participate in multiple Workspaces. |
+| **Member** | An Account's membership in a Workspace. |
+| **Role** | A member's administrative authority within a Workspace. |
+| **Owner** | A Role with full Workspace administration, including membership management. |
+| **Manager** | A Role with delegated membership management. |
+| **User** | A Role with read access to the Workspace. |
+| **Platform administrator** | An operator with authority across Workspaces, distinct from an Organization's entitled users. |
+| **Permission** | Authority to perform an administrative/application action; separate from commercial entitlement. |
 
-## Design and review vocabulary
+## Interoperability and commercial context
 
 | Term | Definition |
 |---|---|
-| **ADR** | Architecture Decision Record: records an architectural choice, its context, and consequences. [ADR-0001](ADR-0001.md) establishes the protocol-plus-own-server direction. Bug fixes that preserve that decision do not each require a new ADR. |
-| **RFC** | Request for Comments: a proposal used to discuss a contract or design before adopting it. This repo's existing spec cites RFC 2119 and RFC 8174 for normative language; those citations are not new feature proposals. |
-| **Normative requirement** | A numbered rule in the specification. `MUST` is required, `SHOULD` permits a justified exception, and `MAY` is optional. |
-| **Standards review** | Checks the implementation against documented engineering constraints and design heuristics. A possible code smell is a judgement call, not automatically a defect. |
-| **Spec review** | Independently checks behavior against the originating specification: missing behavior, incorrect behavior, and unrequested scope. |
-| **Grilling / grill-me** | A structured interview that resolves uncertainty in an idea or design. Use it when a decision is missing, not to invent answers already stated in the specification. |
-| **Grill-with-docs** | An interview that also retains agreed domain language and architectural decisions in glossary entries and ADRs. |
-| **TDD** | Test-driven development: demonstrate a failure, make the smallest behavior fix, and verify it passes before continuing. |
-| **Red / green** | A regression test fails against the old behavior (red), then passes with the fix (green). A test that never failed does not demonstrate the original defect. |
-| **Test seam** | The public boundary where behavior is observed: for example the SDK API or the service's HTTP endpoints. |
-| **Two-way door** | A change that is practical to roll back. A one-way door involves a hard-to-reverse consequence, such as destructive data migration. |
-| **Blast radius** | The consumers and behaviors a change could affect, even when its diff is small. |
+| **OEREP** | OpenEntitlement Remote Evaluation Protocol, the shared contract for remote entitlement decisions. |
+| **Provider** | An implementation that resolves entitlement values from a source of truth. |
+| **Remote provider** | A provider that obtains decisions from a remote entitlement service. |
+| **Connector** | An integration that translates explicitly mapped external facts or operations across systems. |
+| **Conformance** | Demonstrated agreement with the relevant semantic and protocol requirements. |
+| **Control plane** | Administration of definitions, commercial facts, membership and policies. |
+| **Data plane** | Application-facing evaluation of entitlement decisions. |
+| **Quote-to-Cash** | The commercial flow from a quote/order through agreed rights, billing, collection and renewal. |
+| **Deployment** | Where and how software runs, independent of its commercial Tier. |
+
+## OEREP v1 compatibility language
+
+| Term | Definition |
+|---|---|
+| **Feature** | The v1 grouping of one or more Privileges with a gate. Not the preferred new authoring entity. |
+| **Gate** | The Privilege used to decide whether a v1 Feature is enabled. |
+| **Plan** | The v1 named set of Privilege values. |
+| **Family** | Related v1 Plans that share override-binding identity. |
+| **Stale override** | A retained override whose binding no longer matches its active commercial context. |
+| **Pool** | An Organization-wide allowance shared by relevant usage. |
+| **Subject allowance** | A scoped allowance available to one Subject. |
+| **Fixed provider** | A provider whose installed values are not commercially editable through its mutation interface. |
+| **Guard** | An application operation that coordinates evaluation with counting and acting. |

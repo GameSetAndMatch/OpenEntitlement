@@ -2,6 +2,8 @@
 
 > Historical discovery notes. For a narrower, re-verified model comparison, use the [vendor data-model matrix](docs/research/vendor-data-model-matrix.md) (2026-11-04). It distinguishes evidence from unknowns and corrects earlier categorical statements about Lago unlimited values, Stigg promotional semantics, and direct OpenMeter/Schematic provisioning.
 
+**Research extension, 2026-11-09:** [Revenera/FlexNet connector spike](docs/research/revenera-connector-spike.md) adds commercial licensing/entitlement prior art, including API/SDK boundaries, Quote-to-Cash and IAM/billing separation. The original discovery notes below remain historical.
+
 *Researched 2026-11-03.* Sources: web search; GitHub search (`gh search repos`) for `entitlements spec`, `entitlement specification`, `open entitlements`, `openentitlement`, `entitlements sdk provider`, `plan limits sdk`, `entitlements openfeature`, `entitlements`, `entitlements billing`; Hacker News search through the Algolia API for `open entitlements`, `entitlements spec`, `entitlements standard`, `entitlements open source`, `plan limits sdk`, `openfeature entitlements`, `entitlement service open source`; and a CNCF landscape search. Web search returned no relevant Reddit threads, and Reddit was not queried directly.
 
 ## Verdict: no open entitlements *standard* exists, so we proceed
@@ -21,6 +23,7 @@ None of them is a standard. Every group-2 project could *implement* OpenEntitlem
 | Project | Kind | License | Status (2026-11-03) | Why it isn't the standard |
 |---|---|---|---|---|
 | [Stripe Entitlements](https://docs.stripe.com/billing/entitlements) | SaaS feature list | proprietary | active | Boolean features only, derived from Stripe subscriptions |
+| [Revenera / FlexNet](docs/research/revenera-connector-spike.md) | Commercial entitlement and licensing platform | proprietary; SDK terms require verification | public docs reviewed 2026-11-09; current Entitlement REST marked beta | Vendor system with distinct management APIs and runtime licensing semantics; not verified OEREP-compatible |
 | [Stigg](https://docs.stigg.io) | SaaS | proprietary | active | Vendor model and SDK |
 | [Schematic](https://docs.schematichq.com) | SaaS | proprietary | active | Vendor model, and entitlements *are* its flags |
 | Planship ([Stripe app](https://marketplace.stripe.com/apps/planship)) | SaaS | proprietary (client SDKs MIT) | active | Vendor model |
