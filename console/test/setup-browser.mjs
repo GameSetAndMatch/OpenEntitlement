@@ -35,7 +35,18 @@ try {
     assert.equal(badRequests.length, 0, 'Refresh must not load an empty organization');
     assert.equal(await page.getByRole('heading', { name: 'Set up your workspace' }).isVisible(), true);
     assert.equal(await page.getByRole('alert').count(), 0);
-    await page.getByRole('button', { name: 'Configuration', exact: true }).click();
+    await page.getByRole('link', { name: 'Tiers', exact: true }).click();
+    await page.getByRole('heading', { name: 'Tier comparison' }).waitFor();
+    assert.equal(new URL(page.url()).hash, '#/tiers');
+    assert.equal(await page.getByRole('heading', { name: 'Set up your workspace' }).count(), 0);
+    await page.reload();
+    await page.getByRole('heading', { name: 'Tier comparison' }).waitFor();
+    await page.getByRole('link', { name: 'Audit', exact: true }).click();
+    assert.equal(new URL(page.url()).hash, '#/audit');
+    assert.equal(await page.getByRole('heading', { name: 'Set up your workspace' }).count(), 0);
+    await page.goBack();
+    await page.getByRole('heading', { name: 'Tier comparison' }).waitFor();
+    await page.getByRole('link', { name: 'Configuration', exact: true }).click();
     await page.getByRole('heading', { name: 'YAML configuration' }).waitFor();
     const code = page.getByLabel('Read-only YAML configuration');
     const shown = await code.textContent();
@@ -48,7 +59,7 @@ try {
     const download = await pending;
     assert.equal(download.suggestedFilename(), 'openentitlement.snapshot.yaml');
     assert.equal(await readFile(await download.path(), 'utf8'), shown);
-    await page.getByRole('button', { name: 'Organizations', exact: true }).click();
+    await page.getByRole('link', { name: 'Organizations', exact: true }).click();
     await page.getByRole('heading', { name: 'Set up your workspace' }).waitFor();
     await page.close();
   }

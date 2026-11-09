@@ -9,6 +9,12 @@ import { WorkspaceSetup } from "./setup.tsx";
 
 type Organization = { organizationId: string; planId: string; overrides: number; grants: number };
 type OrganizationDetails = { organizationId: string; assignment: { planId: string } | null; privileges: Details[]; overrides: any[]; grants: any[] };
+const sections = ["Organizations", "Tiers", "Audit", "Configuration"];
+function currentSection() {
+  const route = window.location.hash.replace(/^#\//, "").toLowerCase();
+  if (route === "plans") return "Tiers";
+  return sections.find(section => section.toLowerCase() === route) ?? "Organizations";
+}
 function App() {
   const requestId = useRef(0);
   const [meta, setMeta] = useState<Meta>();
@@ -16,7 +22,7 @@ function App() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [selected, setSelected] = useState("");
   const [org, setOrg] = useState<OrganizationDetails>();
-  const [tab, setTab] = useState("Organizations");
+  const [tab, setTab] = useState(currentSection);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,6 +62,11 @@ function App() {
     } catch (e) { if (id === requestId.current) setError(String(e)); }
   };
   useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const sync = () => setTab(currentSection());
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
   useEffect(() => { if (meta && selected) void loadOrg(); }, [selected, subject, meta]);
   async function mutate(title: string, method: string, path: string, body: any) {
     const reason = await ask(title); if (!reason) return;
@@ -69,13 +80,13 @@ function App() {
   const needsSetup = !loading && !error && meta?.capabilities.mutations && plans !== undefined && orgs.length === 0;
   return <div className="shell">
     <a className="skip-link" href="#workspace">Skip to workspace</a>
-    <aside><a className="brand" href="/"><img src="/logo.svg" alt="" width="32" height="32"/><span>OpenEntitlement<small>Service console</small></span></a><div className="nav-label">WORKSPACE</div>{["Organizations", "Tiers", "Audit", "Configuration"].map((t) => <button aria-current={tab === t ? "page" : undefined} aria-label={t} className={`nav ${tab === t ? "active" : ""}`} onClick={() => setTab(t)} key={t}>{t === "Organizations" ? "▦" : t === "Tiers" ? "▤" : t === "Audit" ? "◷" : "{ }"} <span>{t}</span></button>)}<div className="sidebar-footer"><button className="btn" onClick={() => setSettings(!settings)}>Settings</button></div></aside>
+    <aside><a className="brand" href="/"><img src="/logo.svg" alt="" width="32" height="32"/><span>OpenEntitlement<small>Service console</small></span></a><div className="nav-label">WORKSPACE</div>{sections.map((t) => <a aria-current={tab === t ? "page" : undefined} aria-label={t} className={`nav ${tab === t ? "active" : ""}`} href={`#/${t.toLowerCase()}`} key={t}>{t === "Organizations" ? "▦" : t === "Tiers" ? "▤" : t === "Audit" ? "◷" : "{ }"} <span>{t}</span></a>)}<div className="sidebar-footer"><button className="btn" onClick={() => setSettings(!settings)}>Settings</button></div></aside>
     <main id="workspace" tabIndex={-1}><header><span>Workspace <span className="muted">/ {tab}</span></span><span className="badge">{meta?.provider.name === "in-memory" ? "Temporary workspace" : "Service console"}</span></header>
       {settings && <section className="panel settings"><h2>Settings</h2><dl className="service-details"><div><dt>Storage</dt><dd>{meta?.provider.name === "postgres" ? "PostgreSQL" : meta?.provider.name ?? "Not connected"}</dd></div><div><dt>Protocol</dt><dd>OEREP v1</dd></div><div><dt>Specification</dt><dd>{meta?.specVersion ?? "Not connected"}</dd></div></dl><h3>Connection</h3><label>Admin bearer token<input type="password" value={adminToken} onChange={(e) => setAdminToken(e.target.value)}/></label><label>Audit actor<input value={who} onChange={(e) => setWho(e.target.value)}/></label><button className="btn primary" onClick={() => { token.set(adminToken); actor.set(who); setConnectionEpoch(n => n + 1); setLoading(true); setSettings(false); void load(); }}>Connect</button></section>}
       <div className="page-heading"><div><h1>{tab}</h1><p>{tab === "Organizations" ? "See what each customer can do, and why." : tab === "Tiers" ? "Set the access and limits included in each tier." : tab === "Audit" ? "Every change has an actor and a reason." : "Inspect your catalog and tier defaults as YAML."}</p></div><button className="btn" onClick={() => { void load(); void loadOrg(); }}>↻ Refresh</button></div>
       {error && <div role="alert" className="notice error">{error} <button onClick={() => setSettings(true)}>Configure connection</button></div>}
       {loading && <p role="status" className="notice">Loading workspace…</p>}
-      {needsSetup && tab !== "Configuration" && meta && <WorkspaceSetup meta={meta} plans={plans} onComplete={async id => { setSelected(id); await load(); toast("Workspace ready. Your first organization is configured."); }}/>}
+      {needsSetup && tab === "Organizations" && meta && <WorkspaceSetup meta={meta} plans={plans} onComplete={async id => { setSelected(id); await load(); toast("Workspace ready. Your first organization is configured."); }}/>}
       {!needsSetup && !loading && tab === "Organizations" && <>
         <div className="org-grid">{orgs.map((o) => <button key={o.organizationId} onClick={() => setSelected(o.organizationId)} className={`org-card ${selected === o.organizationId ? "selected" : ""}`}><span className="avatar">{o.organizationId.slice(0, 2).toUpperCase()}</span><strong>{o.organizationId}</strong><span className="muted">{plans.find((p) => p.id === o.planId)?.name ?? o.planId}</span><small>{o.overrides ? `${o.overrides} override${o.overrides > 1 ? "s" : ""}` : o.grants ? `${o.grants} grants` : "Tier defaults"}</small></button>)}</div>
         <div className="panel toolbar"><label>Organization<input value={selected} onChange={(e) => setSelected(e.target.value)} /></label><label>Subject (optional)<input placeholder="Optional user or resource subject" value={subject} onChange={(e) => setSubject(e.target.value)} /></label>{meta?.capabilities.mutations && <label>Assigned tier<select value={org?.assignment?.planId ?? ""} onChange={(e) => void mutate("Change organization tier", "PUT", `/api/organizations/${encodeURIComponent(selected)}/plan`, { planId: e.target.value || null })}><option value="">No tier</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}</div>
@@ -84,9 +95,9 @@ function App() {
         {meta?.capabilities.mutations && <div className="split extras"><ChangeForm kind="override" privileges={meta.catalog.flatMap((f) => f.privileges)} onSave={(data) => void mutate("Create negotiated override", "POST", `/api/organizations/${encodeURIComponent(selected)}/overrides`, data)}/><ChangeForm kind="grant" privileges={meta.catalog.flatMap((f) => f.privileges)} onSave={(data) => void mutate("Add quota grant", "POST", `/api/organizations/${encodeURIComponent(selected)}/grants`, data)}/></div>}
         {org && org.organizationId === selected && <ContractsPanel key={`${selected}:${connectionEpoch}`} organizationId={selected} overrides={org.overrides} grants={org.grants}/>}
       </>}
-      {!needsSetup && tab === "Tiers" && meta?.capabilities.mutations && <form className="panel toolbar" onSubmit={(e) => { e.preventDefault(); void mutate("Create tier", "PUT", `/api/plans/${encodeURIComponent(newPlan.trim())}`, { name: newPlan.trim() }); }}><label>New tier name<input required value={newPlan} onChange={(e) => setNewPlan(e.target.value)} placeholder="e.g. Team"/></label><button className="btn" disabled={!newPlan.trim()}>Create tier</button></form>}
-      {!needsSetup && tab === "Tiers" && <section className="panel overflow"><div className="section-title"><h2>Tier comparison</h2><span className="muted">Tier values before overrides and grants</span></div><table><thead><tr><th>Privilege</th>{plans.map((p) => <th key={p.id}>{p.name}</th>)}</tr></thead><tbody>{meta?.catalog.flatMap((f) => f.privileges).map((def) => <tr key={def.key}><td><code>{def.key}</code></td>{plans.map((p) => <td key={p.id}>{meta.capabilities.mutations ? <PlanValueEditor def={def} value={p.values[def.key]} onSave={(value) => void mutate("Update plan entitlement", "PUT", `/api/plans/${encodeURIComponent(p.id)}/values`, { values: { [def.key]: value } })}/> : <Value v={p.values[def.key]}/>}</td>)}</tr>)}</tbody></table></section>}
-      {!needsSetup && tab === "Audit" && <section className="panel"><table><thead><tr><th>When</th><th>Actor</th><th>Change</th><th>Reason</th></tr></thead><tbody>{events.map((e, i) => <tr key={i}><td>{new Date(e.at).toLocaleString()}</td><td>{e.actor}</td><td><code>{e.action} {e.entity}</code><small className="muted">{e.entityId}</small></td><td>{e.reason}</td></tr>)}</tbody></table></section>}
+      {!loading && tab === "Tiers" && meta?.capabilities.mutations && <form className="panel toolbar" onSubmit={(e) => { e.preventDefault(); void mutate("Create tier", "PUT", `/api/plans/${encodeURIComponent(newPlan.trim())}`, { name: newPlan.trim() }); }}><label>New tier name<input required value={newPlan} onChange={(e) => setNewPlan(e.target.value)} placeholder="e.g. Team"/></label><button className="btn" disabled={!newPlan.trim()}>Create tier</button></form>}
+      {!loading && tab === "Tiers" && <section className="panel overflow"><div className="section-title"><h2>Tier comparison</h2><span className="muted">Tier values before overrides and grants</span></div><table><thead><tr><th>Privilege</th>{plans.map((p) => <th key={p.id}>{p.name}</th>)}</tr></thead><tbody>{meta?.catalog.flatMap((f) => f.privileges).map((def) => <tr key={def.key}><td><code>{def.key}</code></td>{plans.map((p) => <td key={p.id}>{meta.capabilities.mutations ? <PlanValueEditor def={def} value={p.values[def.key]} onSave={(value) => void mutate("Update plan entitlement", "PUT", `/api/plans/${encodeURIComponent(p.id)}/values`, { values: { [def.key]: value } })}/> : <Value v={p.values[def.key]}/>}</td>)}</tr>)}</tbody></table></section>}
+      {!loading && tab === "Audit" && <section className="panel"><table><thead><tr><th>When</th><th>Actor</th><th>Change</th><th>Reason</th></tr></thead><tbody>{events.map((e, i) => <tr key={i}><td>{new Date(e.at).toLocaleString()}</td><td>{e.actor}</td><td><code>{e.action} {e.entity}</code><small className="muted">{e.entityId}</small></td><td>{e.reason}</td></tr>)}</tbody></table></section>}
       {tab === "Configuration" && !loading && !error && meta && <ConfigurationPanel meta={meta} plans={plans}/>}
       <footer>OpenEntitlement <span>Tiers → overrides → grants. Every decision is explainable.</span></footer>
     </main>

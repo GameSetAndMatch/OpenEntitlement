@@ -172,3 +172,5 @@ input::placeholder, textarea::placeholder { color: #8797a3; }
 .service-details > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
 .service-details dt { color: var(--muted); font-size: 13px; }
 .service-details dd { margin: 0; font-size: 13px; }
+
+.nav { text-decoration: none; }
