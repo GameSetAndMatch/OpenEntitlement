@@ -104,11 +104,28 @@ Overrides on a narrower subject (one member, one resource) wait for a real need.
 
 There is no version number to bump by hand, because this validation catches every mismatch with a more precise message.
 
+### Contract-status policy
+
+The Tenant operating an entitlement model chooses what happens to its Organizations when a contract becomes `past_due` or `ended`. Authorized Tenant administrators configure this policy; an affected Organization cannot grant itself continued access by changing its own status policy. Self-hosted operators configure the same policy through their installation configuration.
+
+Keep the first policy model small: for each status, select one action:
+
+| Action | Behavior |
+|---|---|
+| `readOnly` | Preserve existing application data and authorized reads, but refuse application mutations. Retain the contract and its provenance so the restriction can be explained. Read-only is explicit lifecycle state that the application enforces, not a fabricated privilege value. |
+| `fallback` with a `tierVariant` | Resolve against a configured, existing variant, such as a Free non-trial variant. Keep the original contract/history; the effective fallback must not rewrite what was sold. Validate the target before activating the policy. |
+
+For example, a Tenant can choose `past_due → readOnly` and `ended → fallback to free`. Another can choose read-only for both. The fallback variant must exist in that Tenant's reviewed defaults; the examples do not require every product to offer a Free tier. This policy is independent of the payment adapter and is audited when changed.
+
+A product may design a variant with read-only entitlements and select it as the fallback. The application must still enforce its intended mutation restrictions: a tier name, reduced cap, or disabled creation switch alone does not guarantee read-only behavior for existing resources. Lifecycle restrictions never bypass role/resource authorization.
+
+Both statuses need an explicit configured action before the lifecycle feature is enabled. Do not infer a fallback from the highest tier, the payment channel, or partial defaults. Applying a policy is idempotent, preserves data, and exposes the triggering status and effective action. When access resumes, recompute from the current contract/status rather than a destructively rewritten assignment. Exact expiry/renewal boundaries and treatment of existing grants still require the decisions below.
+
 ## 5. Self-hosted installs
 
 - **One file per install:** `entitlements.yaml` holds **contracts only**. It never holds definitions or defaults.
 - **At startup, the file is reconciled into the database.** Contracts are created, updated or removed, and marked `source: file`. The resolver has a single path, the same as in SaaS. The API refuses every entitlement write, and the admin shows values read-only.
-- **An expired contract keeps applying**, and the admin shows an "expired contract" warning. Silently falling back to the variant's defaults could grant more than was sold. Renewal is a commercial step.
+- **Expired contracts are visible with a warning.** When expiry transitions a contract to `ended`, apply the configured contract-status policy above. Do not silently discard terms or fall back to the sold variant's defaults, which could grant more than was agreed. Renewal is a commercial step.
 - **There is no single-tenant mode.** The install runs the normal multi-tenant code with one Organization, created by a seed script.
 
 ## 6. Writes and refusals
@@ -174,7 +191,7 @@ These points are not answered by sections 1 to 8. Each one needs a decision befo
 
 1. **Tier order.** `requiredTier` needs a ranking. The example file uses the order of a `tiers` list, lowest first.
 2. **Trial length.** The proposal: a trial is a contract on a trial variant, and the contract's period sets its length.
-3. **Ended contracts in SaaS.** Section 5 keeps an expired contract applying for self-hosted installs. In SaaS, the behavior for `ended` and `past_due` is undecided, especially at the end of a trial.
+3. **Lifecycle transitions.** The Tenant chooses `readOnly` or a named fallback variant for `past_due` and `ended` (section 4). Still define expiry-to-status transitions, renewal/grace boundaries, trial completion, existing grant applicability, and the versioned result carrying lifecycle restrictions. Test policy validation, repeated events, restoration, and application write refusal.
 4. **Organizations without a contract.** Either a configured fallback variant, or the safe error value.
 5. **`NOT_INSTALLED` for string privileges.** "Off" is `false` for a boolean and `0` for an integer, but a string enum has no off value. Options: forbid install gating on string privileges, or declare which value counts as off.
 6. **Inclusive periods.** If periods are dates, "inclusive" needs a time zone. If they are timestamps, it needs a precision.
