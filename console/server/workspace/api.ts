@@ -50,7 +50,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore) {
       if (body.scope !== "evaluate") throw new WorkspaceError("Invalid key scope");
       send(res,201,await store.createKey(account,id!,text(body.name,"Key name"),body.scope,reason()));return true;
     }
-    if (section === "keys" && target && method === "DELETE") { await store.revokeKey(account,id!,target,reason());send(res,200,{});return true; }
+    if (section === "keys" && target && method === "DELETE") { if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target))throw new WorkspaceError("API key not found",404); await store.revokeKey(account,id!,target,reason());send(res,200,{});return true; }
     if (section === "evaluate" && method === "POST") { const workspace=await store.read(account,id!);send(res,200,resolve(workspace.data,text(body.organizationId,"Organization"),text(body.privilege,"Privilege")));return true; }
     if (method !== "PUT" || !["groups","features","privileges","tiers","variants","organizations","policy"].includes(section ?? "")) throw new WorkspaceError("Method not allowed",405);
     if (!Number.isSafeInteger(body.revision) || body.revision < 1) throw new WorkspaceError("Current workspace revision is required");

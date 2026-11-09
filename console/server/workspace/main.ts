@@ -22,7 +22,8 @@ export async function startWorkspaceServer(options: { databaseUrl: string; auth:
         if (req.method !== "GET" && req.method !== "HEAD") throw new WorkspaceError("Method not allowed",405);
         const path=new URL(req.url!,options.auth.appUrl).pathname;
         if (path === "/") { res.writeHead(302,{location:"/app/"}).end();return; }
-        const file=resolve(root,"."+decodeURIComponent(path));
+        let decoded:string;try{decoded=decodeURIComponent(path);}catch{throw new WorkspaceError("Invalid URL encoding",400);}
+        const file=resolve(root,"."+decoded);
         if (!file.startsWith(root+sep)) throw new WorkspaceError("Not found",404);
         let content: Buffer,actual=file;
         try { content=await readFile(file); } catch { if(!path.startsWith("/app"))throw new WorkspaceError("Not found",404);actual=resolve(root,"index.html");content=await readFile(actual); }

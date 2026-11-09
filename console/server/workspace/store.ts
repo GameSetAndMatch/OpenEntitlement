@@ -144,10 +144,11 @@ export class WorkspaceStore {
       if(!invite || invite.email!==account.email.toLowerCase())throw new WorkspaceError("Invitation is invalid, expired, or belongs to another email",403);
       await db.query("SELECT set_config('oe.workspace_id',$1,true)",[invite.workspace_id]);
       // An invitation must never demote an existing Owner or overwrite a member's role.
-      await db.query("INSERT INTO oe_cp_members(workspace_id,account_id,role) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",[invite.workspace_id,account.id,invite.role]);
+      const inserted=await db.query("INSERT INTO oe_cp_members(workspace_id,account_id,role) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING role",[invite.workspace_id,account.id,invite.role]);
+      const membership=inserted.rows[0]??(await db.query("SELECT role FROM oe_cp_members WHERE workspace_id=$1 AND account_id=$2",[invite.workspace_id,account.id])).rows[0];
       await db.query("DELETE FROM oe_cp_invites WHERE id=$1",[invite.id]);
       await this.audit(db,invite.workspace_id,account,"members:join","Accepted email invitation",null,{accountId:account.id});
-      await db.query("COMMIT");return {workspaceId:invite.workspace_id};
+      await db.query("COMMIT");return {workspaceId:invite.workspace_id,alreadyMember:inserted.rowCount===0,role:membership.role};
     }catch(e){await db.query("ROLLBACK");throw e;}finally{db.release();}
   }
   async keys(account: Account,id: string) {
@@ -161,7 +162,7 @@ export class WorkspaceStore {
     });
   }
   async revokeKey(account: Account,id: string,keyId: string,reason: string) {
-    return this.transaction(id,async db => { await this.authorize(db,account,id,"api_keys:manage"); await db.query("UPDATE oe_cp_keys SET revoked=true WHERE id=$1 AND workspace_id=$2",[keyId,id]); await this.audit(db,id,account,"api_keys:revoke",reason,null,{ id: keyId }); });
+    return this.transaction(id,async db => { await this.authorize(db,account,id,"api_keys:manage"); const result=await db.query("UPDATE oe_cp_keys SET revoked=true WHERE id=$1 AND workspace_id=$2",[keyId,id]); if(!result.rowCount)throw new WorkspaceError("API key not found",404); await this.audit(db,id,account,"api_keys:revoke",reason,null,{ id: keyId }); });
   }
   async key(value: string) { return (await this.pool.query("SELECT workspace_id,scope,created_by FROM oe_cp_keys WHERE hash=$1 AND NOT revoked",[hash(value)])).rows[0]; }
   async keyData(id: string) { return this.transaction(id,async db => (await db.query("SELECT data FROM oe_cp_state WHERE workspace_id=$1",[id])).rows[0]?.data as WorkspaceData); }

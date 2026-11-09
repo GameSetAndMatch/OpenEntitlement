@@ -29,6 +29,7 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
       const response=await fetch(origin+path,{method,headers:{"content-type":"application/json",...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
       return{status:response.status,data:response.status===204?undefined:await response.json()};
     }
+    const malformed=await fetch(origin+"/app/%E0%A4%A");assert.equal(malformed.status,400);
     assert.equal((await call("/api/workspaces")).status,401);
     assert.equal((await call("/api/workspaces",{authorization:"Bearer old-admin"})).status,401);
     assert.equal((await call("/api/workspaces",{cookie:a.cookie},{name:"Missing CSRF",reason:"test"})).status,403);
@@ -69,6 +70,10 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     assert.equal((await call("/api/evaluate",{authorization:`Bearer ${secret}`},{organizationId:"acme",privilege:"max_exports"})).data.value,25);
     assert.equal((await call("/api/evaluate",{authorization:`Bearer ${secret}`},{organizationId:"only_in_b",privilege:"max_exports",workspaceId:wb.data.id})).status,404);
     assert.equal((await call(path,{authorization:`Bearer ${secret}`})).status,401);
+    const historyBefore=(await call(path+"/audit",a)).data.length;
+    assert.equal((await call(path+"/keys/not-a-uuid",a,{reason:"revoke"},"DELETE")).status,404);
+    assert.equal((await call(path+"/keys/00000000-0000-0000-0000-000000000000",a,{reason:"revoke"},"DELETE")).status,404);
+    assert.equal((await call(path+"/audit",a)).data.length,historyBefore);
     await call(path+"/keys/"+key.data.id,a,{reason:"revoke"},"DELETE");
     assert.equal((await call("/api/evaluate",{authorization:`Bearer ${secret}`},{organizationId:"acme",privilege:"max_exports"})).status,401);
     const invite=await call(path+"/invitations",m,{email:"invited@example.test",role:"User",reason:"invite"});assert.equal(invite.status,201);
@@ -77,6 +82,11 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     assert.equal((await call("/api/invitations/accept",i,{token:invite.data.token})).status,200);
     assert.equal((await call("/api/invitations/accept",i,{token:invite.data.token})).status,403);
     assert.equal((await call("/api/workspaces",i)).data.length,1);
+    const repeatInvite=await call(path+"/invitations",a,{email:"invited@example.test",role:"Manager",reason:"existing member"});
+    const existingMember=await call("/api/invitations/accept",i,{token:repeatInvite.data.token});
+    assert.equal(existingMember.data.alreadyMember,true);assert.equal(existingMember.data.role,"User");
+    assert.equal((await call(path+"/members",m,{accountId:invited.id,role:null,reason:"remove member"},"PUT")).status,200);
+    assert.equal((await call(path,i)).status,404);
     assert.equal((await call(path+"/members",a,{accountId:owner.id,role:"User",reason:"remove last owner"},"PUT")).status,409);
     assert.equal((await call(path+"/members",m,{accountId:owner.id,role:"User",reason:"demote owner"},"PUT")).status,403);
     const direct=await store.pool.connect();try{

@@ -115,7 +115,7 @@ export function organization(data: WorkspaceData, input: unknown, now = new Date
   const result: Organization = { id, name: text(b.name, "Organization name"), variantId: assigned.id, terms: values(data, b.terms ?? {}), status: b.status ?? "active" };
   if (result.status === "past_due") {
     if(data.tiers.find(t=>t.id===assigned.tierId)!.gracePeriodDays>0&&!data.variants.some(v=>v.tierId===assigned.tierId&&v.kind==="grace"))throw new WorkspaceError("Create a grace-period variant for this tier before using past-due grace");
-    result.graceEndsAt = previous?.status === "past_due" ? previous.graceEndsAt : new Date(now.getTime() + data.tiers.find(t => t.id === assigned.tierId)!.gracePeriodDays * 86400000).toISOString();
+    result.graceEndsAt = previous?.status === "past_due" && data.variants.find(v=>v.id===previous.variantId)?.tierId===assigned.tierId ? previous.graceEndsAt : new Date(now.getTime() + data.tiers.find(t => t.id === assigned.tierId)!.gracePeriodDays * 86400000).toISOString();
   }
   return result;
 }
@@ -123,12 +123,12 @@ export function resolve(data: WorkspaceData, orgId: string, key: string, now = n
   const org = data.organizations.find(o => o.id === orgId), def = data.privileges.find(p => p.key === key);
   if (!org || !def) throw new WorkspaceError("Organization or privilege not found", 404);
   let assigned = data.variants.find(v => v.id === org.variantId)!;
-  let readOnly = false, fallback = false, grace = false;
+  let readOnly = false, fallback = false, grace = false, missingGrace = false;
   if(org.status === "past_due" && org.graceEndsAt && now < new Date(org.graceEndsAt)) {
     const graceVariant=data.variants.find(v=>v.tierId===assigned.tierId&&v.kind==="grace");
-    if(!graceVariant)throw new WorkspaceError("Grace variant is missing",422);assigned=graceVariant;grace=true;
+    if(graceVariant){assigned=graceVariant;grace=true;}else missingGrace=true;
   }
-  const restricted = org.status === "ended" || (org.status === "past_due" && (!org.graceEndsAt || now >= new Date(org.graceEndsAt)));
+  const restricted = missingGrace || org.status === "ended" || (org.status === "past_due" && (!org.graceEndsAt || now >= new Date(org.graceEndsAt)));
   if (restricted) {
     const policy = data.statusPolicy[org.status as "ended" | "past_due"];
     if (policy.action === "readOnly") readOnly = true;

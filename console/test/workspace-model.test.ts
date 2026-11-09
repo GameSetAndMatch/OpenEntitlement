@@ -45,3 +45,21 @@ test("variant identity cannot move Organizations between tiers or lifecycle purp
   assert.throws(()=>variant(d,{...d.variants[0],kind:"grace"}),/tier and purpose cannot change/);
   assert.equal(variant(d,{...d.variants[0],name:"Pro revised"}).name,"Pro revised");
 });
+
+test("changing tiers recomputes grace; same-tier edits preserve it and missing grace fails closed",()=>{
+  const d=emptyData();d.features.push(feature(d,{id:"access",name:"Access"}));
+  d.privileges.push(privilege(d,{featureId:"access",key:"access_enabled",name:"Access",type:"boolean",default:true}));
+  d.tiers.push(tier({id:"pro",name:"Pro",rank:1,gracePeriodDays:30}),tier({id:"basic",name:"Basic",rank:0,gracePeriodDays:0}));
+  d.variants.push(variant(d,{id:"pro",name:"Pro",tierId:"pro",kind:"standard"}),variant(d,{id:"pro_grace",name:"Grace",tierId:"pro",kind:"grace"}),variant(d,{id:"basic",name:"Basic",tierId:"basic",kind:"standard"}));
+  d.organizations.push(organization(d,{id:"acme",name:"Acme",variantId:"pro",status:"past_due"},new Date("2027-01-01T00:00:00Z")));
+  const deadline=d.organizations[0]!.graceEndsAt;
+  d.organizations[0]=organization(d,{...d.organizations[0],name:"Acme edited"},new Date("2027-01-02T00:00:00Z"));assert.equal(d.organizations[0].graceEndsAt,deadline);
+  d.organizations[0]=organization(d,{...d.organizations[0],variantId:"basic"},new Date("2027-01-02T00:00:00Z"));
+  assert.equal(d.organizations[0].graceEndsAt,"2027-01-02T00:00:00.000Z");assert.equal(resolve(d,"acme","access_enabled",new Date("2027-01-02T00:00:01Z")).readOnly,true);
+  // Previously persisted bad assignments must remain evaluable and restrictive.
+  d.organizations[0].graceEndsAt="2027-02-01T00:00:00Z";
+  assert.equal(resolve(d,"acme","access_enabled",new Date("2027-01-03T00:00:00Z")).readOnly,true);
+  d.organizations[0]=organization(d,{...d.organizations[0],variantId:"pro",status:"active"});
+  d.organizations[0]=organization(d,{...d.organizations[0],status:"past_due"},new Date("2027-02-01T00:00:00Z"));
+  assert.equal(d.organizations[0].graceEndsAt,"2027-03-03T00:00:00.000Z");
+});
