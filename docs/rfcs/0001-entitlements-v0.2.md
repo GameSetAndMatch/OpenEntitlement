@@ -1,7 +1,8 @@
-# RFC-0001: Entitlements spec v0.2
+# RFC-0001: Entitlements proposal, revision 0.3
 
 - **Status:** proposed. Not implemented; the normative spec remains v0.1.0 until this is accepted.
 - **Date:** 2026-11-09
+- **Revision:** incorporates the latest short v0.3 brief; this is a proposal revision, not a released spec, SDK, service, or OEREP version.
 - **Replaces:** the drafts in PR #17 and PR #18.
 - **Examples:** [`tier_variants.yaml`](examples/tier_variants.yaml), [`entitlements.yaml`](examples/entitlements.yaml)
 
@@ -53,12 +54,13 @@ Changing a default for everyone is rare and should be reviewed, so a release is 
 Each privilege is defined with a small subset of [JSON Schema 2020-12](https://json-schema.org/draft/2020-12):
 
 - `type`: `boolean`, `integer` or `string`;
+- finite fractional `number` values are deferred by this revision: the initial scope is explicitly integer quantities, booleans, and strings/enums;
 - `title`, `description`;
 - `minimum`, `maximum`: integers only;
 - `enum`: strings only;
 - two extensions: `x-unlimited: true`, which allows the value `unlimited` on an integer, and `x-subjects`.
 
-Nothing else: no `oneOf`, `$ref`, objects or arrays. Plain models with one validator are enough to check it, and a JSON Schema for editors is derived from them. Core SDKs keep no dependencies (ADR-0001), so the validator is hand-written in each language and shared conformance fixtures keep them aligned.
+Nothing else: no `oneOf`, `$ref`, objects or arrays. Plain models with one validator are enough to check it, and a JSON Schema for editors is derived from them. Core SDKs keep no dependencies (ADR-0001), so the validator is hand-written in each language and shared conformance fixtures keep them aligned. Integer quantities must be safe across the supported languages; booleans and numeric strings must not pass as integers. The `x-unlimited` annotation must be translated to an ordinary allowed-value alternative in a generated editor schema; it does not make the string `unlimited` satisfy a standard `type: integer` schema by itself.
 
 ```json
 {
@@ -91,7 +93,7 @@ A name never contains a tier or a price. A capability that every tier has gets n
 2. **The contract's terms**, per Organization, with an end date.
 3. **Grants**, which add to allowances and add up.
 
-Then **the install can only remove**: a component that isn't installed resolves to off, with reason `NOT_INSTALLED`.
+Then **the install can only remove**: a component that isn't installed is unavailable, with reason `NOT_INSTALLED`. Its off representation must remain compatible with the privilege constraints; the unresolved case includes integers with a positive minimum as well as strings (section 11). Do not fabricate an invalid value that the SDK would turn into a validation error.
 
 Overrides on a narrower subject (one member, one resource) wait for a real need. Grants already cover "more minutes for one person".
 
@@ -102,7 +104,7 @@ Overrides on a narrower subject (one member, one resource) wait for a real need.
 - an unknown tier variant;
 - a default missing for a privilege.
 
-There is no version number to bump by hand, because this validation catches every mismatch with a more precise message.
+The configuration files need no manually synchronized catalog-version field: validate them against the running application definitions. This does not remove normal spec, SDK, service, or protocol versioning, or the need to document semantic compatibility changes.
 
 ### Contract-status policy
 
@@ -119,13 +121,13 @@ For example, a Tenant can choose `past_due → readOnly` and `ended → fallback
 
 A product may design a variant with read-only entitlements and select it as the fallback. The application must still enforce its intended mutation restrictions: a tier name, reduced cap, or disabled creation switch alone does not guarantee read-only behavior for existing resources. Lifecycle restrictions never bypass role/resource authorization.
 
-Both statuses need an explicit configured action before the lifecycle feature is enabled. Do not infer a fallback from the highest tier, the payment channel, or partial defaults. Applying a policy is idempotent, preserves data, and exposes the triggering status and effective action. When access resumes, recompute from the current contract/status rather than a destructively rewritten assignment. Exact expiry/renewal boundaries and treatment of existing grants still require the decisions below.
+Both statuses need an explicit configured action before the lifecycle feature is enabled. Do not infer a fallback from the highest tier, the payment channel, or partial defaults. Applying a policy is idempotent, preserves data, and exposes the triggering status and effective action. When access resumes, recompute from the current contract/status rather than a destructively rewritten assignment. Period expiry alone does not change contract status or invoke a fallback: it keeps the agreed terms applying and raises a warning. An explicit, audited transition to `ended` or `past_due` invokes the configured policy. Renewal boundaries and treatment of existing grants still require the decisions below.
 
 ## 5. Self-hosted installs
 
 - **One file per install:** `entitlements.yaml` holds **contracts only**. It never holds definitions or defaults.
 - **At startup, the file is reconciled into the database.** Contracts are created, updated or removed, and marked `source: file`. The resolver has a single path, the same as in SaaS. The API refuses every entitlement write, and the admin shows values read-only.
-- **Expired contracts are visible with a warning.** When expiry transitions a contract to `ended`, apply the configured contract-status policy above. Do not silently discard terms or fall back to the sold variant's defaults, which could grant more than was agreed. Renewal is a commercial step.
+- **An expired contract keeps applying and is flagged.** Expiry alone never silently falls back to the variant defaults or automatically sets `ended`. An explicit status change applies the configured policy in section 4. This distinction applies to SaaS as well. Renewal is a commercial step.
 - **There is no single-tenant mode.** The install runs the normal multi-tenant code with one Organization, created by a seed script.
 
 ## 6. Writes and refusals
@@ -148,16 +150,18 @@ Both statuses need an explicit configured action before the lifecycle feature is
 | Deployment policy (startup configuration) | Is the component installed? May users create Organizations? Where does support go? | whoever installs | per install |
 | Entitlement | What may this Organization use, and how much? | the defaults file, the contracts | permanent, audited |
 
-## 8. Open questions
+## 8. Simple application-owned behavior
 
-1. Should per-container caps (`_per_project`) be declared subjects?
-2. Should "N per seat per year" allowances be a type of their own?
-3. Should a vendor-side global admin be able to read an Organization's data?
-4. Should the Owner be warned before a downgrade makes containers read-only?
+- **Per-container caps are plain integers.** The application counts and compares each container against the resolved value. Do not add container subjects now; revisit only when a contract needs a specific container exception.
+- **“N per seat per year” is a plain integer.** The application multiplies by covered seats and manages the yearly usage reset. The provider neither counts usage nor invents a reset period or per-seat allowance type.
+- **One direction only.** The application reads entitlements. The entitlement layer never calls back into the application for counts, preview data, resource enumeration, or authorization. Anything needing both application state and entitlements, including a downgrade preview, is composed by the client/application. Payment adapters and administrative commands can still explicitly write contracts.
+- **Vendor-side access to Organization data is outside this entitlement spec.** Hosted-service authorization and audit requirements remain separate; out of scope does not mean unrestricted access.
+
+These are decisions for the initial implementation, not open requests for more types, subject hierarchies, or callback APIs.
 
 ## 9. Mapping to OpenEntitlement v0.1
 
-| v0.1 (current spec and SDKs) | v0.2 |
+| v0.1 (current spec and SDKs) | Proposed behavior |
 |---|---|
 | Plan, with `variantOf` for trials | Tier variant (`tier`, `trial`), with defaults read only from `tier_variants.yaml` |
 | Plan values edited through the admin API and console | Read-only at runtime. The admin API refuses default writes. |
@@ -170,9 +174,9 @@ Both statuses need an explicit configured action before the lifecycle feature is
 | `FixedProvider` for self-hosted installs | `entitlements.yaml` reconciled into storage, writes refused |
 | Intervals `[startsAt, expiresAt)` | Contract period, both ends inclusive |
 | `UNLIMITED` encoded on the wire as `{"unlimited": true}` | Unchanged on the wire. `unlimited` is the YAML spelling only. |
-| Service contract records with PDF evidence (console) | The same records become v0.2 contracts. PDFs stay service-only, outside OEREP. |
+| Service contract records with PDF evidence (console) | The same records become the proposed entitlement contracts. PDFs stay service-only, outside OEREP. |
 
-This is a breaking change. Releasing it means spec 0.2.0, a new OEREP major version for the reason and `requiredTier` changes, conformance scenarios rewritten for the three layers, and migration notes. SDK and service versions stay independent.
+This is a breaking change. Releasing it requires a new pre-1.0 spec version, a new OEREP major version for the reason and `requiredTier` changes, conformance scenarios rewritten for the three layers, and migration notes. The brief's revision 0.3 does not assign those release numbers. SDK and service versions stay independent. No runtime or released normative specification changes in this PR.
 
 ## 10. Effect on the hosted service (issue #15)
 
@@ -187,13 +191,13 @@ This is a breaking change. Releasing it means spec 0.2.0, a new OEREP major vers
 
 ## 11. To settle before implementation
 
-These points are not answered by sections 1 to 8. Each one needs a decision before code depends on it.
+These points are not fully answered by sections 1 to 8. Each one needs a decision before code depends on it.
 
 1. **Tier order.** `requiredTier` needs a ranking. The example file uses the order of a `tiers` list, lowest first.
 2. **Trial length.** The proposal: a trial is a contract on a trial variant, and the contract's period sets its length.
-3. **Lifecycle transitions.** The Tenant chooses `readOnly` or a named fallback variant for `past_due` and `ended` (section 4). Still define expiry-to-status transitions, renewal/grace boundaries, trial completion, existing grant applicability, and the versioned result carrying lifecycle restrictions. Test policy validation, repeated events, restoration, and application write refusal.
+3. **Lifecycle transitions.** The Tenant chooses `readOnly` or a named fallback variant for `past_due` and `ended` (section 4). Expiry alone retains terms and raises a warning. Still define renewal/grace boundaries, trial completion, existing grant applicability, and the versioned result carrying lifecycle restrictions. Test policy validation, repeated events, restoration, and application write refusal.
 4. **Organizations without a contract.** Either a configured fallback variant, or the safe error value.
-5. **`NOT_INSTALLED` for string privileges.** "Off" is `false` for a boolean and `0` for an integer, but a string enum has no off value. Options: forbid install gating on string privileges, or declare which value counts as off.
+5. **Constraint-valid `NOT_INSTALLED`.** An integer with `minimum: 1` cannot return `0` through ordinary value validation, and an enum has no universal off value. Choose separate availability state or explicitly declared, validated off semantics before implementation; test bounded integers and enum values without weakening ordinary SDK validation.
 6. **Inclusive periods.** If periods are dates, "inclusive" needs a time zone. If they are timestamps, it needs a precision.
 7. **Error fallback.** Today a privilege's catalog `default` is what a transport error fails closed to. V0.2 still needs such a value, separate from variant defaults.
 8. **A catalog endpoint.** Should OEREP add an optional `GET /oerep/v1/catalog` that returns the JSON Schema, for clients that don't hold the definitions in code?

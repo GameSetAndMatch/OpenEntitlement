@@ -61,7 +61,7 @@ The spec follows [SemVer](https://semver.org). Until 1.0.0, minor versions MAY b
 
 ## Proposals under review
 
-- [RFC-0001: Entitlements spec v0.2](../docs/rfcs/0001-entitlements-v0.2.md) proposes tier variants from a reviewed defaults file, contracts as the only link to payment, and a JSON Schema subset for privilege definitions. It is not part of the current normative specification.
+- [RFC-0001: Entitlements proposal, revision 0.3](../docs/rfcs/0001-entitlements-v0.2.md) proposes tier variants from a reviewed defaults file, contracts as the only link to payment, and a JSON Schema subset for privilege definitions. It is not part of the current normative specification.
 
 ## Roadmap
 
