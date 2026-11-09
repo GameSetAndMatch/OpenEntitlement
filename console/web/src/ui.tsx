@@ -59,8 +59,8 @@ function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
   const lastFinite = useRef(typeof value === "number" ? value : 0);
   useEffect(() => { if (typeof value === "number") lastFinite.current = value; }, [value]);
   return <div className="int-input">
-    <input className="input" type="number" aria-label={def.key} min={0} step={1}
-      disabled={disabled || unlimited} value={unlimited ? lastFinite.current : value ?? ""}
+    <input className="input" type={unlimited ? "text" : "number"} aria-label={def.key} min={0} step={1}
+      disabled={disabled || unlimited} value={unlimited ? "∞" : value ?? ""}
       onChange={e => onChange(e.target.value === "" ? undefined : Math.max(0, Math.trunc(Number(e.target.value))))}/>
     {def.unlimitedAllowed && <label className="unlimited-control">
       <input type="checkbox" aria-label={`Unlimited ${def.key}`} checked={unlimited} disabled={disabled}
