@@ -167,3 +167,8 @@ input::placeholder, textarea::placeholder { color: #8797a3; }
 
 .field-error { display: block; margin-top: 8px; color: #a33131; font-size: 12px; line-height: 1.5; }
 .input[aria-invalid="true"] { border-color: #a33131; }
+
+.service-details { display: grid; gap: 12px; margin: 20px 0 28px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.service-details > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.service-details dt { color: var(--muted); font-size: 13px; }
+.service-details dd { margin: 0; font-size: 13px; }

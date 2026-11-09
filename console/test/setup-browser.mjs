@@ -22,6 +22,13 @@ try {
     });
     await page.goto(service.url);
     await page.getByRole('heading', { name: 'Set up your workspace' }).waitFor();
+    assert.doesNotMatch(await page.locator('aside').textContent(), /in-memory|postgres|OEREP/);
+    assert.equal(await page.getByText(/^Storage:/).count(), 0);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const settings = page.locator('.settings');
+    assert.match(await settings.textContent(), /Storage.*in-memory/);
+    assert.match(await settings.textContent(), /Protocol.*OEREP v1/);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: /Refresh/ }).click();
     // Wait for the lists requested by Refresh to complete, then for any delayed failure.
     await page.waitForLoadState('networkidle');

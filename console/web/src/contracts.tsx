@@ -29,7 +29,7 @@ export function ContractsPanel({ organizationId, overrides, grants }: { organiza
   };
   return <section className="panel contracts-panel"><div className="section-title"><h2>Contracts &amp; source documents</h2><span className="muted">{organizationId}</span></div>
     <p>Link negotiated entitlements to the agreement behind them. Documents and contract dates do not change entitlement values.</p>
-    {error && <p role="alert" className="notice error">{error}. Contracts require a server configured with an admin token. Enter that token in Connection settings.</p>}
+    {error && <p role="alert" className="notice error">{error}. Contracts require a server configured with an admin token. Enter that token in Settings.</p>}
     {!token.get() && !error && <p className="notice">Connect with an admin token to manage private contracts.</p>}
     {!error && <>
       <form className="contract-create" onSubmit={e => { e.preventDefault(); void change("Create customer contract", async reason => {

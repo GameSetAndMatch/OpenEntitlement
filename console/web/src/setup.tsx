@@ -22,7 +22,7 @@ export function WorkspaceSetup({ meta, plans, onComplete }: { meta: Meta; plans:
   return <section className="setup panel" aria-labelledby="setup-title">
     <div className="setup-intro"><img className="setup-mark" src="/logo.svg" alt="" width="40" height="40"/><div><h2 id="setup-title">Set up your workspace</h2><p>Create your first plan and decide what a customer can use. This instance has no sample customers.</p></div></div>
     <ol className="setup-steps" aria-label="Setup progress">{["Create a plan", "Review entitlements", "Add an organization"].map((title, i) => <li key={title} aria-current={step === i + 1 ? "step" : undefined}><span aria-hidden="true">{step > i + 1 ? "✓" : i + 1}</span>{title}</li>)}</ol>
-    <p className="storage-note">{meta.provider.name === "in-memory" ? "Temporary workspace: memory data is lost when the service restarts. Use PostgreSQL to keep your configuration." : `Storage: ${meta.provider.name}.`}</p>
+    {meta.provider.name === "in-memory" && <p className="storage-note">This is a temporary workspace. Changes are lost when the service restarts.</p>}
     {error && <p role="alert" className="notice error">{error}</p>}
     {step === 1 && <form onSubmit={e => { e.preventDefault(); void run("Create first plan", async reason => { await api("PUT", `/api/plans/${encodeURIComponent(planId.trim())}`, { name: name.trim(), reason }); setStep(2); }); }}>
       <h3>Create your first plan</h3><p>A plan is a reusable offer. Customer-specific exceptions can be added later.</p>
