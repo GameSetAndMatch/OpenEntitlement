@@ -64,6 +64,12 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports"})).data.value,25);
     const alice={organizationId:"acme",subjectId:"external|alice",name:"Alice",terms:{max_exports:30},grants:{max_exports:5}};
     await put("subjects",alice);
+    let otherRevision=wb.data.revision;
+    for(const [section,entry] of [["privileges",{key:"max_exports",name:"Exports",type:"integer",default:1}],["tiers",{id:"pro",name:"Pro",rank:1}],["variants",{id:"pro",name:"Pro",tierId:"pro",kind:"standard"}],["organizations",{id:"acme",name:"Other Acme",variantId:"pro",terms:{max_exports:999}}],["subjects",{...alice,terms:{max_exports:777},grants:{}}]]){
+      const configured=await call(`/api/workspaces/${wb.data.id}/${section}`,b,{entry,revision:otherRevision,reason:"Same identifiers in another Workspace"},"PUT");assert.equal(configured.status,200);otherRevision=configured.data.revision;
+    }
+    assert.equal((await call(`/api/workspaces/${wb.data.id}/evaluate`,b,{organizationId:"acme",subjectId:alice.subjectId,privilege:"max_exports"})).data.value,777);
+
     assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports",subjectId:alice.subjectId})).data.value,35);
     assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports",subjectId:"bob"})).data.value,25);
     assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports",subjectId:null})).status,400);
@@ -107,7 +113,7 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
       await assert.rejects(direct.query("UPDATE oe_cp_state SET workspace_id=$1 WHERE workspace_id=$2",[wb.data.id,wa.data.id]),/row-level security/);
       await direct.query("ROLLBACK");
       await put("tags",{id:"enterprise",title:"Enterprise"});await put("tags",{id:"integration",title:"Integration"});
-    const canonical={key:"canonical_limit",title:"Canonical limit",description:"A grouped and tagged privilege",type:"integer",default:2,visibility:"read_only",group_id:"product",tags:["enterprise","integration"]};
+    const canonical={key:"canonical_limit",title:"Canonical limit",description:"A grouped and tagged privilege",type:"integer",default:2,minimum:0,unlimited:false,visibility:"read_only",group_id:"product",tags:["enterprise","integration"]};
     await put("catalog",canonical);
     await put("catalog",{...canonical,key:"bad_environment",env_override:"MCP_INSTALLED"},422);
     await put("catalog",{...canonical,key:"bad_tags",tags:["missing"]},400);

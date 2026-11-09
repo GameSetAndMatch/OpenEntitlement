@@ -46,3 +46,6 @@
 
 .catalog-feature-block { background: #fff; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
 .catalog-group .catalog-feature-block { border-inline: 0; border-radius: 0; }
+
+.workspace-card { min-width: 0; }
+.workspace-card code { overflow-wrap: anywhere; }

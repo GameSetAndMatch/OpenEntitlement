@@ -10,6 +10,10 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). No
 | `@openentitlement/postgres` | peer `pg` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, `schema.sql` (same schema as Python) |
 | `@openentitlement/stripe` | nothing (`fetch`, `node:crypto`) | `StripeEntitlementsProvider`, `verifyWebhook` |
 
+## Typed authoring
+
+Use the optional `@openentitlement/core/authoring` subpath with Zod for `PrivilegeSchema` and `PrivilegeCatalogSchema`. Runtime imports do not load Zod. See the [Python-first ACME case study](../docs/guides/acme-workspace.md) for equivalent JSON, Groups/Tags and the complete Workspace model.
+
 ## Quick start
 
 ```ts
@@ -18,10 +22,10 @@ import { Catalog, createClient, feature, boolean, integer, enumeration, Entitlem
 import { PostgresProvider, PostgresAdvisoryLock } from "@openentitlement/postgres";
 
 const catalog = new Catalog([
-  feature("seats", "Seats", [integer("seats.max", { default: 1, unlimitedAllowed: true })]),
-  feature("projects", "Projects", [integer("projects.max")]),
-  feature("sso", "Single sign-on", [boolean("sso.enabled"), integer("sso.connections.max")], { gate: "sso.enabled" }),
-  feature("reports", "Reports", [boolean("reports.enabled"), enumeration("reports.retention", ["7d", "90d", "365d"])], { gate: "reports.enabled" }),
+  feature("seats", "Seats", [integer("seat_max", { default: 1, unlimitedAllowed: true })]),
+  feature("projects", "Projects", [integer("project_max")]),
+  feature("sso", "Single sign-on", [boolean("sso_enabled"), integer("sso_connection_max")], { gate: "sso_enabled" }),
+  feature("reports", "Reports", [boolean("reports_enabled"), enumeration("report_retention", ["7d", "90d", "365d"])], { gate: "reports_enabled" }),
 ]);
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -34,13 +38,13 @@ const client = createClient({
 // values are data, audited
 const meta = { actor: "alice@back-office", reason: "launch pricing" };
 await client.admin.upsertPlan({ id: "pro", name: "Pro", rank: 10 }, meta);
-await client.admin.setPlanValue("pro", "seats.max", UNLIMITED, meta);
+await client.admin.setPlanValue("pro", "seat_max", UNLIMITED, meta);
 await client.admin.assignPlan("acme", "pro", { ...meta, channel: "card" });
 
 // gate
 const ctx = { organizationId: "acme" };
 await client.isEnabled("sso", ctx);
-await client.getLimit("seats.max", ctx); // UNLIMITED, which JSON.stringify writes as {"unlimited":true}
+await client.getLimit("seat_max", ctx); // UNLIMITED, which JSON.stringify writes as {"unlimited":true}
 
 // Express-style error mapping
 app.use((err, req, res, next) => {

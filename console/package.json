@@ -1,6 +1,6 @@
 {
   "name": "@openentitlement/console",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "OpenEntitlement service: OEREP evaluation API, audited administration, and console.",
   "license": "Apache-2.0",

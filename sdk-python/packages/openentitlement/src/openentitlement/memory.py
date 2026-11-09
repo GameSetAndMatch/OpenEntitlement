@@ -71,7 +71,7 @@ class InMemoryProvider(FactsProvider):
 
         InMemoryProvider(
             plans=[Plan("free", "Free", rank=0), Plan("pro", "Pro", rank=1)],
-            values={"free": {"seats.max": 3}, "pro": {"seats.max": 50}},
+            values={"free": {"seat_max": 3}, "pro": {"seat_max": 50}},
             assignments={"acme": "pro"},
         )
 

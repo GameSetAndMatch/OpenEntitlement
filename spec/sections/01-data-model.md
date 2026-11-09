@@ -29,7 +29,7 @@ The model has two halves. Keep them apart:
 
 > Feature codes and privilege keys MUST match `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$`. Feature codes MUST be unique within a catalog. Privilege keys MUST be unique within a catalog, and each privilege MUST belong to exactly one feature.
 
-Examples: feature `sso` with privileges `sso.enabled` and `sso.connections.max`; feature `seats` with privilege `seats.max`.
+Examples: feature `sso` with privileges `sso_enabled` and `sso_connection_max`; feature `seats` with privilege `seat_max`.
 
 #### Requirement 1.1.3
 
@@ -193,7 +193,7 @@ Metering systems (OpenMeter, Lago, Stigg, your own `SELECT count(*)`) are usage 
 
 #### Requirement 1.8.1
 
-> A seat privilege (for example `seats.max`) MUST constrain the number of seats **purchased**, not the number assigned to people.
+> A seat privilege (for example `seat_max`) MUST constrain the number of seats **purchased**, not the number assigned to people.
 
 Assigning a seat to a person is application logic against the purchased quantity. The entitlement says how many seats the organization *may buy*.
 

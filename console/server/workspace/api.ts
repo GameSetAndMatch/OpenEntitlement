@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { deploymentMode, hosting, requireSubjectEntitlements } from "./hosting.ts";
 import { subject, subjectIdentifier, validateSubjects } from "./subjects.ts";
 import {parsePrivilege} from "./privilege-definition.ts";
@@ -14,7 +15,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
   const evaluate=(data:import("./model.ts").WorkspaceData,b:Record<string,any>)=>{
     const id=b.subjectId===undefined?undefined:subjectIdentifier(b.subjectId);
     if(id!==undefined)requireSubjectEntitlements(data,mode);
-    const now=b.now===undefined?new Date():typeof b.now==='string'&&/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/.test(b.now)?new Date(b.now):new Date(NaN);
+    const now=b.now===undefined?new Date():z.iso.datetime({offset:true}).safeParse(b.now).success?new Date(b.now):new Date(NaN);
     if(!Number.isFinite(now.getTime()))throw new WorkspaceError('Evaluation time must be an RFC 3339 timestamp with a timezone');
     return resolve(data,text(b.organizationId,'Organization'),text(b.privilege,'Privilege'),now,catalogEnvironment(data,env),id);
   };
@@ -76,7 +77,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
       }
       if(section==='subjects'){
         if(method==='DELETE'){
-          const b=object(entry);const index=data.subjects.findIndex(s=>s.organizationId===b.organizationId&&s.subjectId===subjectIdentifier(b.subjectId));
+          const b=object(entry);const subjectId=subjectIdentifier(b.subjectId);const index=data.subjects.findIndex(s=>s.organizationId===b.organizationId&&s.subjectId===subjectId);
           if(index<0)throw new WorkspaceError('User entitlement record not found',404);
           data.subjects.splice(index,1);
         }else{

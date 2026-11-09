@@ -6,7 +6,7 @@
  *
  * - `lookup_key === "<privilege>"`               → boolean privilege is `true`
  * - `lookup_key === "<privilege>:<value>"`       → integer (`50`, `unlimited`), boolean or enum value
- * - `mapping: { "pro-bundle": { "seats.max": 50 } }` → explicit mapping for lookup keys you can't rename
+ * - `mapping: { "pro-bundle": { "seat_max": 50 } }` → explicit mapping for lookup keys you can't rename
  *
  * Several active entitlements for one privilege resolve to the most generous value. Stripe cannot say
  * "false": a boolean missing from a customer who *has* active entitlements resolves to `false` with reason
@@ -36,7 +36,7 @@ export class StripeError extends Error {
   }
 }
 
-/** "seats.max:50" → ["seats.max", "50"]; "sso.enabled" → ["sso.enabled", undefined]. */
+/** "seat_max:50" → ["seat_max", "50"]; "sso_enabled" → ["sso_enabled", undefined]. */
 export function parseLookupKey(lookupKey: string): [string, string | undefined] {
   const i = lookupKey.indexOf(":");
   return i < 0 ? [lookupKey, undefined] : [lookupKey.slice(0, i), lookupKey.slice(i + 1)];

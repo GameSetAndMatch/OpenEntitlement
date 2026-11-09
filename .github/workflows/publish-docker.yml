@@ -48,7 +48,7 @@ jobs:
           grep -q '<html' /tmp/oe-index.html
           node --input-type=module - <<'JS'
           for (const [organizationId, expected] of [["hooli", 3], ["acme", 250]]) {
-            const r = await fetch("http://127.0.0.1:8787/oerep/v1/resolve/seats.max", {
+            const r = await fetch("http://127.0.0.1:8787/oerep/v1/resolve/seat_max", {
               method: "POST", headers: {"content-type": "application/json"},
               body: JSON.stringify({context: {organizationId}})
             });

@@ -5,7 +5,7 @@ active entitlements derive from their subscriptions. This adapter maps them onto
 
 * ``lookup_key == "<privilege>"``                → boolean privilege is ``true``
 * ``lookup_key == "<privilege>:<value>"``        → integer (``50``, ``unlimited``), boolean or enum value
-* ``mapping={"pro-bundle": {"seats.max": 50}}``  → explicit mapping, for lookup keys you can't rename
+* ``mapping={"pro-bundle": {"seat_max": 50}}``  → explicit mapping, for lookup keys you can't rename
 
 Several active entitlements for one privilege resolve to the most generous value. Stripe cannot say
 "false": a boolean privilege missing from a customer who *has* active entitlements resolves to ``false``
@@ -67,7 +67,7 @@ def _urllib_transport(url: str, headers: Mapping[str, str]) -> "tuple[int, bytes
 
 
 def parse_lookup_key(lookup_key: str) -> "tuple[str, Optional[str]]":
-    """``"seats.max:50"`` → ``("seats.max", "50")``; ``"sso.enabled"`` → ``("sso.enabled", None)``."""
+    """``"seat_max:50"`` → ``("seat_max", "50")``; ``"sso_enabled"`` → ``("sso_enabled", None)``."""
     key, sep, raw = lookup_key.partition(":")
     return key, (raw if sep else None)
 

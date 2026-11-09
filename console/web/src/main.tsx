@@ -26,7 +26,7 @@ function App() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [privilege, setPrivilege] = useState("projects.max");
+  const [privilege, setPrivilege] = useState("project_max");
   const [current, setCurrent] = useState(0);
   const [requested, setRequested] = useState(1);
   const [subject, setSubject] = useState("");

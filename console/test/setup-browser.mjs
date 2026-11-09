@@ -71,15 +71,15 @@ try {
   for (const width of [1280, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     await page.goto(service.url);
-    const input = page.getByLabel('seats.max', { exact: true });
-    const checkbox = page.getByRole('checkbox', { name: 'Unlimited seats.max', exact: true });
+    const input = page.getByLabel('seat_max', { exact: true });
+    const checkbox = page.getByRole('checkbox', { name: 'Unlimited seat_max', exact: true });
     await input.fill('-5');
     assert.equal(await input.inputValue(), '-5');
     assert.equal(await input.getAttribute('aria-invalid'), 'true');
     const inlineError = await page.getByRole('alert').textContent();
     const invalid = await fetch(service.url + '/api/plans/checkbox-test/values', {
       method: 'PUT', headers: { 'content-type': 'application/json', 'x-oe-actor': 'browser-test' },
-      body: JSON.stringify({ values: { 'seats.max': -5 }, reason: 'negative value regression' }),
+      body: JSON.stringify({ values: { 'seat_max': -5 }, reason: 'negative value regression' }),
     });
     assert.equal(invalid.status, 422);
     assert.equal((await invalid.json()).message, inlineError);
@@ -97,8 +97,8 @@ try {
     await checkbox.focus(); await page.keyboard.press('Space');
     assert.equal(await input.isEnabled(), true);
     assert.equal(await input.inputValue(), '25');
-    assert.equal(await page.getByRole('checkbox', { name: 'Unlimited projects.max', exact: true }).count(), 0);
-    const toggle = page.getByRole('switch', { name: 'sso.enabled', exact: true });
+    assert.equal(await page.getByRole('checkbox', { name: 'Unlimited project_max', exact: true }).count(), 0);
+    const toggle = page.getByRole('switch', { name: 'sso_enabled', exact: true });
     assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     assert.match(await toggle.textContent(), /Disabled.*Feature access not included/);
     await toggle.click();

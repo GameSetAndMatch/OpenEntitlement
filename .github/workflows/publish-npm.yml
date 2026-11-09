@@ -58,9 +58,9 @@ jobs:
           import { Catalog, FixedProvider, createClient, feature, integer } from '@openentitlement/core';
           import { PostgresProvider } from '@openentitlement/postgres';
           import { StripeEntitlementsProvider } from '@openentitlement/stripe';
-          const catalog = new Catalog([feature('projects', 'Projects', [integer('projects.max')])]);
-          const client = createClient({ catalog, provider: new FixedProvider(catalog, {'projects.max': 5}) });
-          if (await client.getLimit('projects.max', {organizationId: 'demo'}) !== 5) throw Error('Incorrect limit');
+          const catalog = new Catalog([feature('projects', 'Projects', [integer('project_max')])]);
+          const client = createClient({ catalog, provider: new FixedProvider(catalog, {'project_max': 5}) });
+          if (await client.getLimit('project_max', {organizationId: 'demo'}) !== 5) throw Error('Incorrect limit');
           if (!PostgresProvider || !StripeEntitlementsProvider) throw Error('Adapter export missing');
           JS
       - uses: actions/upload-artifact@v4

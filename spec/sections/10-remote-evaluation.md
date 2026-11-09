@@ -27,7 +27,7 @@ Keys use percent encoding as one path segment. Unknown context fields are ignore
 > A single resolution MUST return HTTP 200 with §4.3 resolution details, including `privilege`, `value`, `reason`, `grants`, and `staleOverrides`. Bulk MUST return HTTP 200 with `{privileges: ResolutionDetails[]}`, one result per catalog privilege. Values MUST use §1.2 JSON encoding, including `{"unlimited":true}`. Resolution errors MUST use reason `ERROR` and an §8 error code; an ordinary disabled feature or exhausted quota is not a transport error.
 
 ```json
-{"privilege":"seats.max","value":250,"reason":"OVERRIDE","planId":"business","planValue":100,"overrideId":"override_42","grants":[],"staleOverrides":[]}
+{"privilege":"seat_max","value":250,"reason":"OVERRIDE","planId":"business","planValue":100,"overrideId":"override_42","grants":[],"staleOverrides":[]}
 ```
 
 #### Requirement 10.2.2

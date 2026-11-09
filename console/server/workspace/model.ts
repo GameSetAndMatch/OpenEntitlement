@@ -153,14 +153,14 @@ export function resolve(data: WorkspaceData, orgId: string, key: string, now = n
   const subjectActive=Boolean(scoped&&scoped.variantId===org.variantId&&!fallback&&!grace);
   const subjectTerm=subjectActive&&Object.hasOwn(scoped!.terms,key);
   if(subjectTerm)effective=scoped!.terms[key];
-  const grant=subjectActive?scoped!.grants[key]??0:0;
-  if(grant&&typeof effective==='number'){
-    effective+=grant;
-    const error=valueError(def,effective);if(error)throw new WorkspaceError(error,422);
-  }
   const binding=Object.hasOwn(environment,key)?environment[key]:undefined;
   const defaultFrozen=Boolean(def.frozen||data.features.find(f=>f.id===def.featureId)?.frozen);
   const frozen=Boolean(binding||defaultFrozen);
+  const grant=scoped&&!fallback&&!grace&&Object.hasOwn(scoped.grants,key)?scoped.grants[key]!:0;
+  if(grant&&typeof effective==='number'&&!defaultFrozen){
+    effective+=grant;
+    const error=valueError(def,effective);if(error)throw new WorkspaceError(error,422);
+  }
   if(effective===undefined)throw new WorkspaceError(`${key}: variant has no value`,422);
   return { privilege: key, environment:binding, frozen, value:binding?(defaultFrozen?def.default:effective)===true&&binding.value:defaultFrozen?def.default:effective, subjectId, subjectState:scoped?(subjectActive?"active":scoped.variantId!==org.variantId?"stale":"suspended"):"inherited", grantApplied:!frozen&&typeof effective==="number"?grant:0, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":grant&&typeof effective==="number"?"SUBJECT_GRANT":subjectTerm?"SUBJECT":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
 }

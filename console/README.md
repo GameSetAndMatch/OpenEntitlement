@@ -2,6 +2,8 @@
 
 Our open-source entitlement server owns plans, assignments, negotiated overrides, additive grants, and audit records. It exposes OEREP v1 for generic SDK clients and a separate administrative API and web console. No billing vendor is required.
 
+For the multi-Workspace console and user scope, read the [Python-first ACME walkthrough](../docs/guides/acme-workspace.md) and [Workspace service guide](WORKSPACES.md). The standalone OEREP service below remains a separate entry point. Current source samples use flat keys; older released images and persisted installations may retain dotted keys. Use an explicit old Catalog or a pinned image until you migrate data and application checks together.
+
 ## Local demo
 
 Requires Node >=22.18 (Node 24 recommended).
@@ -43,21 +45,21 @@ The server migrates its `oe_*` tables at startup. Set `OE_CATALOG` to a catalog 
 ## OEREP v1
 
 ```sh
-curl http://localhost:8787/oerep/v1/resolve/seats.max \
+curl http://localhost:8787/oerep/v1/resolve/seat_max \
   -H 'Content-Type: application/json' \
   -d '{"context":{"organizationId":"acme"}}'
-```
-
-```ts
-import { createClient, RemoteProvider } from "@openentitlement/core";
-const client = createClient({ catalog, provider: new RemoteProvider({ baseUrl: "http://localhost:8787", token: process.env.OE_EVAL_TOKEN }) });
-const seats = await client.getLimit("seats.max", { organizationId: "acme" });
 ```
 
 ```python
 from openentitlement import create_client, RemoteProvider
 client = create_client(catalog=catalog, provider=RemoteProvider("http://localhost:8787", token=eval_token))
-seats = client.get_limit("seats.max", {"organization_id": "acme"})
+seats = client.get_limit("seat_max", {"organization_id": "acme"})
+```
+
+```ts
+import { createClient, RemoteProvider } from "@openentitlement/core";
+const client = createClient({ catalog, provider: new RemoteProvider({ baseUrl: "http://localhost:8787", token: process.env.OE_EVAL_TOKEN }) });
+const seats = await client.getLimit("seat_max", { organizationId: "acme" });
 ```
 
 Both clients use the application's catalog and validate remote values against it. They do not cache decisions. See the [protocol](../spec/sections/10-remote-evaluation.md) and [OpenAPI](../spec/oerep.openapi.json) for bulk resolution and suggestions.

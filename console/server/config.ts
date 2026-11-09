@@ -135,15 +135,15 @@ export async function seedDemo(client: EntitlementClient): Promise<void> {
     for (const [k, v] of Object.entries(values)) await a.setPlanValue(p.id, k, decodeValue(v), meta);
   }
   await a.assignPlan("acme", "business", { ...meta, channel: "contract" });
-  await a.createOverride({ organizationId: "acme", privilege: "seats.max", value: 250 }, { actor: "sales@demo", reason: "MSA #42: 250 seats" });
-  await a.createOverride({ organizationId: "acme", privilege: "sso.connections.max", value: 10 }, { actor: "sales@demo", reason: "MSA #42: 10 IdPs" });
+  await a.createOverride({ organizationId: "acme", privilege: "seat_max", value: 250 }, { actor: "sales@demo", reason: "MSA #42: 250 seats" });
+  await a.createOverride({ organizationId: "acme", privilege: "sso_connection_max", value: 10 }, { actor: "sales@demo", reason: "MSA #42: 10 IdPs" });
   await a.assignPlan("globex", "pro", { ...meta, channel: "card" });
-  await a.createGrant({ organizationId: "globex", privilege: "api_calls.monthly", amount: 50_000 }, { actor: "support@demo", reason: "launch-week goodwill" });
-  await a.createGrant({ organizationId: "globex", subjectId: "hank", privilege: "api_calls.monthly", amount: 5_000 }, { actor: "support@demo", reason: "personal pack" });
+  await a.createGrant({ organizationId: "globex", privilege: "api_calls_monthly", amount: 50_000 }, { actor: "support@demo", reason: "launch-week goodwill" });
+  await a.createGrant({ organizationId: "globex", subjectId: "hank", privilege: "api_calls_monthly", amount: 5_000 }, { actor: "support@demo", reason: "personal pack" });
   await a.assignPlan("initech", "pro_trial", { ...meta, channel: "card" });
-  await a.createOverride({ organizationId: "initech", privilege: "projects.max", value: 8 }, { actor: "sales@demo", reason: "trial extension: 8 projects" });
+  await a.createOverride({ organizationId: "initech", privilege: "project_max", value: 8 }, { actor: "sales@demo", reason: "trial extension: 8 projects" });
   await a.assignPlan("hooli", "free", meta);
   await a.assignPlan("umbrella", "enterprise", { ...meta, channel: "contract" });
-  await a.createOverride({ organizationId: "umbrella", privilege: "projects.max", value: 5000, planFamily: "enterprise" }, { actor: "sales@demo", reason: "MSA #77" });
+  await a.createOverride({ organizationId: "umbrella", privilege: "project_max", value: 5000, planFamily: "enterprise" }, { actor: "sales@demo", reason: "MSA #77" });
   await a.assignPlan("umbrella", "business", { actor: "billing@demo", reason: "downgrade at renewal" }); // leaves a stale override
 }

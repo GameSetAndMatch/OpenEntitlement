@@ -53,7 +53,7 @@ Feature: Feature enablement
   @plan-catalog @spec-3.4.2
   Scenario: Non-public plans and variants are never suggested
     Given organization "acme" is on plan "business"
-    When I require 101 more "seats.max" with current 0 for organization "acme"
+    When I require 101 more "seat_max" with current 0 for organization "acme"
     Then the check fails
     And there is no required plan
 

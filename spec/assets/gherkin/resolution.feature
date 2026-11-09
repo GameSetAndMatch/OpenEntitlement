@@ -8,7 +8,7 @@ Feature: Resolution
   @spec-3.1.4 @spec-3.1.8 @spec-4.2.7 @spec-4.3.1 @spec-4.4.1
   Scenario: The plan value applies
     Given organization "acme" is on plan "pro"
-    When I resolve "seats.max" for organization "acme"
+    When I resolve "seat_max" for organization "acme"
     Then the value is 20
     And the reason is "PLAN"
     And the plan value is 20
@@ -19,7 +19,7 @@ Feature: Resolution
   @spec-3.1.3 @spec-3.1.8
   Scenario: An organization without a plan gets the privilege default
     Given organization "acme" has no plan
-    When I resolve "seats.max" for organization "acme"
+    When I resolve "seat_max" for organization "acme"
     Then the value is 1
     And the reason is "DEFAULT"
     And there is no plan value
@@ -27,7 +27,7 @@ Feature: Resolution
   @spec-3.1.3
   Scenario: A plan that sets no value falls back to the privilege default
     Given organization "acme" is on plan "legacy"
-    When I resolve "sso.connections.max" for organization "acme"
+    When I resolve "sso_connection_max" for organization "acme"
     Then the value is 0
     And the reason is "DEFAULT"
     And there is no plan value
@@ -42,7 +42,7 @@ Feature: Resolution
 
   @spec-2.1.1
   Scenario: A context without an organization is invalid
-    When I resolve "seats.max" for organization ""
+    When I resolve "seat_max" for organization ""
     Then the reason is "ERROR"
     And the error code is "INVALID_CONTEXT"
     And the value is 1
@@ -50,7 +50,7 @@ Feature: Resolution
   @spec-1.4.2
   Scenario Outline: The payment channel never changes resolution
     Given organization "acme" is on plan "business" paid by "<channel>"
-    When I resolve "seats.max" for organization "acme"
+    When I resolve "seat_max" for organization "acme"
     Then the value is 100
     And the reason is "PLAN"
 
@@ -63,21 +63,21 @@ Feature: Resolution
   @spec-1.3.3
   Scenario: A trial resolves to its own values, like any plan
     Given organization "acme" is on plan "pro_trial"
-    When I resolve "projects.max" for organization "acme"
+    When I resolve "project_max" for organization "acme"
     Then the value is 5
     And the reason is "PLAN"
 
   @spec-1.1.3 @spec-4.2.5
   Scenario: Enum privileges resolve to one of their options
     Given organization "acme" is on plan "business"
-    When I read the option of "reports.retention" for organization "acme"
+    When I read the option of "report_retention" for organization "acme"
     Then the value is "365d"
     And the reason is "PLAN"
 
   @spec-4.2.5
   Scenario: Reading an option from a non-enum privilege is a type mismatch
     Given organization "acme" is on plan "business"
-    When I read the option of "seats.max" for organization "acme"
+    When I read the option of "seat_max" for organization "acme"
     Then the reason is "ERROR"
     And the error code is "TYPE_MISMATCH"
     And the value is ""
@@ -92,7 +92,7 @@ Feature: Resolution
   @spec-4.2.3
   Scenario: Reading a limit from a non-integer privilege is a type mismatch
     Given organization "acme" is on plan "business"
-    When I read the limit of "sso.enabled" for organization "acme"
+    When I read the limit of "sso_enabled" for organization "acme"
     Then the reason is "ERROR"
     And the error code is "TYPE_MISMATCH"
     And the value is 0
@@ -100,7 +100,7 @@ Feature: Resolution
   @mutations @spec-1.3.5
   Scenario: Plan values are data and change at runtime
     Given organization "acme" is on plan "pro"
-    When "pricing-team" sets plan "pro" "seats.max" to 25 because "Q3 repackaging"
-    And I resolve "seats.max" for organization "acme"
+    When "pricing-team" sets plan "pro" "seat_max" to 25 because "Q3 repackaging"
+    And I resolve "seat_max" for organization "acme"
     Then the value is 25
     And the reason is "PLAN"

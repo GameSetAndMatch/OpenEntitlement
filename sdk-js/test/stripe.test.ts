@@ -5,8 +5,8 @@ import { boolean, Catalog, createClient, enumeration, feature, integer, Reason, 
 import { parseLookupKey, StripeEntitlementsProvider, verifyWebhook, type Transport } from "@openentitlement/stripe";
 
 const CATALOG = new Catalog([
-  feature("seats", "Seats", [integer("seats.max", { default: 1, unlimitedAllowed: true })]),
-  feature("sso", "SSO", [boolean("sso.enabled")]),
+  feature("seats", "Seats", [integer("seat_max", { default: 1, unlimitedAllowed: true })]),
+  feature("sso", "SSO", [boolean("sso_enabled")]),
   feature("support", "Support", [boolean("support.enabled"), enumeration("support.tier", ["community", "priority"])], { gate: "support.enabled" }),
 ]);
 
@@ -40,14 +40,14 @@ const setup = (transport: Transport, extra: Partial<ConstructorParameters<typeof
 
 describe("stripe adapter", () => {
   it("parses the lookup key convention", () => {
-    assert.deepEqual(parseLookupKey("seats.max:50"), ["seats.max", "50"]);
-    assert.deepEqual(parseLookupKey("sso.enabled"), ["sso.enabled", undefined]);
+    assert.deepEqual(parseLookupKey("seat_max:50"), ["seat_max", "50"]);
+    assert.deepEqual(parseLookupKey("sso_enabled"), ["sso_enabled", undefined]);
   });
 
   it("paginates, picks the most generous value, and caches", async () => {
-    const t = paged([["seats.max:10", "sso.enabled"], ["seats.max:50", "support.tier:priority"]]);
+    const t = paged([["seat_max:10", "sso_enabled"], ["seat_max:50", "support.tier:priority"]]);
     const { c } = setup(t);
-    assert.equal(await c.getLimit("seats.max"), 50);
+    assert.equal(await c.getLimit("seat_max"), 50);
     assert.match(t.calls[1]!, /starting_after=ent_0_1/);
     assert.ok(await c.isEnabled("sso"));
     assert.equal(await c.getEnum("support.tier"), "priority");
@@ -58,34 +58,34 @@ describe("stripe adapter", () => {
   });
 
   it("supports unlimited and explicit mappings", async () => {
-    assert.equal(await setup(sequence([["seats.max:unlimited"]])).c.getLimit("seats.max"), UNLIMITED);
-    const { c } = setup(sequence([["pro-bundle"]]), { mapping: { "pro-bundle": { "seats.max": 25, "sso.enabled": true } } });
-    assert.equal(await c.getLimit("seats.max"), 25);
+    assert.equal(await setup(sequence([["seat_max:unlimited"]])).c.getLimit("seat_max"), UNLIMITED);
+    const { c } = setup(sequence([["pro-bundle"]]), { mapping: { "pro-bundle": { "seat_max": 25, "sso_enabled": true } } });
+    assert.equal(await c.getLimit("seat_max"), 25);
     assert.ok(await c.isEnabled("sso"));
   });
 
   it("ignores invalid keys and defaults unknown customers", async () => {
-    const { c } = setup(sequence([["seats.max:lots"]]));
-    assert.equal((await c.getLimitDetails("seats.max")).reason, Reason.DEFAULT);
-    assert.equal((await c.getLimitDetails("seats.max", { organizationId: "other" })).reason, Reason.DEFAULT);
+    const { c } = setup(sequence([["seat_max:lots"]]));
+    assert.equal((await c.getLimitDetails("seat_max")).reason, Reason.DEFAULT);
+    assert.equal((await c.getLimitDetails("seat_max", { organizationId: "other" })).reason, Reason.DEFAULT);
   });
 
   it("turns API errors into reason ERROR", async () => {
     const { c } = setup(async () => ({ status: 401, body: "{}" }));
-    const d = await c.getLimitDetails("seats.max");
+    const d = await c.getLimitDetails("seat_max");
     assert.equal(d.reason, Reason.ERROR);
     assert.equal(d.value, 1);
   });
 
   it("refreshes the cache from webhooks and invalidates truncated summaries", async () => {
-    const t = sequence([["seats.max:10"], ["seats.max:99"]]);
+    const t = sequence([["seat_max:10"], ["seat_max:99"]]);
     const { p, c } = setup(t, { cacheTtl: 3600 });
-    assert.equal(await c.getLimit("seats.max"), 10);
-    p.handleEvent({ type: "entitlements.active_entitlement_summary.updated", data: { object: { customer: "cus_1", entitlements: { data: [{ lookup_key: "seats.max:20" }], has_more: false } } } });
-    assert.equal(await c.getLimit("seats.max"), 20);
+    assert.equal(await c.getLimit("seat_max"), 10);
+    p.handleEvent({ type: "entitlements.active_entitlement_summary.updated", data: { object: { customer: "cus_1", entitlements: { data: [{ lookup_key: "seat_max:20" }], has_more: false } } } });
+    assert.equal(await c.getLimit("seat_max"), 20);
     assert.equal(t.calls.length, 1);
     p.handleEvent({ type: "entitlements.active_entitlement_summary.updated", data: { object: { customer: "cus_1", entitlements: { data: [], has_more: true } } } });
-    assert.equal(await c.getLimit("seats.max"), 99);
+    assert.equal(await c.getLimit("seat_max"), 99);
     assert.equal(t.calls.length, 2);
   });
 

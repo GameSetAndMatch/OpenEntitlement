@@ -6,8 +6,8 @@ Three calls answer almost every question an application asks, mirroring OpenFeat
 
 ```ts
 client.isEnabled("sso", ctx)                          // → boolean
-client.getLimit("seats.max", ctx)                     // → number | UNLIMITED
-client.requireWithin("seats.max", current, 1, ctx)    // → details, or throws EntitlementLimitExceeded
+client.getLimit("seat_max", ctx)                     // → number | UNLIMITED
+client.requireWithin("seat_max", current, 1, ctx)    // → details, or throws EntitlementLimitExceeded
 ```
 
 Each one has a `…Details` form that returns the full **resolution details**, the counterpart of OpenFeature's `FlagEvaluationDetails`. Four more round out the API: `requireEnabled` (throws instead of returning `false`), `getEnum`, `guard` ([§5](05-concurrency.md)), and `requiredPlan`.

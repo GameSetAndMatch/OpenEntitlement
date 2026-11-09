@@ -21,6 +21,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
+      - run: npm ci --prefix ../sdk-js
       - run: npm ci --prefix ../console
       - run: uv sync --locked --python 3.12
       - run: uv run pre-commit run uv-lock-check --all-files

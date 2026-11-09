@@ -28,10 +28,10 @@ import {
 } from "@openentitlement/core";
 
 const CATALOG = new Catalog([
-  feature("seats", "Seats", [integer("seats.max", { default: 1, unlimitedAllowed: true })]),
-  feature("projects", "Projects", [integer("projects.max")]),
-  feature("sso", "SSO", [boolean("sso.enabled"), integer("sso.connections.max")], { gate: "sso.enabled" }),
-  feature("reports", "Reports", [boolean("reports.enabled"), enumeration("reports.retention", ["7d", "90d"])], { gate: "reports.enabled" }),
+  feature("seats", "Seats", [integer("seat_max", { default: 1, unlimitedAllowed: true })]),
+  feature("projects", "Projects", [integer("project_max")]),
+  feature("sso", "SSO", [boolean("sso_enabled"), integer("sso_connection_max")], { gate: "sso_enabled" }),
+  feature("reports", "Reports", [boolean("reports_enabled"), enumeration("report_retention", ["7d", "90d"])], { gate: "reports_enabled" }),
 ]);
 
 const provider = () =>
@@ -40,7 +40,7 @@ const provider = () =>
       { id: "free", name: "Free", rank: 0 },
       { id: "pro", name: "Pro", rank: 1 },
     ],
-    values: { free: { "seats.max": 3, "projects.max": 1, "sso.enabled": false }, pro: { "seats.max": UNLIMITED, "projects.max": 5, "sso.enabled": true } },
+    values: { free: { "seat_max": 3, "project_max": 1, "sso_enabled": false }, pro: { "seat_max": UNLIMITED, "project_max": 5, "sso_enabled": true } },
     assignments: { acme: "free" },
   });
 
@@ -82,32 +82,32 @@ describe("failures never throw from evaluation and fail closed", () => {
   for (const [name, p, code] of cases)
     it(name, async () => {
       const c = createClient({ provider: p, catalog: CATALOG, context: acme, logger: { error() {} } });
-      const d = await c.getLimitDetails("seats.max");
+      const d = await c.getLimitDetails("seat_max");
       assert.equal(d.reason, Reason.ERROR);
       assert.equal(d.errorCode, code);
       assert.equal(d.value, 1);
       assert.equal(await c.isEnabled("sso"), false);
-      await assert.rejects(c.requireWithin("seats.max", 1, 1), (e: any) => e instanceof EntitlementLimitExceeded && e.requiredPlan === undefined);
+      await assert.rejects(c.requireWithin("seat_max", 1, 1), (e: any) => e instanceof EntitlementLimitExceeded && e.requiredPlan === undefined);
     });
 });
 
 describe("client", () => {
   it("merges the default context with the invocation", async () => {
     const c = createClient({ provider: provider(), catalog: CATALOG, context: acme });
-    assert.equal(await c.getLimit("seats.max"), 3);
-    assert.equal(await c.getLimit("seats.max", { organizationId: "nobody" }), 1);
+    assert.equal(await c.getLimit("seat_max"), 3);
+    assert.equal(await c.getLimit("seat_max", { organizationId: "nobody" }), 1);
   });
 
   it("raises type and argument errors", async () => {
     const c = createClient({ provider: provider(), catalog: CATALOG, context: acme });
-    await assert.rejects(c.requireWithin("sso.enabled", 0, 1), TypeMismatch);
-    await assert.rejects(c.requireWithin("seats.max", 0, 1.5), InvalidArgument);
-    assert.equal((await c.getEnumDetails("seats.max")).errorCode, ErrorCode.TYPE_MISMATCH);
+    await assert.rejects(c.requireWithin("sso_enabled", 0, 1), TypeMismatch);
+    await assert.rejects(c.requireWithin("seat_max", 0, 1.5), InvalidArgument);
+    assert.equal((await c.getEnumDetails("seat_max")).errorCode, ErrorCode.TYPE_MISMATCH);
   });
 
   it("maps denials with usage breakdowns to a 403 problem", async () => {
     const c = createClient({ provider: provider(), catalog: CATALOG, context: acme });
-    const e = await c.requireWithin("seats.max", { pool: 3, subject: 0 }, 1).catch((x) => x);
+    const e = await c.requireWithin("seat_max", { pool: 3, subject: 0 }, 1).catch((x) => x);
     const { status, body } = toHttpProblem(e);
     assert.equal(status, 403);
     assert.deepEqual(body.current, { pool: 3, subject: 0 });
@@ -115,8 +115,8 @@ describe("client", () => {
   });
 
   it("rejects admin calls on read-only providers", async () => {
-    const c = createClient({ provider: new FixedProvider(CATALOG, { "projects.max": 9, "sso.connections.max": 1 }), catalog: CATALOG });
-    await assert.rejects(c.admin.setPlanValue("pro", "seats.max", 1, { actor: "a", reason: "b" }), NotSupported);
+    const c = createClient({ provider: new FixedProvider(CATALOG, { "project_max": 9, "sso_connection_max": 1 }), catalog: CATALOG });
+    await assert.rejects(c.admin.setPlanValue("pro", "seat_max", 1, { actor: "a", reason: "b" }), NotSupported);
   });
 });
 
@@ -137,21 +137,21 @@ describe("hooks", () => {
   it("run in order, and after-hook failures do not change results", async () => {
     const log: string[] = [];
     const c = createClient({ provider: provider(), catalog: CATALOG, context: acme, hooks: [recorder("a", log), recorder("b", log, { failAfter: true })], logger: { error() {} } });
-    assert.equal(await c.getLimit("seats.max"), 3);
+    assert.equal(await c.getLimit("seat_max"), 3);
     assert.deepEqual(log, ["a.before", "b.before", "b.after:PLAN", "a.after:PLAN", "b.finally", "a.finally"]);
   });
 
   it("a before-hook failure short-circuits to ERROR", async () => {
     const log: string[] = [];
     const c = createClient({ provider: provider(), catalog: CATALOG, context: acme, hooks: [recorder("a", log, { failBefore: true })] });
-    assert.equal((await c.getLimitDetails("seats.max")).reason, Reason.ERROR);
+    assert.equal((await c.getLimitDetails("seat_max")).reason, Reason.ERROR);
     assert.deepEqual(log, ["a.before", "a.error", "a.finally"]);
   });
 
   it("denials run after hooks, not error hooks", async () => {
     const log: string[] = [];
     const c = createClient({ provider: provider(), catalog: CATALOG, context: acme, hooks: [recorder("a", log)] });
-    await assert.rejects(c.requireWithin("projects.max", 1, 1), EntitlementLimitExceeded);
+    await assert.rejects(c.requireWithin("project_max", 1, 1), EntitlementLimitExceeded);
     assert.deepEqual(log, ["a.before", "a.after:PLAN", "a.finally"]);
   });
 });
@@ -164,7 +164,7 @@ describe("guard", () => {
     await Promise.all(
       Array.from({ length: 20 }, () =>
         c
-          .guard("projects.max", 1, acme, {
+          .guard("project_max", 1, acme, {
             count: async () => {
               const v = n;
               await new Promise((r) => setTimeout(r, 2));
@@ -181,14 +181,14 @@ describe("guard", () => {
   };
 
   it("serializes check-then-act, and the test has teeth", async () => {
-    assert.equal(await race(new InProcessLock()), 1); // free plan: projects.max = 1
+    assert.equal(await race(new InProcessLock()), 1); // free plan: project_max = 1
     assert.ok((await race(noLock)) > 1); // without a lock, the race overshoots
   });
 
   it("releases the lock on error and reports its domain", async () => {
     const c = createClient({ provider: provider(), catalog: CATALOG });
-    await assert.rejects(c.guard("projects.max", 1, acme, { count: () => 0, act: () => { throw new RangeError("x"); } }), RangeError);
-    const r = await c.guard("projects.max", 1, acme, { count: () => 0, act: () => "ok" });
+    await assert.rejects(c.guard("project_max", 1, acme, { count: () => 0, act: () => { throw new RangeError("x"); } }), RangeError);
+    const r = await c.guard("project_max", 1, acme, { count: () => 0, act: () => "ok" });
     assert.equal(r.result, "ok");
     assert.equal(r.details.lockDomain, "process");
   });
@@ -197,9 +197,9 @@ describe("guard", () => {
 describe("context precedence", () => {
   it("rejects explicit invalid tenant IDs instead of inheriting the client's tenant", async () => {
     const c = createClient({ catalog: CATALOG, provider: provider(), context: acme });
-    assert.equal(await c.getLimit("seats.max", { subjectId: "alice" }), 3);
+    assert.equal(await c.getLimit("seat_max", { subjectId: "alice" }), 3);
     for (const organizationId of ["", null, false, 0]) {
-      const d = await c.getDetails("seats.max", { organizationId } as any);
+      const d = await c.getDetails("seat_max", { organizationId } as any);
       assert.equal(d.reason, Reason.ERROR);
       assert.equal(d.errorCode, ErrorCode.INVALID_CONTEXT);
       assert.equal(d.value, 1);
@@ -212,8 +212,8 @@ describe("read-only inspection", () => {
     const p = provider();
     const c = createClient({ catalog: CATALOG, provider: p, context: acme });
     const meta = { actor: "support", reason: "contract" };
-    const event = await c.admin.createOverride({ organizationId: "acme", privilege: "seats.max", value: 5, expiresAt: new Date("2050-01-01T00:00:00Z") }, meta);
-    await c.admin.createGrant({ organizationId: "acme", privilege: "seats.max", amount: 2 }, meta);
+    const event = await c.admin.createOverride({ organizationId: "acme", privilege: "seat_max", value: 5, expiresAt: new Date("2050-01-01T00:00:00Z") }, meta);
+    await c.admin.createGrant({ organizationId: "acme", privilege: "seat_max", amount: 2 }, meta);
     (await p.inspection.listAssignments())[0]!.planId = "pro";
     const o = (await p.inspection.listOverrides("acme"))[0]!;
     o.value = 999; o.scope.organizationId = "other"; o.expiresAt!.setUTCFullYear(2000);
@@ -222,11 +222,11 @@ describe("read-only inspection", () => {
     audit[0]!.reason = "rewritten";
     (audit[0]!.after as any).amount = 1000;
     event.reason = "rewritten by mutation caller";
-    assert.equal(await c.getLimit("seats.max"), 7);
+    assert.equal(await c.getLimit("seat_max"), 7);
     const retained = await p.inspection.listAudit();
     assert.ok(retained.every((e) => e.reason === "contract"));
     assert.equal((retained[0]!.after as any).amount, 2);
-    assert.equal((await p.inspection.listPlans()).find((p) => p.id === "pro")!.values["seats.max"], UNLIMITED);
+    assert.equal((await p.inspection.listPlans()).find((p) => p.id === "pro")!.values["seat_max"], UNLIMITED);
   });
 });
 
@@ -234,8 +234,8 @@ describe("usage validation", () => {
   it("rejects missing or null pool usage instead of assuming zero", async () => {
     const c = createClient({ catalog: CATALOG, provider: provider(), context: acme });
     for (const usage of [{}, [], { subject: 1 }, { pool: null }, { pool: 0, subject: null }])
-      await assert.rejects(c.requireWithin("seats.max", usage as any, 1), InvalidArgument);
-    await c.requireWithin("seats.max", { pool: 0 }, 1);
+      await assert.rejects(c.requireWithin("seat_max", usage as any, 1), InvalidArgument);
+    await c.requireWithin("seat_max", { pool: 0 }, 1);
   });
 });
 
@@ -245,7 +245,7 @@ describe("guard ordering", () => {
     let limit = 1;
     const p: Provider = { metadata: { name: "changing" }, capabilities: { overrides: false, grants: false, mutations: false, planCatalog: false, fixed: false }, async resolve(privilege) { order.push("resolve"); return { privilege: privilege.key, value: limit, reason: Reason.PLAN, grants: [], staleOverrides: [] }; } };
     const c = createClient({ catalog: CATALOG, provider: p });
-    await assert.rejects(c.guard("projects.max", 2, acme, { count: () => { order.push("count"); limit = 10; return 0; }, act: () => { order.push("act"); } }), EntitlementLimitExceeded);
+    await assert.rejects(c.guard("project_max", 2, acme, { count: () => { order.push("count"); limit = 10; return 0; }, act: () => { order.push("act"); } }), EntitlementLimitExceeded);
     assert.deepEqual(order, ["resolve", "count"]);
   });
 });

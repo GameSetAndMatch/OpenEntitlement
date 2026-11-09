@@ -16,6 +16,7 @@ export function WorkspaceApp(){
   const [list,setList]=useState<Array<{id:string;name:string;role:string}>>([]),[selected,setSelected]=useState(""),[workspace,setWorkspace]=useState<Workspace>(),[page,setPage]=useState(currentPage);
   const [name,setName]=useState(""),[busy,setBusy]=useState(false),[audit,setAudit]=useState<any[]>([]);
   const [invite,setInvite]=useState(()=>{const incoming=location.hash.startsWith("#invite=")?location.hash.slice(8):"";if(incoming){sessionStorage.setItem("oe.invite",incoming);history.replaceState(null,"","/app/");}return incoming||sessionStorage.getItem("oe.invite")||"";});
+  const savingRef=useRef(false);
   const selectedRef=useRef(selected);selectedRef.current=selected;
   const ask=useReason(),toast=useToast();
   async function loadList(){const data=await request<typeof list>("/api/workspaces");setList(data);return data;}
@@ -26,10 +27,10 @@ export function WorkspaceApp(){
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main")setPage(currentPage());};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);
   const save:Save=async(section,entry,title,method="PUT")=>{
-    if(!workspace)return false;const reason=await ask(title);if(!reason)return false;
+    if(!workspace||savingRef.current)return false;savingRef.current=true;
     setBusy(true);setError("");
-    try{const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,reason});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
-    catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}
+    try{const reason=await ask(title);if(!reason)return false;const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,reason});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
+    catch(e){setError((e as Error).message);return false;}finally{savingRef.current=false;setBusy(false);}
   };
   async function create(){const reason=await ask("Create workspace");if(!reason)return;setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name,reason});await loadList();setSelected(value.id);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   async function accept(){setBusy(true);try{const value=await request("/api/invitations/accept","POST",{token:invite});sessionStorage.removeItem("oe.invite");setInvite("");await loadList();setSelected(value.workspaceId);toast(value.alreadyMember?`Already a member. Your ${value.role} role is unchanged.`:"Workspace joined");}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
