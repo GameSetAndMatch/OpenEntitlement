@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Define a portable description of a product's entitlements, in the spirit of OpenAPI's description of an API. Separate application-owned definitions from installation/customer values so a document can be checked before use, and so editor completion can be derived from the exact catalog.
+Define a small typed model for a product's entitlements, validate it, and serialize it to JSON. OpenAPI is an analogy, not a dependency or a required document structure. YAML is an optional authoring convenience over the same data model. Keep application-owned definitions separate from installation/customer values without building a new schema framework.
 
 This proposal extends RFC-0001 with a declarative format and a distinct contract-terms resolution layer. It does not supersede the current specification or automatically accept unresolved decisions in either RFC. The sample `openentitlement: "0.1.0"` identifies a **candidate document dialect**, not support by the currently released 0.1 specification or any package. This PR does not change release versions.
 
@@ -100,18 +100,29 @@ Use YAML 1.2 with JSON-compatible scalars, no executable/custom tags, and bounde
 
 For fixed providers, the complete effective configuration is validated before activation. Mutable services validate imports before publishing changes; an invalid import must not partially replace working configuration. Startup validation is not a requirement to restart a mutable provider for every audited value change.
 
-### Generated JSON Schema and editor support
+### Keep the implementation simple: typed models first
 
-A catalog-derived schema should provide:
+The first implementation needs only typed models, constraints, validation, and ordinary JSON serialization. Do not require a schema registry, reusable components, authored `$ref`/`$defs`, code generation, or an OpenAPI document.
 
-1. Exact variant/privilege codes and descriptions for completion.
-2. Type/bounds/enum rules for each individual privilege and the explicit unlimited sentinel where allowed.
-3. A constant `catalogVersion`, references to permitted variants, strict object properties, and contract shape validation.
-4. Standard JSON Schema editor support using `# yaml-language-server: $schema=...`.
+In Python, use Pydantic-style model operations rather than inventing serialization methods. The intended workflow is illustrated below; `CatalogDocument` represents a future model, not an implemented API:
 
-The generator should identify its dialect and catalog revision and generate deterministic artifacts. The examples intentionally omit a schema URL: **there is no published schema or generator yet**, so a fake editor directive would mislead users. Schema generation and editor fixtures are a follow-up implementation, not delivered by this documentation PR.
+```python
+catalog = CatalogDocument.model_validate(data)
+json_text = catalog.model_dump_json(by_alias=True)
+restored = CatalogDocument.model_validate_json(json_text)
+```
 
-JSON Schema alone cannot enforce all behavior. The loader must also reject duplicate YAML keys, check cross-record invariants and period relationships, enforce import authorization, and validate semantic rules not encoded by the generated schema. A catalog schema validates the catalog; the derived schema validates its associated values document. Neither is a replacement for runtime authorization.
+Declare types and constraints once on those models: strict booleans/integers, allowed options, bounds, required fields, and rejection of unknown fields. Keep public names camelCase through consistent aliases. Validate cross-field rules such as period ordering, known variant references, and complete privilege values in ordinary model validation. Python booleans must not accidentally pass as integer allowances; string values must not silently coerce to numbers or booleans. Explicit unlimited stays distinct from a number.
+
+JSON is the canonical serialized data representation, not a requirement for byte-identical JSON or cryptographic canonicalization. Serialization and re-validation must preserve meaning. Preserve the distinction between an omitted field, a defaulted value, and an explicit command `null`. A typed read model and a partial update command need not be the same model. TypeScript or other implementations can use equivalent runtime validators; a static type alone does not validate input.
+
+If YAML is supported, safely parse it into ordinary data and pass that data through the same validator. Do not maintain separate YAML semantics or a second validation implementation. The two examples describe separate responsibilities, not a requirement to ship a file-format framework.
+
+**Optional later:** generate JSON Schema with the model library's normal schema method if an editor, HTTP documentation, or structured-output consumer needs it. Generated internal references are a library detail; users should not have to author or manage them. Add tooling only for an actual consumer, and check that its supported schema subset is compatible. No schema generator or editor integration is required for the first implementation.
+
+The Structured Outputs analogy is schema-constrained data rather than free-form JSON. OpenAI's API supports a subset of JSON Schema with additional restrictions, so compatibility is a separate optional adapter concern, not the definition of the OpenEntitlement model. AI-generated drafts would still require domain validation and authorization before any write. There is no OpenAI or AI-generation dependency in this proposal.
+
+References for the existing library concepts: [Pydantic serialization](https://pydantic.dev/docs/validation/latest/concepts/serialization/), [Pydantic models](https://pydantic.dev/docs/validation/latest/concepts/models/), and [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas).
 
 ## Proposed resolution
 
@@ -169,7 +180,7 @@ Application access composes these controls; none substitutes for another. Usage 
 
 1. Are per-container caps declared resource subjects, or quantities the application compares against each container? How do team/member/resource scopes compose?
 2. Does a renewable allowance such as “N per seat per year” need a distinct type, or application-maintained grants? Define reset boundary, time zone, idempotency, and seat coverage separately.
-3. Do `$ref` and reusable components belong in the first dialect? Start without them unless their resolution, security, and compatibility rules are specified.
+3. No authored `$ref` or reusable-component system in the first implementation. Revisit only when a concrete use case cannot be handled by normal typed models.
 4. Who may read/write Organization data from vendor/global administration? Define least privilege, cross-Tenant boundaries, elevation, and audit before shipping global administration.
 5. What happens for no Contract, `past_due`, ended/expired Contract, renewal, or competing updates? How are trial start/end and duration overrides represented?
 6. Does the shared specification standardize the Contract, or only contract terms while source/status/period stay in service administration? This is a broader proposal than the previously service-only contract metadata model. **PDF bytes, storage, and download mechanisms stay service-only regardless.**
@@ -181,4 +192,4 @@ Before implementation acceptance, require fixtures for both valid and invalid do
 
 ## Delivery and compatibility
 
-Merge this as a proposal only. Follow-up decisions should select the normative concepts, versioned document dialect and schema, validation/generation tooling, fixed-provider loader, mutable import/migrations, and any separately versioned OEREP changes. Do not rename existing SDK fields or claim YAML loading until those implementations and tests exist.
+Merge this as a proposal only. Follow-up decisions should select the normative concepts, versioned typed models and validation, JSON serialization, optional YAML loading, fixed-provider loader, mutable import/migrations, and any separately versioned OEREP changes. Do not rename existing SDK fields or claim YAML loading until those implementations and tests exist.
