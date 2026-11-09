@@ -33,8 +33,8 @@ export function Check() {
 export function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} className={`toggle ${checked ? "on" : ""}`} onClick={() => onChange(!checked)}>
-      <span className="toggle-text">{checked ? "On" : "Off"}</span>
-      <span className="knob" />
+      <span className="toggle-track" aria-hidden="true"><span className="knob" /></span>
+      <span className="toggle-copy"><span className="toggle-text">{checked ? "Enabled" : "Disabled"}</span><small>{checked ? "Feature access included" : "Feature access not included"}</small></span>
     </button>
   );
 }

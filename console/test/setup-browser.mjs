@@ -64,6 +64,15 @@ try {
     assert.equal(await input.isEnabled(), true);
     assert.equal(await input.inputValue(), '25');
     assert.equal(await page.getByRole('checkbox', { name: 'Unlimited projects.max', exact: true }).count(), 0);
+    const toggle = page.getByRole('switch', { name: 'sso.enabled', exact: true });
+    assert.equal(await toggle.getAttribute('aria-checked'), 'false');
+    assert.match(await toggle.textContent(), /Disabled.*Feature access not included/);
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+    assert.match(await toggle.textContent(), /Enabled.*Feature access included/);
+    assert.equal(await toggle.locator('.toggle-track').evaluate(el => el.getBoundingClientRect().width), 44);
+    await toggle.focus(); await page.keyboard.press('Space');
+    assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await page.close();
   }
   console.log('Setup, YAML copy/download, and Unlimited checkbox tests passed at desktop and mobile widths');
