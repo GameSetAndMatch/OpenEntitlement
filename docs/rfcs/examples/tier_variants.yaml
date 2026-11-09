@@ -1,0 +1,41 @@
+# tier_variants.yaml: the only source of tier variant defaults (RFC-0001).
+# Changed by a reviewed PR and shipped in a release. No API writes it.
+# Proposed shape; not read by any released package yet.
+
+tiers: [business, enterprise]        # lowest first; used to compute requiredTier
+
+variants:
+  business:
+    tier: business
+    values:
+      max_members_per_project: 10
+      recording_minutes: 600
+      export_enabled: true
+      self_serve_purchase_enabled: true
+      retention: 30d
+  business_trial:
+    tier: business
+    trial: true
+    values:
+      max_members_per_project: 3
+      recording_minutes: 60
+      export_enabled: false
+      self_serve_purchase_enabled: true
+      retention: 30d
+  enterprise:
+    tier: enterprise
+    values:
+      max_members_per_project: unlimited
+      recording_minutes: 6000
+      export_enabled: true
+      self_serve_purchase_enabled: false
+      retention: 365d
+  enterprise_trial:
+    tier: enterprise
+    trial: true
+    values:
+      max_members_per_project: 25
+      recording_minutes: 600
+      export_enabled: true
+      self_serve_purchase_enabled: false
+      retention: 365d
