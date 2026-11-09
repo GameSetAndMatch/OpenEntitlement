@@ -3,15 +3,16 @@ import {environmentOverride,type EnvironmentOverrides} from "../environment.ts";
 export type Value = boolean | number | string | { unlimited: true };
 export type Role = "Owner" | "Manager" | "User";
 export type Action = "catalog:write" | "tiers:write" | "organizations:write" | "contracts:write" | "members:manage" | "api_keys:manage";
-export interface Group { id: string; name: string; description: string; parentId?: string }
+export interface Group { id: string; name: string; description: string; parentId?: string; legacyFeatureId?:string }
+export interface Tag {id:string;name:string;description:string}
 export interface Feature { id: string; name: string; description: string; groupId?: string; hidden?:boolean; frozen?:boolean }
-export interface Privilege { key: string; name: string; description: string; groupId?: string; featureId?: string; type: "boolean" | "integer" | "string"; minimum?: number; maximum?: number; enum?: string[]; unlimited?: boolean; default?: Value; envVariable?:string; hidden?:boolean; frozen?:boolean }
+export interface Privilege { key: string; name: string; description: string; groupId?: string; featureId?: string; type: "boolean" | "integer" | "string"; minimum?: number; maximum?: number; enum?: string[]; unlimited?: boolean; default?: Value; tags?:string[]; envVariable?:string; hidden?:boolean; frozen?:boolean }
 export interface Tier { id: string; name: string; rank: number; gracePeriodDays: number }
 export interface Variant { id: string; name: string; tierId: string; kind: "standard" | "trial" | "grace"; values: Record<string, Value> }
 export interface Organization { id: string; name: string; variantId: string; terms: Record<string, Value>; status: "active" | "past_due" | "ended"; graceEndsAt?: string }
-export interface WorkspaceData { groups: Group[]; features: Feature[]; privileges: Privilege[]; tiers: Tier[]; variants: Variant[]; organizations: Organization[]; statusPolicy: { past_due: StatusPolicy; ended: StatusPolicy } }
+export interface WorkspaceData { groups: Group[]; tags:Tag[]; features: Feature[]; privileges: Privilege[]; tiers: Tier[]; variants: Variant[]; organizations: Organization[]; statusPolicy: { past_due: StatusPolicy; ended: StatusPolicy } }
 export type StatusPolicy = { action: "readOnly" } | { action: "fallback"; variantId: string };
-export const emptyData = (): WorkspaceData => ({ groups: [], features: [], privileges: [], tiers: [], variants: [], organizations: [], statusPolicy: { past_due: { action: "readOnly" }, ended: { action: "readOnly" } } });
+export const emptyData = (): WorkspaceData => ({ groups: [], tags:[], features: [], privileges: [], tiers: [], variants: [], organizations: [], statusPolicy: { past_due: { action: "readOnly" }, ended: { action: "readOnly" } } });
 export const actions: Action[] = ["catalog:write", "tiers:write", "organizations:write", "contracts:write", "members:manage", "api_keys:manage"];
 export class WorkspaceError extends Error {
   status: number;
@@ -56,7 +57,8 @@ export function values(data: WorkspaceData, input: unknown): Record<string, Valu
 const description = (input: unknown) => input === undefined || input === "" ? "" : text(input, "Description", 2000);
 export function group(data: WorkspaceData, input: unknown): Group {
   const b = object(input); only(b,["id","name","description","parentId"]); const id = identifier(b.id);
-  const result: Group = { id, name: text(b.name, "Group name"), description: description(b.description) };
+  const legacyFeatureId=data.groups.find(g=>g.id===id)?.legacyFeatureId;
+  const result: Group = { ...(legacyFeatureId?{legacyFeatureId}:{}),id, name: text(b.name, "Group name"), description: description(b.description) };
   if (b.parentId) {
     result.parentId = text(b.parentId, "Parent group");
     if (!data.groups.some(g => g.id === result.parentId)) throw new WorkspaceError("Parent group does not exist");
@@ -66,6 +68,7 @@ export function group(data: WorkspaceData, input: unknown): Group {
   }
   return result;
 }
+export function tag(input:unknown):Tag {const b=object(input);only(b,["id","name","description"]);return {id:identifier(b.id),name:text(b.name,"Tag name"),description:description(b.description)};}
 export function feature(data: WorkspaceData,input: unknown): Feature {
   const b=object(input);only(b,["id","name","description","groupId","hidden","frozen"]);const result: Feature={id:identifier(b.id),name:text(b.name,"Feature name"),description:description(b.description)};
   if(b.frozen!==undefined){if(typeof b.frozen!=="boolean")throw new WorkspaceError("Frozen must be a boolean");result.frozen=b.frozen;}
@@ -75,22 +78,23 @@ export function feature(data: WorkspaceData,input: unknown): Feature {
   return result;
 }
 export function privilege(data: WorkspaceData, input: unknown): Privilege {
-  const b = object(input); only(b,["key","name","description","groupId","featureId","type","minimum","maximum","enum","unlimited","default","envVariable","hidden","frozen"]); const key = identifier(b.key);
+  const b = object(input); only(b,["key","name","description","groupId","featureId","type","minimum","maximum","enum","unlimited","default","envVariable","hidden","frozen","tags"]); const key = identifier(b.key);
   if (!["boolean", "integer", "string"].includes(b.type)) throw new WorkspaceError("Choose boolean, integer or string");
   const result: Privilege = { key, name: text(b.name, "Feature name"), description: description(b.description), type: b.type, ...(Object.hasOwn(b,"default") ? { default: b.default } : {}) };
   if(b.frozen!==undefined){if(typeof b.frozen!=="boolean")throw new WorkspaceError("Frozen must be a boolean");result.frozen=b.frozen;}
   if(b.hidden!==undefined){if(typeof b.hidden!=="boolean")throw new WorkspaceError("Hidden must be a boolean");result.hidden=b.hidden;}
   if(b.envVariable!==undefined){if(b.type!=="boolean")throw new WorkspaceError("Environment bindings support boolean privileges only");if(!Object.hasOwn(b,"default"))throw new WorkspaceError("Environment-linked values need a Catalog default");if(typeof b.envVariable!=="string"||! /^[A-Z][A-Z0-9_]*$/.test(b.envVariable))throw new WorkspaceError("envVariable must be an uppercase environment variable name");result.envVariable=b.envVariable;}
   if (b.groupId) { result.groupId = text(b.groupId, "Group"); if (!data.groups.some(g => g.id === result.groupId)) throw new WorkspaceError("Group does not exist"); }
-  if (!b.featureId) throw new WorkspaceError("Choose a feature for this privilege");
+
   if (b.featureId) { result.featureId=text(b.featureId,"Feature");if(!data.features.some(f=>f.id===result.featureId))throw new WorkspaceError("Feature does not exist"); }
+  if(b.tags!==undefined){if(!Array.isArray(b.tags)||b.tags.length>50||b.tags.some((id:unknown)=>typeof id!=="string"||!data.tags.some(t=>t.id===id))||new Set(b.tags).size!==b.tags.length)throw new WorkspaceError("Select unique existing Tags");result.tags=[...b.tags];}
   for (const field of ["minimum", "maximum"] as const) if (b[field] !== undefined) {
     if (b.type !== "integer" || !Number.isSafeInteger(b[field]) || b[field] < 0) throw new WorkspaceError(`${field} must be a non-negative integer on an integer privilege`);
     result[field] = b[field];
   }
   if ((result.minimum ?? 0) > (result.maximum ?? Number.MAX_SAFE_INTEGER)) throw new WorkspaceError("Minimum cannot exceed maximum");
   if (b.unlimited !== undefined) { if (b.type !== "integer" || typeof b.unlimited !== "boolean") throw new WorkspaceError("Unlimited is only available for integer privileges"); result.unlimited = b.unlimited; }
-  if (b.enum !== undefined) { if (b.type !== "string" || !Array.isArray(b.enum) || !b.enum.length || b.enum.length > 100 || b.enum.some((v: unknown) => typeof v !== "string" || !v || v.length > 200) || new Set(b.enum).size !== b.enum.length) throw new WorkspaceError("Enum must contain unique non-empty strings"); result.enum = b.enum; }
+  if (b.enum !== undefined) { if (b.type !== "string" || !Array.isArray(b.enum) || !b.enum.length || b.enum.length > 100 || b.enum.some((v: unknown) => typeof v !== "string" || v.length > 200) || new Set(b.enum).size !== b.enum.length) throw new WorkspaceError("Enum must contain unique strings"); result.enum = b.enum; }
   if((result.hidden||result.frozen||data.features.find(f=>f.id===result.featureId)?.hidden||data.features.find(f=>f.id===result.featureId)?.frozen)&&!Object.hasOwn(result,"default"))throw new WorkspaceError("Hidden or frozen privileges need a Catalog default");
   if (Object.hasOwn(result,"default")) { const error = valueError(result,result.default);if(error)throw new WorkspaceError(error,422); }
   else if(data.variants.some(v=>!Object.hasOwn(v.values,key)))throw new WorkspaceError(`Set ${key} in every existing variant before requiring tier values`,409);

@@ -49,7 +49,10 @@ from .values import UNLIMITED, Limit, Unlimited, Value, decode_value, encode_jso
 
 __version__ = "0.1.0"
 
+from .privileges import BooleanPrivilege, Group, IntegerPrivilege, Privilege, PrivilegeCatalog, StringEnumPrivilege, Tag, Visibility
+
 __all__ = [
+    "PrivilegeCatalog", "Privilege", "BooleanPrivilege", "IntegerPrivilege", "StringEnumPrivilege", "Visibility", "Group", "Tag",
     "AbstractProvider",
     "AdminClient",
     "Assignment",

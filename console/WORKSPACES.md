@@ -71,3 +71,5 @@ The browser regression signs in through real OIDC and creates a catalog, tier, v
 Audit records currently store full before/after workspace snapshots for each configuration change. History has no retention policy in this preview; plan database capacity and retention before production use.
 
 Catalog values can also be environment-controlled, frozen or hidden; see [Environment overrides](ENVIRONMENT-OVERRIDES.md). UI snapshots omit hidden definitions and resolved environment values.
+
+The workspace authoring UI now uses the [Privilege Catalog](PRIVILEGE-CATALOG.md): typed definitions, one Group, multiple Tags, visibility and boolean-only `env_override`. Existing preview Feature containers remain compatible and are presented as Groups.

@@ -1,0 +1,13 @@
+import type {Meta,StoryObj} from '@storybook/react-vite';
+import {expect,userEvent,within} from 'storybook/test';
+import {Catalog} from './catalog.tsx';
+import {emptyData} from '../../../server/workspace/model.ts';
+const data=emptyData();
+data.groups=[{id:'integration',name:'Integrations',description:'Connect to other tools.'}];
+data.tags=[{id:'enterprise',name:'Enterprise',description:''},{id:'integration',name:'Integration',description:''}];
+data.privileges=[{key:'mcp_enabled',name:'MCP access',description:'Use the MCP integration.',type:'boolean',default:true,envVariable:'MCP_INSTALLED',groupId:'integration',tags:['enterprise','integration']},{key:'seats',name:'Seats',description:'Licensed seats.',type:'integer',default:10,tags:['enterprise']},{key:'internal_enabled',name:'Internal privilege',description:'',type:'boolean',default:false,hidden:true}];
+const meta={title:'Privilege Catalog',component:Catalog,args:{workspace:{id:'example',name:'Example product',role:'Platform administrator',data,revision:1,environment:{mcp_enabled:{variable:'MCP_INSTALLED',configuredValue:'False',value:false}}},save:async()=>true,canEdit:false,busy:false},tags:['autodocs']} satisfies Meta<typeof Catalog>;
+export default meta;
+type Story=StoryObj<typeof meta>;
+export const GroupedAndTagged:Story={play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText('MCP access')).toBeVisible();await expect(canvas.queryByText('Internal privilege')).not.toBeInTheDocument();await expect(canvas.getByRole('note')).toHaveTextContent('MCP_INSTALLED=False');await userEvent.selectOptions(canvas.getByLabelText('Filter by tag'),'integration');await expect(canvas.queryByText('Seats')).not.toBeInTheDocument();}};
+export const Authoring:Story={args:{canEdit:true}};
