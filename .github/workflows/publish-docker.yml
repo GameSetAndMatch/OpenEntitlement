@@ -42,7 +42,7 @@ jobs:
           tags: openentitlement:test
       - name: Test console and entitlement evaluation
         run: |
-          docker run -d --name oe-test -p 127.0.0.1:8787:8787 openentitlement:test
+          docker run -d --name oe-test -e OE_SEED=demo -p 127.0.0.1:8787:8787 openentitlement:test
           trap 'docker logs oe-test; docker rm -f oe-test' EXIT
           curl --fail --retry 20 --retry-delay 1 --retry-connrefused --retry-all-errors http://127.0.0.1:8787/ -o /tmp/oe-index.html
           grep -q '<html' /tmp/oe-index.html

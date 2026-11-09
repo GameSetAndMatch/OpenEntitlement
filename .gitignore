@@ -27,3 +27,8 @@ website/src/content/docs/reference/glossary.md
 website/public/oerep.openapi.json
 
 website/public/diagrams/
+
+.env
+
+# Local compose secrets
+deploy/.env

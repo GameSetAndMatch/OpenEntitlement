@@ -8,7 +8,7 @@ export default defineConfig({
     title: 'OpenEntitlement',
     disable404Route: true,
     description: 'An open-source entitlement service and protocol. Learn to resolve what an organization may do, and how much of it.',
-    logo: { src: './public/logo.svg', replacesTitle: false },
+    logo: { light: './public/logo.svg', dark: './public/logo-dark.svg', replacesTitle: false },
     favicon: '/favicon.svg',
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/GameSetAndMatch/openentitlement' }],
     customCss: ['./src/styles/docs.css'],

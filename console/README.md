@@ -10,10 +10,10 @@ Requires Node >=22.18 (Node 24 recommended).
 cd console
 npm ci
 npm run build
-npm start
+OE_SEED=demo npm start
 ```
 
-Open http://localhost:8787. The default memory backend seeds five example organizations:
+Open http://localhost:8787. Without `OE_SEED=demo`, the memory backend starts empty and the console shows a setup screen. With it, the console loads five example organizations:
 
 | Organization | Plan | Example entitlement |
 |---|---|---|
@@ -72,12 +72,16 @@ The administrative API supports plans (`/api/plans`), organizations and plan ass
 
 The console can attach private agreement/SLA PDFs and link them to negotiated overrides and grants. This service-only feature requires an admin token and does not change OEREP. See [contracts and PDF evidence](CONTRACTS.md) for setup, storage, and access details.
 
+`DATABASE_URL` takes precedence over raw `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, and `PGDATABASE` connection fields. The Compose example uses raw fields so passwords containing URL-reserved characters remain intact.
+
 ## Validation
 
 ```sh
 npm run typecheck
 npm test
 npm run build
+npx playwright install chromium
+npm run test:setup
 ```
 
 HTTP integration tests exercise the actual service through the TypeScript SDK. Python's `tests/test_remote.py` starts the same service and exercises it through the Python SDK.

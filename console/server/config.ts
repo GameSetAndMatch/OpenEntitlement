@@ -42,10 +42,14 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ConsoleConf
     host: env.OE_HOST ?? "127.0.0.1",
     provider,
     catalogPath: env.OE_CATALOG ?? new URL("../../spec/assets/catalog.json", here).pathname,
-    seedDemo: (env.OE_SEED ?? (provider === "memory" ? "demo" : "none")) === "demo",
+    seedDemo: env.OE_SEED === "demo",
     ...(env.OE_ADMIN_TOKEN ? { adminToken: env.OE_ADMIN_TOKEN } : {}),
     ...(env.OE_EVAL_TOKEN ? { evalToken: env.OE_EVAL_TOKEN } : {}),
-    ...(env.DATABASE_URL ? { databaseUrl: env.DATABASE_URL } : {}),
+    ...(env.DATABASE_URL
+      ? { databaseUrl: env.DATABASE_URL }
+      : env.PGHOST
+        ? { databaseUrl: `postgresql://${encodeURIComponent(env.PGUSER ?? "oe")}:${encodeURIComponent(env.PGPASSWORD ?? "")}@${env.PGHOST}:${env.PGPORT ?? "5432"}/${encodeURIComponent(env.PGDATABASE ?? "oe")}` }
+        : {}),
     ...(env.OE_FIXED_VALUES ? { fixedValues: JSON.parse(env.OE_FIXED_VALUES) } : {}),
     staticDir: env.OE_STATIC_DIR ?? new URL("../web/dist/", here).pathname,
   };
@@ -73,7 +77,7 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
       provider = new InMemoryProvider();
       break;
     case "postgres": {
-      if (!cfg.databaseUrl) throw new Error("OE_PROVIDER=postgres needs DATABASE_URL");
+      if (!cfg.databaseUrl) throw new Error("OE_PROVIDER=postgres needs DATABASE_URL or PGHOST connection fields");
       const { default: pg } = await import("pg");
       const { PostgresProvider, PostgresAdvisoryLock } = await import("@openentitlement/postgres");
       const pool = new pg.Pool({ connectionString: cfg.databaseUrl });

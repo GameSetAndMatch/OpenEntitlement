@@ -7,17 +7,23 @@ Run a local service, inspect the demo organizations, and evaluate a real entitle
 
 ## 1. Start the service
 
-Requires Git, npm, and **Node 24** (Node ≥22.18 also supports the source runner).
+This walkthrough uses the sample organizations, so start a disposable instance with demo data:
+
+```sh
+docker run --rm -p 127.0.0.1:8787:8787 -e OE_SEED=demo olivierbelhumeur/openentitlement
+```
+
+Or, from source (requires Git, npm, and **Node 24**; Node ≥22.18 also supports the source runner):
 
 ```sh
 git clone https://github.com/GameSetAndMatch/openentitlement.git
 cd openentitlement/console
 npm ci
 npm run build
-npm start
+OE_SEED=demo npm start
 ```
 
-Open **http://localhost:8787** for the administrative console. The default backend is in memory and seeds illustrative organizations. Data resets on restart.
+Open **http://localhost:8787** for the administrative console. The memory backend resets on restart. Without `OE_SEED=demo`, a new instance starts empty and the console opens a setup screen instead.
 
 ## 2. Resolve an entitlement
 
