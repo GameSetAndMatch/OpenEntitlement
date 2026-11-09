@@ -4,8 +4,13 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   python:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -30,6 +35,7 @@ jobs:
       - run: uv run pytest -q
 
   typescript:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -50,6 +56,7 @@ jobs:
       - run: npm run build
 
   service:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -76,6 +83,7 @@ jobs:
       - run: npm run test:storybook
 
   website:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     env:
       ASTRO_TELEMETRY_DISABLED: "1"

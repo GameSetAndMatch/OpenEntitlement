@@ -12,6 +12,8 @@ Source review dated November 9, 2026. This is a public engineering assessment, n
 | P2 | Type constraints were hand-maintained without a first-class validation-library interface. | Optional strict Pydantic and Zod authoring, shared browser/server Zod schemas, Python model/schema/roundtrip and cross-language tests. Runtime SDK imports retain no mandatory dependencies. |
 | P2 | Storybook's runner enumerated only the original stories. New user stories could exist without running in CI. | Extend the compiled-story checks to include personal allowances and Cloud Pro locking, alongside a real authenticated browser flow. |
 
+| P2 | CI had no per-job deadline or cancellation of superseded PR runs; a Storybook build stalled for over twenty minutes during this work. | Add 20-minute CI job limits and per-PR cancellation of superseded runs. Retry a cancelled stalled build once; diagnose repeated stalls rather than repeatedly paying for retries. |
+
 ## Remaining priorities
 
 | Priority | Evidence / consequence | Focused next step |
