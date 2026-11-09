@@ -55,7 +55,23 @@ try {
     await page.goto(service.url);
     const input = page.getByLabel('seats.max', { exact: true });
     const checkbox = page.getByRole('checkbox', { name: 'Unlimited seats.max', exact: true });
+    await input.fill('-5');
+    assert.equal(await input.inputValue(), '-5');
+    assert.equal(await input.getAttribute('aria-invalid'), 'true');
+    const inlineError = await page.getByRole('alert').textContent();
+    const invalid = await fetch(service.url + '/api/plans/checkbox-test/values', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'x-oe-actor': 'browser-test' },
+      body: JSON.stringify({ values: { 'seats.max': -5 }, reason: 'negative value regression' }),
+    });
+    assert.equal(invalid.status, 422);
+    assert.equal((await invalid.json()).message, inlineError);
+    await page.getByRole('button', { name: 'Save entitlements', exact: true }).click();
+    assert.equal(await page.getByRole('dialog').count(), 0);
+    await input.fill('1.5');
+    assert.equal(await input.inputValue(), '1.5');
+    assert.equal(await input.getAttribute('aria-invalid'), 'true');
     await input.fill('25');
+    assert.equal(await input.getAttribute('aria-invalid'), 'false');
     await checkbox.check();
     assert.equal(await input.isDisabled(), true);
     assert.equal(await input.inputValue(), '∞');

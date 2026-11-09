@@ -1,6 +1,7 @@
 /** Small UI kit: chips, toggles, value inputs, the mandatory-reason dialog. */
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { validateValue } from "@openentitlement/core";
 import { formatValue, isUnlimited, UNLIMITED, type Json, type PrivilegeDef } from "./api.ts";
 
 export function Chip({ children, tone = "neutral", title }: { children: ReactNode; tone?: "neutral" | "blue" | "green" | "amber" | "red" | "violet" | "grey"; title?: string }) {
@@ -56,12 +57,17 @@ export function ValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
 
 function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeDef; value: Json; onChange: (v: Json) => void; disabled?: boolean }) {
   const unlimited = isUnlimited(value);
+  const errorId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  const problem = unlimited || value === undefined ? undefined : validateValue({ ...def, feature: "" }, value);
+  useEffect(() => { input.current?.setCustomValidity(problem ?? ""); }, [problem]);
   const lastFinite = useRef(typeof value === "number" ? value : 0);
   useEffect(() => { if (typeof value === "number") lastFinite.current = value; }, [value]);
   return <div className="int-input">
-    <input className="input" type={unlimited ? "text" : "number"} aria-label={def.key} min={0} step={1}
+    <input ref={input} aria-invalid={Boolean(problem)} aria-describedby={problem ? errorId : undefined} className="input" type={unlimited ? "text" : "number"} aria-label={def.key} min={0} step={1}
       disabled={disabled || unlimited} value={unlimited ? "∞" : value ?? ""}
-      onChange={e => onChange(e.target.value === "" ? undefined : Math.max(0, Math.trunc(Number(e.target.value))))}/>
+      onChange={e => onChange(e.target.value === "" ? undefined : Number(e.target.value))}/>
+    {problem && <small id={errorId} role="alert" className="field-error">{problem}</small>}
     {def.unlimitedAllowed && <label className="unlimited-control">
       <input type="checkbox" aria-label={`Unlimited ${def.key}`} checked={unlimited} disabled={disabled}
         onChange={e => {
