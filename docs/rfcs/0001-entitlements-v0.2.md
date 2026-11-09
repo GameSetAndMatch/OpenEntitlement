@@ -188,16 +188,28 @@ These are decisions for the initial implementation, not open requests for more t
 
 This is a breaking change. Releasing it requires a new pre-1.0 spec version, a new OEREP major version for the reason and `requiredTier` changes, conformance scenarios rewritten for the three layers, and migration notes. The brief's revision 0.3 does not assign those release numbers. SDK and service versions stay independent. No runtime or released normative specification changes in this PR.
 
-## 10. Effect on the hosted service (issue #15)
+## 10. Workspace control plane and hosted service (issue #15)
 
-- A Tenant pushes `tier_variants.yaml` from its CI with an API key, alongside its privilege definitions. The console shows both read-only. Nobody edits tiers in the console.
-- Permissions change accordingly:
-  - `plans:write` is removed;
-  - `overrides:write` becomes `contracts:write`;
-  - `grants:write` stays.
+**Workspace** is the business-facing control plane: one business manages its catalog of features/actions, tiers and variants, and customer Organizations within a Workspace. An Account can access several Workspaces and switch between them. Each Workspace owns independent definitions, defaults, assignments, contracts, grants, and audit records; changing one Workspace must not change another. In SaaS, Tenant remains the technical isolation term for this boundary, not the UI name for an Organization. No additional business container is needed for the initial model.
 
-  Permission scopes become tier variants or Organizations. A Member can be limited to Business contracts, or to specific Organizations.
-- The console's YAML view (PR #19) shows the defaults file as last pushed, followed by each Organization's contract.
+The application flow is:
+
+1. Create or select a Workspace.
+2. **Define features/actions** on a dedicated catalog page: key, type/constraints, default, and description. Groups can nest and have descriptions. Keys are flat and globally unique within the Workspace, for example `max_exports`; group membership is separate metadata and does not create dotted evaluation paths.
+3. **Create tiers and variants.** Each privilege inherits its catalog default unless the tier variant explicitly replaces it. The UI distinguishes inherited defaults from explicit values. Resolve and validate a complete effective variant before assignment.
+4. **Assign a tier variant to an Organization**, then apply negotiated Organization-level contract terms where needed. Preserve the source and effective value in the read model.
+
+The latest catalog-first UI requirement supersedes the earlier assumption in this proposal that all default authoring is release-file-only and the console can never author definitions or tiers. Workspace-authorized administrators need the catalog/tier authoring workflow. Definitions and values must use the same validation as the server and SDK contract. A reviewed export/release remains a possible deployment workflow, not a second competing source of truth. Fixed installations remain read-only at runtime. Existing dotted keys require an explicit migration preserving assignments and negotiated values; do not merely strip dots in the UI or rewrite identifiers without migrating references.
+
+### Platform administration
+
+The designated SaaS operator Account has a **Platform administrator** role, with master control over all Workspaces. This is separate from an individual Workspace's Owner/Manager/User roles. It includes listing, creating, inspecting, and managing Workspaces and their membership, catalogs, tiers, and Organizations. Workspace-scoped Owners cannot grant themselves platform administration or access another Workspace by changing a URL or identifier.
+
+Grant the role to the operator's verified sign-in identity through explicit bootstrap/provisioning. Do not put a personal email address in public examples or use a client-supplied email string as authorization. Persist and enforce the role server-side; global administrative actions must record the actor, target Workspace, action, and reason. This adds a hosted control-plane requirement without turning global administration into an OEREP entitlement privilege or exposing it to ordinary evaluation API keys.
+
+Issue #15 must distinguish platform role checks from Workspace-scoped membership/permissions. Precise action names for catalog/tier administration, bootstrap mechanics, and isolation tests are required before implementation. The current standalone service has neither SaaS identity nor Workspace isolation; this section specifies future behavior, not existing support.
+
+The YAML Configuration view remains a read-only snapshot until the new model is implemented; do not present its existing export as the new authoring/import API.
 
 ## 11. To settle before implementation
 
