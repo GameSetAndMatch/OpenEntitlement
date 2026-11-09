@@ -1,6 +1,7 @@
 /** Small UI kit: chips, toggles, value inputs, the mandatory-reason dialog. */
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { validateValue } from "@openentitlement/core";
 import { formatValue, isUnlimited, UNLIMITED, type Json, type PrivilegeDef } from "./api.ts";
 
 export function Chip({ children, tone = "neutral", title }: { children: ReactNode; tone?: "neutral" | "blue" | "green" | "amber" | "red" | "violet" | "grey"; title?: string }) {
@@ -33,8 +34,8 @@ export function Check() {
 export function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} className={`toggle ${checked ? "on" : ""}`} onClick={() => onChange(!checked)}>
-      <span className="toggle-text">{checked ? "On" : "Off"}</span>
-      <span className="knob" />
+      <span className="toggle-track" aria-hidden="true"><span className="knob" /></span>
+      <span className="toggle-copy"><span className="toggle-text">{checked ? "Enabled" : "Disabled"}</span><small>{checked ? "Feature access included" : "Feature access not included"}</small></span>
     </button>
   );
 }
@@ -51,27 +52,31 @@ export function ValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
         ))}
       </select>
     );
+  return <IntegerValueInput key={def.key} def={def} value={value} onChange={onChange} disabled={disabled}/>;
+}
+
+function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeDef; value: Json; onChange: (v: Json) => void; disabled?: boolean }) {
   const unlimited = isUnlimited(value);
-  return (
-    <div className="int-input">
-      <input
-        className="input"
-        type="number"
-        aria-label={def.key}
-        min={0}
-        step={1}
-        disabled={disabled || unlimited}
-        value={unlimited || value === undefined ? "" : value}
-        placeholder={unlimited ? "Unlimited" : "—"}
-        onChange={(e) => onChange(e.target.value === "" ? undefined : Math.max(0, Math.trunc(Number(e.target.value))))}
-      />
-      {def.unlimitedAllowed && (
-        <button type="button" className={`chip-btn ${unlimited ? "active" : ""}`} disabled={disabled} onClick={() => onChange(unlimited ? 0 : UNLIMITED)}>
-          ∞ Unlimited
-        </button>
-      )}
-    </div>
-  );
+  const errorId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  const problem = unlimited || value === undefined ? undefined : validateValue({ ...def, feature: "" }, value);
+  useEffect(() => { input.current?.setCustomValidity(problem ?? ""); }, [problem]);
+  const lastFinite = useRef(typeof value === "number" ? value : 0);
+  useEffect(() => { if (typeof value === "number") lastFinite.current = value; }, [value]);
+  return <div className="int-input">
+    <input ref={input} aria-invalid={Boolean(problem)} aria-describedby={problem ? errorId : undefined} className="input" type={unlimited ? "text" : "number"} aria-label={def.key} min={0} step={1}
+      disabled={disabled || unlimited} value={unlimited ? "∞" : value ?? ""}
+      onChange={e => onChange(e.target.value === "" ? undefined : Number(e.target.value))}/>
+    {problem && <small id={errorId} role="alert" className="field-error">{problem}</small>}
+    {def.unlimitedAllowed && <label className="unlimited-control">
+      <input type="checkbox" aria-label={`Unlimited ${def.key}`} checked={unlimited} disabled={disabled}
+        onChange={e => {
+          if (e.target.checked && typeof value === "number") lastFinite.current = value;
+          onChange(e.target.checked ? UNLIMITED : lastFinite.current);
+        }}/>
+      <span>Unlimited</span>
+    </label>}
+  </div>;
 }
 
 export const Value = ({ v }: { v: Json }) => <span className={`value ${isUnlimited(v) ? "value-unlimited" : ""}`}>{formatValue(v)}</span>;
