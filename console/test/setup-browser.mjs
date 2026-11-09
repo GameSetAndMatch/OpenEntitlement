@@ -45,5 +45,26 @@ try {
     await page.getByRole('heading', { name: 'Set up your workspace' }).waitFor();
     await page.close();
   }
-  console.log('Fresh setup + Refresh regression passed at desktop and mobile widths');
+  const created = await fetch(service.url + '/api/plans/checkbox-test', {
+    method: 'PUT', headers: { 'content-type': 'application/json', 'x-oe-actor': 'browser-test' },
+    body: JSON.stringify({ name: 'Checkbox test', reason: 'test unlimited control' }),
+  });
+  assert.equal(created.status, 200);
+  for (const width of [1280, 390]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    await page.goto(service.url);
+    const input = page.getByRole('spinbutton', { name: 'seats.max', exact: true });
+    const checkbox = page.getByRole('checkbox', { name: 'Unlimited seats.max', exact: true });
+    await input.fill('25');
+    await checkbox.check();
+    assert.equal(await input.isDisabled(), true);
+    assert.equal(await input.inputValue(), '25');
+    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(237, 241, 244)');
+    await checkbox.focus(); await page.keyboard.press('Space');
+    assert.equal(await input.isEnabled(), true);
+    assert.equal(await input.inputValue(), '25');
+    assert.equal(await page.getByRole('checkbox', { name: 'Unlimited projects.max', exact: true }).count(), 0);
+    await page.close();
+  }
+  console.log('Setup, YAML copy/download, and Unlimited checkbox tests passed at desktop and mobile widths');
 } finally { await browser?.close(); await service.close(); }

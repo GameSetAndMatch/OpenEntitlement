@@ -51,27 +51,26 @@ export function ValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
         ))}
       </select>
     );
+  return <IntegerValueInput key={def.key} def={def} value={value} onChange={onChange} disabled={disabled}/>;
+}
+
+function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeDef; value: Json; onChange: (v: Json) => void; disabled?: boolean }) {
   const unlimited = isUnlimited(value);
-  return (
-    <div className="int-input">
-      <input
-        className="input"
-        type="number"
-        aria-label={def.key}
-        min={0}
-        step={1}
-        disabled={disabled || unlimited}
-        value={unlimited || value === undefined ? "" : value}
-        placeholder={unlimited ? "Unlimited" : "—"}
-        onChange={(e) => onChange(e.target.value === "" ? undefined : Math.max(0, Math.trunc(Number(e.target.value))))}
-      />
-      {def.unlimitedAllowed && (
-        <button type="button" className={`chip-btn ${unlimited ? "active" : ""}`} disabled={disabled} onClick={() => onChange(unlimited ? 0 : UNLIMITED)}>
-          ∞ Unlimited
-        </button>
-      )}
-    </div>
-  );
+  const lastFinite = useRef(typeof value === "number" ? value : 0);
+  useEffect(() => { if (typeof value === "number") lastFinite.current = value; }, [value]);
+  return <div className="int-input">
+    <input className="input" type="number" aria-label={def.key} min={0} step={1}
+      disabled={disabled || unlimited} value={unlimited ? lastFinite.current : value ?? ""}
+      onChange={e => onChange(e.target.value === "" ? undefined : Math.max(0, Math.trunc(Number(e.target.value))))}/>
+    {def.unlimitedAllowed && <label className="unlimited-control">
+      <input type="checkbox" aria-label={`Unlimited ${def.key}`} checked={unlimited} disabled={disabled}
+        onChange={e => {
+          if (e.target.checked && typeof value === "number") lastFinite.current = value;
+          onChange(e.target.checked ? UNLIMITED : lastFinite.current);
+        }}/>
+      <span>Unlimited</span>
+    </label>}
+  </div>;
 }
 
 export const Value = ({ v }: { v: Json }) => <span className={`value ${isUnlimited(v) ? "value-unlimited" : ""}`}>{formatValue(v)}</span>;
