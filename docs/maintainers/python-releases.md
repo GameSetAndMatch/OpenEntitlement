@@ -8,9 +8,9 @@ In [PyPI account publishing](https://pypi.org/manage/account/publishing/), add a
 
 | PyPI project name | GitHub owner | Repository | Workflow filename | Environment |
 |---|---|---|---|---|
-| `openentitlement-sdk` | `GameSetAndMatch` | `openentitlement-sdk` | `publish-python.yml` | `pypi` |
-| `openentitlement-postgres` | `GameSetAndMatch` | `openentitlement-sdk` | `publish-python.yml` | `pypi-postgres` |
-| `openentitlement-stripe` | `GameSetAndMatch` | `openentitlement-sdk` | `publish-python.yml` | `pypi-stripe` |
+| `openentitlement-sdk` | `GameSetAndMatch` | `OpenEntitlement` | `publish-python.yml` | `pypi` |
+| `openentitlement-postgres` | `GameSetAndMatch` | `OpenEntitlement` | `publish-python.yml` | `pypi-postgres` |
+| `openentitlement-stripe` | `GameSetAndMatch` | `OpenEntitlement` | `publish-python.yml` | `pypi-stripe` |
 
 For a project already owned by your account, configure its publisher in that project's settings instead. Pending publishers do not reserve names. Verify availability before the first release. No PyPI password or API token belongs in repository secrets.
 
