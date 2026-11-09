@@ -148,3 +148,7 @@ input::placeholder, textarea::placeholder { color: #8797a3; }
   .contract-card { margin: 0 16px; } .contracts-panel .contract-create, .contracts-panel > .muted { margin-inline: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+
+.configuration-panel .section-title { flex-wrap: wrap; }
+.configuration-code { margin: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 5px; background: #f8fafb; overflow: auto; max-height: 65vh; line-height: 1.7; tab-size: 2; }
+.configuration-code code { white-space: pre; overflow-wrap: normal; color: var(--ink); }

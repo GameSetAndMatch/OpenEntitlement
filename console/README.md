@@ -85,3 +85,7 @@ npm run test:setup
 ```
 
 HTTP integration tests exercise the actual service through the TypeScript SDK. Python's `tests/test_remote.py` starts the same service and exercises it through the Python SDK.
+
+## YAML configuration view
+
+Open **Configuration** to inspect the current catalog and tier defaults as YAML. Copy or download `openentitlement.snapshot.yaml`, including before completing setup. Refresh reloads changes from the service. This read-only snapshot uses the current `plans` model and is not the proposed declarative format or a backup: assignments, overrides, grants, contracts, and usage are excluded. YAML import is not supported. Providers without inspection expose only their catalog.
