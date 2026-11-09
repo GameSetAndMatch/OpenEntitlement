@@ -1,0 +1,47 @@
+/** Real OIDC login and Catalog → tier → Organization UI regression, isolated database. */
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {createServer} from 'node:net';
+import pg from 'pg';
+import {chromium} from 'playwright';
+import {startDevIssuer} from '../dev/issuer.ts';
+import {startWorkspaceServer} from '../server/workspace/main.ts';
+import {authConfig} from '../server/workspace/auth.ts';
+if(!process.env.OE_PG_DSN)throw new Error('OE_PG_DSN is required; this test creates its own disposable database');
+async function port(){const s=createServer();await new Promise(ok=>s.listen(0,'127.0.0.1',ok));const p=s.address().port;await new Promise(ok=>s.close(ok));return p;}
+const admin=new pg.Client({connectionString:process.env.OE_PG_DSN});await admin.connect();
+const name='oe_browser_'+randomBytes(8).toString('hex'),password=randomBytes(24).toString('hex');
+let browser,issuer,running,role=false,database=false;
+try{
+ await admin.query(`CREATE ROLE ${name} LOGIN PASSWORD '${password}'`);role=true;
+ await admin.query(`CREATE DATABASE ${name} OWNER ${name}`);database=true;
+ const appPort=await port();issuer=await startDevIssuer(await port(),`http://localhost:${appPort}`);
+ running=await startWorkspaceServer({databaseUrl:`postgresql://${name}:${password}@${admin.host}:${admin.port}/${name}`,port:appPort,auth:authConfig({OE_APP_URL:`http://localhost:${appPort}`,OE_OIDC_ISSUER:issuer.url,OE_OIDC_LOCAL_HTTP:'true',OE_PLATFORM_ADMIN_SUBJECT:'local-admin'})});
+ browser=await chromium.launch();const context=await browser.newContext();const page=await context.newPage();page.setDefaultTimeout(10000);
+ const pageErrors=[];page.on('pageerror',e=>pageErrors.push(e.message));
+ async function signIn(p,identity){await p.goto(running.url+'/app/');await p.getByRole('link',{name:'Sign in',exact:true}).click();await p.locator('[name=login]').fill(identity);await p.locator('[name=password]').fill('local');await p.getByRole('button',{name:/sign.in/i}).click();if(p.url().includes('interaction'))await p.getByRole('button',{name:/continue/i}).click();await p.getByRole('heading',{name:'Workspaces',exact:true}).waitFor();}
+ async function confirm(){const dialog=page.getByRole('dialog');await dialog.getByRole('textbox').fill('Browser regression');await dialog.getByRole('button',{name:'Confirm',exact:true}).click();await dialog.waitFor({state:'hidden'});}
+ async function save(label){await page.getByRole('button',{name:label,exact:true}).click();await confirm();await page.getByRole('button',{name:label,exact:true}).waitFor({state:'hidden'});}
+ await signIn(page,'local-admin');
+ await page.getByLabel('Workspace name').fill('Acme product');await page.locator('form.workspace-create').getByRole('button',{name:'Create workspace'}).click();await confirm();
+ await page.getByRole('heading',{name:'Catalog',exact:true}).waitFor();
+ const workspaceId=await page.getByLabel('Workspace',{exact:true}).inputValue();
+ await page.getByRole('button',{name:'Create group',exact:true}).click();await page.getByLabel('Group name').fill('Product');await page.getByLabel('Group ID').fill('product');await page.getByLabel('Description',{exact:true}).fill('Customer capabilities');await save('Save group');
+ await page.getByRole('button',{name:'Create feature',exact:true}).click();await page.getByLabel('Feature name').fill('Exports');await page.getByLabel('Feature ID').fill('exports');await page.getByLabel(/^Group/).selectOption('product');await save('Save feature');
+ await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Privilege name').fill('Maximum exports');await page.getByLabel('Privilege key').fill('max_exports');await page.getByLabel(/^FeatureChoose/).selectOption('exports');await page.getByLabel('Value type').selectOption('integer');await page.getByLabel('Allow unlimited',{exact:true}).check();
+ await page.getByLabel('max_exports',{exact:true}).fill('-5');assert.match(await page.getByRole('alert').innerText(),/0 or greater/);
+ await page.getByLabel('max_exports',{exact:true}).fill('5');await page.getByLabel('Unlimited max_exports').check();assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'∞');assert.equal(await page.getByLabel('max_exports',{exact:true}).isDisabled(),true);await page.getByLabel('Unlimited max_exports').uncheck();await save('Save privilege');
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByLabel('Tier name').fill('Pro');await page.getByLabel('Tier ID').fill('pro');await save('Save tier');
+ await page.getByRole('button',{name:'Create variant',exact:true}).click();await page.getByLabel('Variant name').fill('Pro standard');await page.getByLabel('Variant ID').fill('pro');await page.getByLabel('Override max_exports').check();await page.getByLabel('max_exports',{exact:true}).fill('10');await save('Save variant');
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();await page.getByRole('button',{name:'Add organization',exact:true}).click();await page.getByLabel('Organization name').fill('Acme');await page.getByLabel('Organization ID').fill('acme');await page.getByLabel('Override max_exports').check();await page.getByLabel('max_exports',{exact:true}).fill('25');await save('Save organization');
+ const row=page.getByRole('row').filter({hasText:'Maximum exports'});assert.match(await row.innerText(),/25\s+CONTRACT/);
+ await page.getByRole('link',{name:'Configuration',exact:true}).click();assert.match(await page.locator('main').innerText(),/max_exports/);
+ const second=await browser.newContext();const userPage=await second.newPage();await signIn(userPage,'local-user');
+ const forbidden=await userPage.request.get(running.url+`/api/workspaces/${workspaceId}`);assert.equal(forbidden.status(),404);
+ await userPage.getByLabel('Workspace name').fill('Another business');await userPage.locator('form.workspace-create').getByRole('button',{name:'Create workspace'}).click();const dialog=userPage.getByRole('dialog');await dialog.getByRole('textbox').fill('Create isolated workspace');await dialog.getByRole('button',{name:'Confirm',exact:true}).click();await userPage.getByRole('heading',{name:'Catalog',exact:true}).waitFor();assert.equal(await userPage.getByText('Maximum exports',{exact:true}).count(),0);
+ await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page must not overflow horizontally');
+ assert.deepEqual(pageErrors,[]);console.log('Workspace browser regression passed: verified login, catalog, validation, inheritance, Organization terms, YAML and account isolation');
+}finally{
+ await browser?.close();await running?.close();await issuer?.close();
+ if(database)await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);if(role)await admin.query(`DROP ROLE ${name}`);await admin.end();
+}

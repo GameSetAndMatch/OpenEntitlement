@@ -70,6 +70,9 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:setup
+      - run: npm run test:workspaces
+      - run: npm run build:storybook
+      - run: npm run test:storybook
 
   website:
     runs-on: ubuntu-latest

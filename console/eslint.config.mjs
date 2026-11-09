@@ -1,1 +1,2 @@
-export { default } from "../sdk-js/eslint.config.mjs";
+import base from "../sdk-js/eslint.config.mjs";
+export default [...base, { ignores: ["build/**"] }];
