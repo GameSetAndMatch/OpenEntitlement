@@ -72,7 +72,7 @@ OEREP does not lock your application's usage database. Use a shared application 
 
 ## Environment-controlled, frozen and hidden Catalog values
 
-Link an environment variable directly to a typed value in your Catalog. The self-hosted service accepts YAML or JSON at `OE_CATALOG`:
+Link a boolean environment prerequisite directly to a boolean value in your Catalog. The self-hosted service accepts YAML or JSON at `OE_CATALOG`:
 
 ```yaml
 features:
@@ -90,8 +90,8 @@ features:
         frozen: true
 ```
 
-The environment value wins and the console locks its control. A frozen value without an environment binding uses its Catalog default. Set `hidden: true` on a feature or privilege to omit it from normal console controls while keeping its backend evaluation. Hidden or frozen workspace values need a default or a valid environment binding.
+Access requires both the resolved entitlement and the environment variable to be true. The console locks the affected control. A frozen value without an environment binding uses its Catalog default. Set `hidden: true` on a feature or privilege to omit it from normal console controls while keeping its backend evaluation. Hidden, frozen and environment-linked workspace values need a Catalog default.
 
-Bound variables are parsed according to their Catalog types and constraints. Invalid or missing variables are errors; restart after changing the environment. Environment overrides can force values, including `true`: keep installation status separate from Basic/Business commercial access when both must be checked.
+Only boolean environment bindings are supported. `false` vetoes access; `true` preserves the customer’s existing entitlement and never grants additional access. Invalid or missing bound variables are errors; restart after changing the environment. Integer and string settings remain normal Catalog values.
 
 See the [Catalog environment guide](https://github.com/GameSetAndMatch/openentitlement/blob/main/console/ENVIRONMENT-OVERRIDES.md) for supported types, Compose examples and workspace administration.

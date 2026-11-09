@@ -45,7 +45,7 @@ export function Toggle({ checked, onChange, disabled, label }: { checked: boolea
 export function EnvironmentNotice({binding,frozen=false}:{binding?:EnvironmentOverride;frozen?:boolean}){return binding||frozen?<p className="environment-notice" role="note">{binding?environmentMessage(binding):"Frozen to the Catalog default. This value cannot be changed manually."}</p>:null;}
 export function ValueInput(props: { def: PrivilegeDef; value: Json; onChange: (v: Json) => void; disabled?: boolean }) {
  const frozen=Boolean(props.def.environment||props.def.frozen);
- return <><UnrestrictedValueInput {...props} disabled={props.disabled||frozen} value={props.def.environment?props.def.environment.value:props.def.frozen?props.def.default:props.value}/><EnvironmentNotice binding={props.def.environment} frozen={frozen}/></>;
+ return <><UnrestrictedValueInput {...props} disabled={props.disabled||frozen} value={props.def.environment?(props.def.frozen?props.def.default:props.value??props.def.default)===true&&props.def.environment.value:props.def.frozen?props.def.default:props.value}/><EnvironmentNotice binding={props.def.environment} frozen={frozen}/></>;
 }
 function UnrestrictedValueInput({ def, value, onChange, disabled }: { def: PrivilegeDef; value: Json; onChange: (v: Json) => void; disabled?: boolean }) {
   if (def.valueType === "boolean") return <Toggle checked={value === true} onChange={onChange} disabled={disabled} label={def.key} />;

@@ -10,12 +10,10 @@ features:
       - key: max_mcp_calls
         valueType: integer
         default: 100
-        envVariable: MCP_MAX_CALLS
       - key: mcp_mode
         valueType: enum
         options: [read, write]
         default: read
-        envVariable: MCP_MODE
       - key: max_connections
         valueType: integer
         default: 3

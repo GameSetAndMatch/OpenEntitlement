@@ -109,12 +109,12 @@ try {
     assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await page.close();
   }
-  const controlled=await startServer({...configFromEnv({OE_CATALOG:new URL('../../deploy/catalog.environment.example.yaml',import.meta.url).pathname,MCP_INSTALLED:'False',MCP_MAX_CALLS:'500',MCP_MODE:'write'}),port:0});
+  const controlled=await startServer({...configFromEnv({OE_CATALOG:new URL('../../deploy/catalog.environment.example.yaml',import.meta.url).pathname,MCP_INSTALLED:'False'}),port:0});
   try{
     const created=await fetch(controlled.url+'/api/plans/pro',{method:'PUT',headers:{'content-type':'application/json','x-oe-actor':'browser-test'},body:JSON.stringify({name:'Pro',reason:'Prepare environment control regression'})});assert.equal(created.status,200);
     for(const width of [1280,390]){const page=await browser.newPage({viewport:{width,height:900}});await page.goto(controlled.url);await page.getByRole('heading',{name:'Review what the tier includes'}).waitFor();
       const toggle=page.getByRole('switch',{name:'mcp_enabled',exact:true});assert.equal(await toggle.isDisabled(),true);assert.equal(await toggle.getAttribute('aria-checked'),'false');
-      for(const [key,value] of [['max_mcp_calls','500'],['mcp_mode','write'],['max_connections','3']]){const input=page.getByLabel(key,{exact:true});assert.equal(await input.isDisabled(),true);assert.equal(await input.inputValue(),value);}
+      for(const [key,value] of [['max_mcp_calls','100'],['mcp_mode','read'],['max_connections','3']]){const input=page.getByLabel(key,{exact:true});assert.equal(await input.isDisabled(),key==='max_connections');assert.equal(await input.inputValue(),value);}
       assert.equal(await page.getByRole('switch',{name:'internal_enabled'}).count(),0);assert.match(await page.locator('main').innerText(),/MCP_INSTALLED=False/);assert.match(await page.locator('main').innerText(),/Frozen to the Catalog default/);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.close();}
   }finally{await controlled.close();}
   console.log('Setup, YAML copy/download, and Unlimited checkbox tests passed at desktop and mobile widths');

@@ -1,18 +1,17 @@
-# Catalog environment bindings, frozen values and visibility
+# Boolean environment prerequisites and Catalog visibility
 
-Each typed Catalog privilege can declare `envVariable`, `frozen` and `hidden`. A whole feature can also declare `frozen` or `hidden` for all its privileges. These are independent settings:
+Environment bindings currently support **booleans only**. They are a final install prerequisite: `effective = entitlement AND environment`. An installed component never grants access that a customer's tier or contract does not allow.
 
-| Setting | Behavior |
-|---|---|
-| `envVariable: MCP_INSTALLED` | The typed process-environment value wins and is read-only in the console |
-| `frozen: true` | Without an environment binding, the Catalog default wins and is greyed out |
-| `hidden: true` | Omit the feature/value from normal console pages, forms and UI YAML snapshots; evaluation still works |
+| Entitlement | Environment | Effective value |
+|---|---|---|
+| false | false | false |
+| false | true | false |
+| true | false | false |
+| true | true | true |
 
-A hidden or frozen workspace privilege must have a default or an environment binding. A definition without a default or binding still requires an explicit value in every tier variant.
+## Catalog configuration
 
-## Self-hosted Catalog YAML
-
-The reference service accepts YAML or JSON through the existing `OE_CATALOG` path. Bind variables directly on typed privilege definitions; there is no separate deployment binding file:
+Link the variable directly on the boolean privilege in the existing YAML/JSON Catalog. There is no separate deployment binding file:
 
 ```yaml
 features:
@@ -24,15 +23,6 @@ features:
         valueType: boolean
         default: false
         envVariable: MCP_INSTALLED
-      - key: max_mcp_calls
-        valueType: integer
-        default: 100
-        envVariable: MCP_MAX_CALLS
-      - key: mcp_mode
-        valueType: enum
-        options: [read, write]
-        default: read
-        envVariable: MCP_MODE
       - key: max_connections
         valueType: integer
         default: 3
@@ -46,44 +36,34 @@ features:
         default: true
 ```
 
-`deploy/catalog.environment.example.yaml` and `deploy/compose.environment.example.yaml` provide a runnable empty-workspace example:
+The self-hosted service accepts YAML or JSON at `OE_CATALOG`. The repository includes an empty-workspace example:
 
 ```sh
 docker compose -f deploy/compose.memory.yaml -f deploy/compose.environment.example.yaml up
 ```
 
-The environment is deployment configuration:
+Use an image built from this change; previously published images do not include it yet. The Compose override mounts `deploy/catalog.environment.example.yaml` read-only and sets `MCP_INSTALLED=false`. Your deployment automation must set that variable to match the installed components; OpenEntitlement does not discover or deploy pods.
 
-```yaml
-services:
-  openentitlement:
-    environment:
-      OE_CATALOG: /config/catalog.yaml
-      MCP_INSTALLED: 'false'
-      MCP_MAX_CALLS: '500'
-      MCP_MODE: read
-    volumes:
-      - ./catalog.yaml:/config/catalog.yaml:ro
-```
+Booleans accept case-insensitive `true`/`false`, or `1`/`0`. Invalid and unset bound variables are errors rather than silent defaults. Restart after changing the environment. Attaching `envVariable` to an integer, enum or string is rejected. There is no numeric cap, string substitution or allow-list behavior in this release.
 
-Use a service image built from this change; previously published images do not include it yet. Restart after changing environment values. The standalone Catalog is read at startup. Bound booleans accept case-insensitive `true`, `false`, `1`, `0`; integer values must be safe whole numbers within Catalog bounds; strings retain their exact text and must match any enum. Missing bound variables, invalid types and out-of-bounds values are errors, never silent fallbacks. A string may be empty when its definition permits it. The existing OEREP v1 Catalog supports enum strings; the workspace Catalog also supports unrestricted strings.
+## Hidden and frozen controls
 
-## Console and workspace behavior
+`hidden: true` and `frozen: true` remain available for all Catalog types, separately from environment prerequisites. They can be declared on a feature (all its privileges) or an individual privilege:
 
-The Catalog displays the binding and source. Tiers and Organizations show a greyed-out control with `Controlled by environment variable 'MCP_INSTALLED=False'` or `Frozen to the Catalog default`. Setting a different tier value, override or grant cannot change the effective result. Stored commercial values are preserved for when a binding is removed or a definition is unfrozen.
+- **Hidden:** omitted from normal console pages, forms and UI YAML snapshots; backend evaluation still works.
+- **Frozen:** visible but greyed out, using the Catalog default rather than tier or Organization replacements.
+- **Environment-linked boolean:** visible but greyed out, showing the commercial value AND the environment prerequisite. If also frozen, its default is used before applying the prerequisite.
 
-A feature has several typed privileges, so the environment binding belongs to the particular value—not an ambiguous whole feature. Feature-wide `hidden` and `frozen` flags apply to every privilege. In the workspace console these flags can be authored alongside feature definitions; a platform administrator can add/change an environment binding. Workspace Owners cannot read arbitrary server environment variables by adding bindings. Invalid binding changes are rejected atomically. The configured service environment is snapshotted at startup.
+Hidden, frozen and environment-linked workspace values require a Catalog default, so every locked control has a commercial baseline. Values without these controls can still require an explicit value in every tier variant.
 
-Values resolve in this order:
+The console explains the source, for example `Restricted by environment variable 'MCP_INSTALLED=False'` or `Frozen to the Catalog default`. Stored tier and negotiated values remain intact. They cannot bypass the prerequisite. Removing the binding or unfreezing a value restores normal commercial resolution.
 
-1. Linked environment value, if present.
-2. Catalog default for a frozen feature/privilege.
-3. Normal Catalog → tier variant → Organization terms, with contract lifecycle policy.
+In the workspace service, only a platform administrator can add or change server environment bindings. Workspace Owners cannot read arbitrary server variables by adding definitions. Binding changes are validated and audited atomically, and the service environment is snapshotted at startup. Self-hosted bindings are installer-owned Catalog configuration.
 
-The standalone OEREP service returns its existing `FIXED` reason plus optional `environment`/`frozen` diagnostics. The separate workspace preview uses `ENVIRONMENT` or `FROZEN`. No new mandatory OEREP fields or reasons are introduced. Environment bindings replace numeric allowances as a final value; grants are not added again.
+The standalone OEREP service uses its existing `FIXED` reason plus optional diagnostics. The separate workspace preview uses `ENVIRONMENT` or `FROZEN`; no new mandatory OEREP fields or reasons are introduced.
 
-`hidden` is presentation, not authorization: the backend and evaluation API still know the definition. Do not use it for storing secrets. UI YAML snapshots omit hidden definitions and resolved environment values and are not full backups. Administrative APIs still provide complete definitions.
+`hidden` controls presentation, not authorization. Administrative APIs still provide complete definitions. UI YAML snapshots omit hidden definitions and resolved environment values; they are not full backups. Only explicitly linked boolean variables are exposed as diagnostics.
 
-## Installation versus SaaS commercial access
+## Basic and Business in SaaS
 
-These are explicit operator overrides: an environment boolean of `true` forces `true`, just as an integer or string forces its value. For paid SaaS MCP access, keep the Basic/Business entitlement separate from installation status and require both checks in the application. Do not bind a commercial access flag to `MCP_INSTALLED=true` if the intention is merely to make the component available. OpenEntitlement does not deploy or discover MCP pods itself.
+Keep MCP as a normal boolean entitlement: Basic denies it and Business includes it. If the MCP component is absent, `MCP_INSTALLED=false` vetoes both. When installed, `true` preserves each customer's entitlement: Basic stays denied and Business can use MCP. Behavior settings such as timeouts or model names remain deployment configuration, not entitlement environment bindings.

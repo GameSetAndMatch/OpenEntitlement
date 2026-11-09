@@ -70,7 +70,7 @@ export function feature(data: WorkspaceData,input: unknown): Feature {
   const b=object(input);only(b,["id","name","description","groupId","hidden","frozen"]);const result: Feature={id:identifier(b.id),name:text(b.name,"Feature name"),description:description(b.description)};
   if(b.frozen!==undefined){if(typeof b.frozen!=="boolean")throw new WorkspaceError("Frozen must be a boolean");result.frozen=b.frozen;}
   if(b.hidden!==undefined){if(typeof b.hidden!=="boolean")throw new WorkspaceError("Hidden must be a boolean");result.hidden=b.hidden;}
-  if((result.hidden||result.frozen)&&data.privileges.some(p=>p.featureId===result.id&&!Object.hasOwn(p,"default")&&!p.envVariable))throw new WorkspaceError("Hidden or frozen privileges need a default or an environment binding");
+  if((result.hidden||result.frozen)&&data.privileges.some(p=>p.featureId===result.id&&!Object.hasOwn(p,"default")))throw new WorkspaceError("Hidden or frozen privileges need a Catalog default");
   if(b.groupId){result.groupId=text(b.groupId,"Group");if(!data.groups.some(g=>g.id===result.groupId))throw new WorkspaceError("Group does not exist");}
   return result;
 }
@@ -80,7 +80,7 @@ export function privilege(data: WorkspaceData, input: unknown): Privilege {
   const result: Privilege = { key, name: text(b.name, "Feature name"), description: description(b.description), type: b.type, ...(Object.hasOwn(b,"default") ? { default: b.default } : {}) };
   if(b.frozen!==undefined){if(typeof b.frozen!=="boolean")throw new WorkspaceError("Frozen must be a boolean");result.frozen=b.frozen;}
   if(b.hidden!==undefined){if(typeof b.hidden!=="boolean")throw new WorkspaceError("Hidden must be a boolean");result.hidden=b.hidden;}
-  if(b.envVariable!==undefined){if(typeof b.envVariable!=="string"||! /^[A-Z][A-Z0-9_]*$/.test(b.envVariable))throw new WorkspaceError("envVariable must be an uppercase environment variable name");result.envVariable=b.envVariable;}
+  if(b.envVariable!==undefined){if(b.type!=="boolean")throw new WorkspaceError("Environment bindings support boolean privileges only");if(!Object.hasOwn(b,"default"))throw new WorkspaceError("Environment-linked values need a Catalog default");if(typeof b.envVariable!=="string"||! /^[A-Z][A-Z0-9_]*$/.test(b.envVariable))throw new WorkspaceError("envVariable must be an uppercase environment variable name");result.envVariable=b.envVariable;}
   if (b.groupId) { result.groupId = text(b.groupId, "Group"); if (!data.groups.some(g => g.id === result.groupId)) throw new WorkspaceError("Group does not exist"); }
   if (!b.featureId) throw new WorkspaceError("Choose a feature for this privilege");
   if (b.featureId) { result.featureId=text(b.featureId,"Feature");if(!data.features.some(f=>f.id===result.featureId))throw new WorkspaceError("Feature does not exist"); }
@@ -91,9 +91,9 @@ export function privilege(data: WorkspaceData, input: unknown): Privilege {
   if ((result.minimum ?? 0) > (result.maximum ?? Number.MAX_SAFE_INTEGER)) throw new WorkspaceError("Minimum cannot exceed maximum");
   if (b.unlimited !== undefined) { if (b.type !== "integer" || typeof b.unlimited !== "boolean") throw new WorkspaceError("Unlimited is only available for integer privileges"); result.unlimited = b.unlimited; }
   if (b.enum !== undefined) { if (b.type !== "string" || !Array.isArray(b.enum) || !b.enum.length || b.enum.length > 100 || b.enum.some((v: unknown) => typeof v !== "string" || !v || v.length > 200) || new Set(b.enum).size !== b.enum.length) throw new WorkspaceError("Enum must contain unique non-empty strings"); result.enum = b.enum; }
-  if((result.hidden||result.frozen||data.features.find(f=>f.id===result.featureId)?.hidden||data.features.find(f=>f.id===result.featureId)?.frozen)&&!Object.hasOwn(result,"default")&&!result.envVariable)throw new WorkspaceError("Hidden or frozen privileges need a default or an environment binding");
+  if((result.hidden||result.frozen||data.features.find(f=>f.id===result.featureId)?.hidden||data.features.find(f=>f.id===result.featureId)?.frozen)&&!Object.hasOwn(result,"default"))throw new WorkspaceError("Hidden or frozen privileges need a Catalog default");
   if (Object.hasOwn(result,"default")) { const error = valueError(result,result.default);if(error)throw new WorkspaceError(error,422); }
-  else if(!result.envVariable&&data.variants.some(v=>!Object.hasOwn(v.values,key)))throw new WorkspaceError(`Set ${key} in every existing variant before requiring tier values`,409);
+  else if(data.variants.some(v=>!Object.hasOwn(v.values,key)))throw new WorkspaceError(`Set ${key} in every existing variant before requiring tier values`,409);
   // Updating a definition may not invalidate existing negotiated or variant values.
   for (const row of [...data.variants.map(v => v.values), ...data.organizations.map(o => o.terms)]) if (Object.hasOwn(row, key)) { const e = valueError(result, row[key]); if (e) throw new WorkspaceError(`Existing value would become invalid: ${e}`, 409); }
   return result;
@@ -111,7 +111,7 @@ export function variant(data: WorkspaceData, input: unknown): Variant {
   if(existing&&(existing.tierId!==b.tierId||existing.kind!==b.kind))throw new WorkspaceError("A variant’s tier and purpose cannot change. Create a new variant instead.",409);
   if (data.variants.some(v => v.id !== id && v.tierId === b.tierId && v.kind === b.kind)) throw new WorkspaceError("This tier already has a variant with that purpose", 409);
   const explicit=values(data,b.values??{});
-  for(const p of data.privileges)if(!p.envVariable&&!Object.hasOwn(p,"default")&&!Object.hasOwn(explicit,p.key))throw new WorkspaceError(`${p.key}: a value is required in this variant`,422);
+  for(const p of data.privileges)if(!Object.hasOwn(p,"default")&&!Object.hasOwn(explicit,p.key))throw new WorkspaceError(`${p.key}: a value is required in this variant`,422);
   return { id, name: text(b.name, "Variant name"), tierId: b.tierId, kind: b.kind, values: explicit };
 }
 export function organization(data: WorkspaceData, input: unknown, now = new Date()): Organization {
@@ -145,9 +145,10 @@ export function resolve(data: WorkspaceData, orgId: string, key: string, now = n
   const contract = !fallback && !grace && Object.hasOwn(org.terms, key), explicit = Object.hasOwn(assigned.values, key);
   const effective=contract?org.terms[key]:explicit?assigned.values[key]:def.default;
   const binding=Object.hasOwn(environment,key)?environment[key]:undefined;
-  const frozen=Boolean(binding||def.frozen||data.features.find(f=>f.id===def.featureId)?.frozen);
-  if(effective===undefined&&!binding)throw new WorkspaceError(`${key}: variant has no value`,422);
-  return { privilege: key, environment:binding, frozen, value:binding?binding.value:frozen?def.default:effective, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
+  const defaultFrozen=Boolean(def.frozen||data.features.find(f=>f.id===def.featureId)?.frozen);
+  const frozen=Boolean(binding||defaultFrozen);
+  if(effective===undefined)throw new WorkspaceError(`${key}: variant has no value`,422);
+  return { privilege: key, environment:binding, frozen, value:binding?(defaultFrozen?def.default:effective)===true&&binding.value:defaultFrozen?def.default:effective, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
 }
 export function catalogEnvironment(data:WorkspaceData,env:NodeJS.ProcessEnv):EnvironmentOverrides {
  const result:EnvironmentOverrides={};

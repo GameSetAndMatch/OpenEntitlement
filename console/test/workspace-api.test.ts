@@ -19,7 +19,7 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     await admin.query(`CREATE DATABASE ${name} OWNER ${name}`);database=true;
     const dbUrl=`postgresql://${name}:${password}@${admin.host}:${admin.port}/${name}`;
     const appPort=await port(),issuerPort=await port(),origin=`http://localhost:${appPort}`;
-    const runtimeEnv={MAX_EXPORTS:"7",RETENTION:"365d",LABEL:"Environment label",MCP_ENABLED:"False",INVALID_INTEGER:"nope"};
+    const runtimeEnv={MCP_INSTALLED:"False",INVALID_BOOLEAN:"nope"};
     issuer=await startDevIssuer(issuerPort,origin);
     running=await startWorkspaceServer({databaseUrl:dbUrl,port:appPort,env:runtimeEnv,auth:authConfig({OE_APP_URL:origin,OE_OIDC_ISSUER:issuer.url,OE_OIDC_LOCAL_HTTP:"true",OE_PLATFORM_ADMIN_SUBJECT:"local-admin"})});
     const store=running.store;
@@ -104,16 +104,14 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     // Restart the service with the same database; workspace and negotiated terms persist.
     await running.close();running=await startWorkspaceServer({databaseUrl:dbUrl,port:appPort,env:runtimeEnv,auth:authConfig({OE_APP_URL:origin,OE_OIDC_ISSUER:issuer.url,OE_OIDC_LOCAL_HTTP:"true"})});
     assert.equal((await call(path,a)).data.data.organizations[0].terms.max_exports,25);
-    const definition=(await call(path,p)).data.data.privileges.find((d:any)=>d.key==="max_exports");
-    assert.equal((await call(path+"/privileges",a,{entry:{...definition,envVariable:"MAX_EXPORTS"},revision,reason:"owner cannot read server env"},"PUT")).status,403);
-    const bound=await call(path+"/privileges",p,{entry:{...definition,envVariable:"MAX_EXPORTS"},revision,reason:"bind typed value"},"PUT");assert.equal(bound.status,200);revision=bound.data.revision;assert.equal(bound.data.environment.max_exports.value,7);
-    assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"max_exports"})).data.value,7);
-    assert.equal((await call(path+"/privileges",p,{entry:{...definition,envVariable:"INVALID_INTEGER"},revision,reason:"invalid binding"},"PUT")).status,422);
-    const gateKey=await call(path+"/keys",p,{name:"Environment evaluation",scope:"evaluate",reason:"test"});assert.equal((await call("/api/evaluate",{authorization:`Bearer ${gateKey.data.secret}`},{organizationId:"acme",privilege:"max_exports",environment:{}})).data.value,7);
-    const retention=(await call(path,p)).data.data.privileges.find((d:any)=>d.key==="retention");const enumBound=await call(path+"/privileges",p,{entry:{...retention,envVariable:"RETENTION"},revision,reason:"bind enum"},"PUT");assert.equal(enumBound.status,200);revision=enumBound.data.revision;
-    assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"retention"})).data.value,"365d");
-    assert.equal((await call(path+"/privileges",a,{entry:definition,revision,reason:"unlink env"},"PUT")).status,403);
-
+    const definition={key:"mcp_enabled",name:"MCP",featureId:"exports",type:"boolean",default:true,envVariable:"MCP_INSTALLED"};
+    assert.equal((await call(path+"/privileges",a,{entry:definition,revision,reason:"owner cannot bind server env"},"PUT")).status,403);
+    const bound=await call(path+"/privileges",p,{entry:definition,revision,reason:"bind boolean"},"PUT");assert.equal(bound.status,200);revision=bound.data.revision;assert.equal(bound.data.environment.mcp_enabled.value,false);
+    assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"mcp_enabled"})).data.value,false);
+    assert.equal((await call(path+"/privileges",p,{entry:{...definition,envVariable:"INVALID_BOOLEAN"},revision,reason:"invalid binding"},"PUT")).status,422);
+    const keyForEnv=await call(path+"/keys",p,{name:"Environment evaluation",scope:"evaluate",reason:"test"});assert.equal((await call("/api/evaluate",{authorization:`Bearer ${keyForEnv.data.secret}`},{organizationId:"acme",privilege:"mcp_enabled",environment:{}})).data.value,false);
+    assert.equal((await call(path+"/privileges",p,{entry:{...definition,key:"bound_number",type:"integer",default:5},revision,reason:"unsupported integer"},"PUT")).status,400);
+    const {envVariable:_env,...unbound}=definition;assert.equal((await call(path+"/privileges",a,{entry:unbound,revision,reason:"unlink env"},"PUT")).status,403);
   }finally{
     await running?.close();await issuer?.close();
     if(database)await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);if(role)await admin.query(`DROP ROLE ${name}`);await admin.end();

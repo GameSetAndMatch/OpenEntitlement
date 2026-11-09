@@ -14,7 +14,7 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   await page.locator('#storybook-root').locator('input,select,button').first().waitFor();
   if(story==='unlimited')await page.waitForFunction(()=>!document.querySelector('input[aria-label="max_exports"]').disabled);
   if(story==='invalid-negative')assert.match(await page.getByRole('alert').innerText(),/0 or greater/);
-  if(story==='environment-override'){assert.equal(await page.getByLabel('max_exports',{exact:true}).isDisabled(),true);assert.match(await page.getByRole('note').innerText(),/MAX_EXPORTS=7/);}
+  if(story==='environment-override'){assert.equal(await page.getByRole('switch').isDisabled(),true);assert.match(await page.getByRole('note').innerText(),/MCP_INSTALLED=False/);}
   if(story==='boolean-access')await page.getByRole('switch',{checked:true}).waitFor();
   assert.equal(await page.locator('#error-stack').isVisible(),false,`Story ${story} must render without errors`);
  }

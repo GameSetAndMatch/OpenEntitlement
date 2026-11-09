@@ -6,5 +6,3 @@ services:
     environment:
       OE_CATALOG: /config/catalog.yaml
       MCP_INSTALLED: '${MCP_INSTALLED:-false}'
-      MCP_MAX_CALLS: '${MCP_MAX_CALLS:-500}'
-      MCP_MODE: '${MCP_MODE:-read}'
