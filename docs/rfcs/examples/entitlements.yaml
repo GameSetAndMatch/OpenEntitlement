@@ -1,0 +1,50 @@
+# Candidate format from RFC-0002; not currently accepted by the service.
+openentitlement: "0.1.0"
+info:
+  title: Acme Knowledge
+  version: 3
+features:
+  projects:
+    name: Projects
+    description: Every tier has projects; tiers differ in collaboration limits.
+    privileges:
+      max_members_per_project:
+        description: How many members one project may have.
+        type: integer
+        minimum: 0
+        unlimited: true
+        subjects: [organization]
+      export_enabled:
+        description: Export selected pages to an external documentation tool.
+        type: boolean
+  purchase:
+    name: Self-serve purchase
+    privileges:
+      self_serve_purchase_enabled:
+        description: Whether this Organization may buy more through in-app checkout.
+        type: boolean
+tiers:
+  business: {name: Business}
+  enterprise: {name: Enterprise}
+tierVariants:
+  business:
+    tier: business
+    trial: false
+    values:
+      max_members_per_project: 1
+      export_enabled: true
+      self_serve_purchase_enabled: true
+  business_trial:
+    tier: business
+    trial: {durationDays: 30}
+    values:
+      max_members_per_project: 1
+      export_enabled: false
+      self_serve_purchase_enabled: true
+  enterprise:
+    tier: enterprise
+    trial: false
+    values:
+      max_members_per_project: unlimited
+      export_enabled: true
+      self_serve_purchase_enabled: false

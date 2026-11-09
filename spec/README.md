@@ -59,6 +59,10 @@ The spec uses camelCase (`requireWithin`, `organizationId`). SDKs SHOULD follow 
 
 The spec follows [SemVer](https://semver.org). Until 1.0.0, minor versions MAY break compatibility. Each SDK MUST declare the spec version it implements.
 
+## Proposals under review
+
+- [RFC-0002: Declarative catalogs, installation values, and contract terms](../docs/rfcs/0002-declarative-catalog-values-and-contracts.md) proposes a YAML authoring format and contract-resolution layer. It is not implemented or part of the current normative specification.
+
 ## Roadmap
 
 - **Implemented (draft):** [OEREP v1](sections/10-remote-evaluation.md), generic Python/TypeScript HTTP providers, and our own [server and console](../console/README.md).

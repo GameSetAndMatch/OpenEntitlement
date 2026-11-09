@@ -1,0 +1,18 @@
+# Candidate format from RFC-0002; no published editor schema exists yet.
+openentitlement: "0.1.0"
+catalogVersion: 3
+# Partial installation default specializations; no new definitions.
+tierVariants:
+  enterprise: {export_enabled: false}
+# Keys are Organization IDs, not infrastructure Tenant IDs.
+contracts:
+  4f1c2d8e-6728-4b1b-90ae-d9a841c09bc6:
+    tierVariant: enterprise
+    status: active
+    # Proposed interval is half-open: [start, end), expressed as UTC timestamps.
+    period:
+      start: "2027-01-29T00:00:00Z"
+      end: "2028-01-29T00:00:00Z"
+    source: {sales: ACME-001}
+    # Alternative source: {provider: stripe, ref: sub_example}
+    terms: {max_members_per_project: 25}
