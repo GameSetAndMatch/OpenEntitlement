@@ -33,3 +33,9 @@ export const Inheritance: Story = {render:()=>{
   const [values,setValues]=useState<Record<string,Value>>({});
   return <ValuesEditor definitions={[limit,{key:'retention',name:'Retention',description:'Choose this value in every variant.',type:'string',enum:['30d','365d']}]} base={{}} values={values} onChange={setValues}/>;
 }};
+
+export const EnvironmentOverride: Story = {render:()=> <ValuesEditor definitions={[limit]} base={{max_exports:100}} values={{max_exports:250}} onChange={()=>{}} environment={{max_exports:{variable:"MAX_EXPORTS",configuredValue:"7",value:7}}}/>,play:async({canvasElement})=>{
+  const canvas=within(canvasElement);await expect(canvas.getByLabelText("max_exports")).toBeDisabled();await expect(canvas.getByLabelText("max_exports")).toHaveValue(7);await expect(canvas.getByRole("note")).toHaveTextContent("MAX_EXPORTS=7");
+}};
+
+export const FrozenDefault: Story = {render:()=> <ValuesEditor definitions={[{...limit,frozen:true}]} base={{max_exports:100}} values={{max_exports:250}} onChange={()=>{}}/>};

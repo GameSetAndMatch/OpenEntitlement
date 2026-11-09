@@ -1,0 +1,29 @@
+features:
+  - code: mcp
+    name: MCP
+    gate: mcp_enabled
+    privileges:
+      - key: mcp_enabled
+        valueType: boolean
+        default: false
+        envVariable: MCP_INSTALLED
+      - key: max_mcp_calls
+        valueType: integer
+        default: 100
+        envVariable: MCP_MAX_CALLS
+      - key: mcp_mode
+        valueType: enum
+        options: [read, write]
+        default: read
+        envVariable: MCP_MODE
+      - key: max_connections
+        valueType: integer
+        default: 3
+        frozen: true
+  - code: internal
+    name: Internal capability
+    hidden: true
+    privileges:
+      - key: internal_enabled
+        valueType: boolean
+        default: true

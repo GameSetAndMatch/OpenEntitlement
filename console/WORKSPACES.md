@@ -69,3 +69,5 @@ OE_PG_DSN=postgresql://oe:oe@localhost:5432/oe npm --prefix console run test:wor
 The browser regression signs in through real OIDC and creates a catalog, tier, variant and Organization, verifies inline validation/infinity, YAML visibility and isolation between two accounts. API tests also cover invitations, CSRF, roles, keys, last-Owner protection, RLS, revision conflicts and restart persistence. The existing `test:setup` checks the standalone console separately.
 
 Audit records currently store full before/after workspace snapshots for each configuration change. History has no retention policy in this preview; plan database capacity and retention before production use.
+
+Catalog values can also be environment-controlled, frozen or hidden; see [Environment overrides](ENVIRONMENT-OVERRIDES.md). UI snapshots omit hidden definitions and resolved environment values.

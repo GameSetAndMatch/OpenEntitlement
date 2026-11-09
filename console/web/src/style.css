@@ -174,3 +174,10 @@ input::placeholder, textarea::placeholder { color: #8797a3; }
 .service-details dd { margin: 0; font-size: 13px; }
 
 .nav { text-decoration: none; }
+
+.environment-notice { color: var(--muted); background: #f1f4f6; border-left: 3px solid #77858d; padding: 10px 12px; font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.environment-frozen { background: #f3f5f7; }
+.environment-frozen input, .environment-frozen select { background: #edf1f3; }
+
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+.environment-binding { color: var(--muted); font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
