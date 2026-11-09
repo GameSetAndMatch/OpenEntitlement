@@ -6,7 +6,7 @@ Shared language for the service, SDKs, specification, and contributor reviews.
 
 | Term | Definition |
 |---|---|
-| **Organization** | The entitled party: the customer account, tenant, or workspace that has a plan. Identified by `organizationId`. |
+| **Organization** | The entitled party: one of a Tenant's own customers, the account that has a plan. Identified by `organizationId`. Not to be confused with a Tenant. |
 | **Subject** | An optional actor within an organization (a user or service account). Identified by `subjectId`. |
 | **Resource** | An optional object within an organization (a project or workspace) that can carry its own overrides. Identified by `resourceId`. |
 | **Feature** | A named product capability, declared in code, made of one or more privileges. |
@@ -28,6 +28,21 @@ Shared language for the service, SDKs, specification, and contributor reviews.
 | **Fixed provider** | A provider for installs with no commercial terms (self-hosted): everything on, nothing overridable. |
 | **Lock** | Serializes `guard` calls per `(organizationId, privilege)`. |
 | **Hook** | Code that runs at the `before`, `after`, `error`, and `finally` stages of an evaluation or a mutation. |
+
+
+## Hosted service
+
+| Term | Definition |
+|---|---|
+| **Tenant** | A customer of the hosted OpenEntitlement service. It owns its own catalog, plans, Organizations, and records, isolated from every other Tenant. |
+| **Account** | A person's sign-in identity. One Account can be a Member of several Tenants and can create new Tenants. |
+| **Member** | An Account's membership in one Tenant, with exactly one Role there. |
+| **Role** | What a Member is in a Tenant: Owner, Manager, or User. A Role is a named bundle of Permissions. |
+| **Owner** | The Role that pays for the Tenant's subscription to the service, and can do everything in the Tenant. |
+| **Manager** | The Role that invites Accounts into the Tenant and removes Members from it. |
+| **User** | The Role that can navigate the Tenant without changing it, except where a Permission says otherwise. |
+| **Permission** | The right to perform one kind of action in a Tenant, such as reading plans or overriding a plan value. |
+| **Permission scope** | The part of a Tenant a Permission covers: everything, or only specific Plans or specific Organizations. |
 
 ## Protocol and service
 
