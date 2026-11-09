@@ -44,6 +44,7 @@ function App() {
   };
   const loadOrg = async () => {
     const id = ++requestId.current;
+    if (!selected.trim()) { setOrg(undefined); setResult(undefined); return; }
     try {
       const data = await api<OrganizationDetails>("GET", `/api/organizations/${encodeURIComponent(selected)}`);
       if (subject) {
@@ -51,7 +52,7 @@ function App() {
         data.privileges = evaluated.privileges;
       }
       if (id === requestId.current) { setOrg(data); setResult(undefined); }
-    } catch (e) { setError(String(e)); }
+    } catch (e) { if (id === requestId.current) setError(String(e)); }
   };
   useEffect(() => { void load(); }, []);
   useEffect(() => { if (meta && selected) void loadOrg(); }, [selected, subject, meta]);

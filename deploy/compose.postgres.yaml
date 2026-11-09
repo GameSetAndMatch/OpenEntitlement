@@ -29,7 +29,11 @@ services:
       - "127.0.0.1:8787:8787"
     environment:
       OE_PROVIDER: postgres
-      DATABASE_URL: postgresql://oe:${POSTGRES_PASSWORD}@postgres:5432/oe
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: oe
+      PGDATABASE: oe
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       OE_ADMIN_TOKEN: ${OE_ADMIN_TOKEN:?set OE_ADMIN_TOKEN}
       OE_EVAL_TOKEN: ${OE_EVAL_TOKEN:?set OE_EVAL_TOKEN}
 
