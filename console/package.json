@@ -17,6 +17,7 @@
   "dependencies": {
     "@openentitlement/core": "file:../sdk-js/packages/core",
     "@openentitlement/postgres": "file:../sdk-js/packages/postgres",
+    "openid-client": "6.8.9",
     "pg": "^8.13.0"
   },
   "devDependencies": {
