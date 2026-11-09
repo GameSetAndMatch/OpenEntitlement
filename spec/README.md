@@ -59,6 +59,10 @@ The spec uses camelCase (`requireWithin`, `organizationId`). SDKs SHOULD follow 
 
 The spec follows [SemVer](https://semver.org). Until 1.0.0, minor versions MAY break compatibility. Each SDK MUST declare the spec version it implements.
 
+## Proposals under review
+
+- [RFC-0001: Tiers, trial variants, and explicit entitlement values](../docs/rfcs/0001-tiers-variants-and-resolution.md) proposes the next model and records compatibility questions. It is not part of the current normative specification.
+
 ## Roadmap
 
 - **Implemented (draft):** [OEREP v1](sections/10-remote-evaluation.md), generic Python/TypeScript HTTP providers, and our own [server and console](../console/README.md).
