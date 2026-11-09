@@ -123,6 +123,16 @@ A product may design a variant with read-only entitlements and select it as the 
 
 Both statuses need an explicit configured action before the lifecycle feature is enabled. Do not infer a fallback from the highest tier, the payment channel, or partial defaults. Applying a policy is idempotent, preserves data, and exposes the triggering status and effective action. When access resumes, recompute from the current contract/status rather than a destructively rewritten assignment. Period expiry alone does not change contract status or invoke a fallback: it keeps the agreed terms applying and raises a warning. An explicit, audited transition to `ended` or `past_due` invokes the configured policy. Renewal boundaries and treatment of existing grants still require the decisions below.
 
+### Per-tier grace period
+
+Add one optional Tier policy field, `gracePeriodDays`, to the reviewed defaults configuration. It is a non-negative integer, defaults to `0`, and applies to `past_due`. It is lifecycle metadata, not a privilege, a new tier flavor, or another value-resolution layer. A tier's trial and non-trial variants share this setting unless a later use case justifies more complexity.
+
+On entry into `past_due`, record the transition instant and compute an explicit `graceEndsAt` from the tier's setting. For this setting, a day is 24 hours and timestamps are UTC. Before `graceEndsAt`, retain the contract's agreed access. At or after that instant, apply the configured `past_due` action (`readOnly` or a named fallback variant), without deleting data, removing contract terms, or changing the recorded commercial status merely to enforce access. Zero means the configured action applies immediately.
+
+Repeated events for the same `past_due` episode must not restart grace. Returning to `active` clears that episode's restriction; a later genuine transition into `past_due` starts a new episode. An explicit transition to `ended` applies its own policy immediately, without borrowing past-due grace. Evaluation uses the request's deterministic time; an application does not need an entitlement callback for this behavior.
+
+Snapshot the grace deadline on entry so a defaults release, tier change, or duplicate event does not silently extend the current episode. An authorized, explicit deadline adjustment must be audited. Persist the episode/deadline for mutable services; fixed-file reconciliation must not restart it on every boot. Period expiry alone still keeps terms applying and raises a warning—it does not automatically begin a past-due episode.
+
 ## 5. Self-hosted installs
 
 - **One file per install:** `entitlements.yaml` holds **contracts only**. It never holds definitions or defaults.
@@ -195,7 +205,7 @@ These points are not fully answered by sections 1 to 8. Each one needs a decisio
 
 1. **Tier order.** `requiredTier` needs a ranking. The example file uses the order of a `tiers` list, lowest first.
 2. **Trial length.** The proposal: a trial is a contract on a trial variant, and the contract's period sets its length.
-3. **Lifecycle transitions.** The Tenant chooses `readOnly` or a named fallback variant for `past_due` and `ended` (section 4). Expiry alone retains terms and raises a warning. Still define renewal/grace boundaries, trial completion, existing grant applicability, and the versioned result carrying lifecycle restrictions. Test policy validation, repeated events, restoration, and application write refusal.
+3. **Lifecycle transitions.** The Tenant chooses `readOnly` or a named fallback variant for `past_due` and `ended` (section 4). Expiry alone retains terms and raises a warning. Past-due grace uses the per-tier setting above. Still define renewal/trial-completion transitions, existing grant applicability, and the versioned result carrying lifecycle restrictions. Test policy validation, zero grace, UTC deadline boundaries, duplicate events, process restarts, active restoration, explicit termination, and application write refusal.
 4. **Organizations without a contract.** Either a configured fallback variant, or the safe error value.
 5. **Constraint-valid `NOT_INSTALLED`.** An integer with `minimum: 1` cannot return `0` through ordinary value validation, and an enum has no universal off value. Choose separate availability state or explicitly declared, validated off semantics before implementation; test bounded integers and enum values without weakening ordinary SDK validation.
 6. **Inclusive periods.** If periods are dates, "inclusive" needs a time zone. If they are timestamps, it needs a precision.
