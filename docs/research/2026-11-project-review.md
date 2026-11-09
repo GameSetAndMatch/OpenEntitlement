@@ -14,6 +14,8 @@ Source review dated November 9, 2026. This is a public engineering assessment, n
 
 | P2 | CI had no per-job deadline or cancellation of superseded PR runs; a Storybook build stalled for over twenty minutes during this work. | Add 20-minute CI job limits and per-PR cancellation of superseded runs. Retry a cancelled stalled build once; diagnose repeated stalls rather than repeatedly paying for retries. |
 
+| P1 | Idle PostgreSQL errors had no pool error handler. A backend interruption could terminate the service and dump client connection details; CI exposed this during database teardown. | Handle pool errors in both service entry points with a sanitized error code. A database integration test terminates an idle backend and verifies the next authenticated request reconnects successfully. |
+
 ## Remaining priorities
 
 | Priority | Evidence / consequence | Focused next step |

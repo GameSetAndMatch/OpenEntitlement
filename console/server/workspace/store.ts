@@ -9,7 +9,7 @@ const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 export const token = () => randomBytes(32).toString("base64url");
 export class WorkspaceStore {
   pool: pg.Pool;
-  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }); }
+  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }); this.pool.on("error",(error:Error & {code?:string})=>console.error("Workspace database connection lost",error.code??"UNKNOWN")); }
   async initialize() {
     const db = await this.pool.connect();
     try {

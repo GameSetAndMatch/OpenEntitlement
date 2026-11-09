@@ -123,6 +123,10 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
   }finally{direct.release();}
     const parallel=await Promise.all(Array.from({length:12},(_,n)=>store.read(n%2?owner:other,n%2?wa.data.id:wb.data.id)));
     for(let n=0;n<parallel.length;n++)assert.equal(parallel[n]!.id,n%2?wa.data.id:wb.data.id);
+    const idlePid=(await store.pool.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const disconnected=new Promise<void>(ok=>store.pool.once("error",()=>ok()));
+    await admin.query("SELECT pg_terminate_backend($1)",[idlePid]);await disconnected;
+    assert.equal((await call(path,a)).status,200,"Idle database errors must not terminate the service; a new connection can serve the next request");
     const history=await call(path+"/audit",a);assert.ok(history.data.some((e:any)=>e.actor===owner.id&&e.action==="catalog:write"));
     await call("/auth/logout",u,{},"POST");assert.equal((await call(path,u)).status,401);
     // Restart the service with the same database; workspace and negotiated terms persist.

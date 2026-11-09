@@ -102,6 +102,7 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
       const { default: pg } = await import("pg");
       const { PostgresProvider, PostgresAdvisoryLock } = await import("@openentitlement/postgres");
       const pool = new pg.Pool({ connectionString: cfg.databaseUrl });
+      pool.on("error",(error:Error & {code?:string})=>console.error("Service database connection lost",error.code??"UNKNOWN"));
       contracts = new ContractStore(pool);
       provider = new PostgresProvider({ pool, autoMigrate: true });
       lock = new PostgresAdvisoryLock({ pool });
