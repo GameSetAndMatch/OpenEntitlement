@@ -17,8 +17,14 @@ try {
   });
   await page.goto('https://demo.test/');
   const demo=page.getByRole('region',{name:'Interactive Privilege Catalog'});
-  await demo.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+  await demo.getByRole('button',{name:'Edit Catalog',exact:true}).waitFor();
   assert.equal(await page.locator('details').getAttribute('open'),null);
+  await page.screenshot({path:`/tmp/oe-landing-initial-${width}.png`,fullPage:true});
+  await demo.getByRole('button',{name:'Edit Catalog',exact:true}).click();
+  await demo.getByRole('button',{name:'Edit Seats',exact:true}).click();
+  await demo.getByLabel('seat_max',{exact:true}).fill('7');
+  await demo.getByRole('button',{name:'Save privilege',exact:true}).click();
+  assert.equal(await demo.getByRole('button',{name:'Save privilege',exact:true}).count(),0);
   await demo.getByLabel('Filter by tag').selectOption('capacity');
   assert.equal(await demo.getByText('MCP access',{exact:true}).count(),0);
   await demo.getByLabel('Filter by tag').selectOption('');

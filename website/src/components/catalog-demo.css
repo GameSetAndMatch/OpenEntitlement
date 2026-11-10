@@ -51,3 +51,6 @@
 @media(max-width:600px) { .catalog-demo .demo-content { padding:12px; } .catalog-demo .catalog-feature { grid-template-columns:minmax(0,1fr) 100px; gap:10px; } .catalog-demo .catalog-feature>.btn { grid-column:1/-1; justify-self:start; } .catalog-demo .setup-value { grid-template-columns:minmax(0,1fr) 135px; gap:10px; } .catalog-demo .two-cols { grid-template-columns:1fr; } .catalog-demo nav { padding:0 4px; } .catalog-demo nav button { padding:12px 9px; } .catalog-demo .demo-results>div { grid-template-columns:1fr 1fr; } .catalog-demo .demo-results small { grid-column:1/-1; } }
 
 @media(max-width:600px) { .catalog-demo .demo-header { gap:8px; padding:12px; } .catalog-demo .demo-header span { order:3; flex-basis:100%; } .catalog-demo .demo-header strong { flex:1; } }
+
+.catalog-demo .demo-catalog-action { display:flex; justify-content:flex-end; }
+.catalog-demo .demo-catalog-action+.workspace-form { border:0; padding:0; margin-top:0; }

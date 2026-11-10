@@ -1,6 +1,5 @@
 /** Small UI kit: chips, toggles, value inputs, the mandatory-reason dialog. */
 
-import {type EnvironmentOverride} from "../../server/environment.ts";
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { validateValue } from "@openentitlement/core";
 import { formatValue, isUnlimited, UNLIMITED, type Json, type PrivilegeDef } from "./api.ts";

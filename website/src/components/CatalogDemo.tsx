@@ -24,7 +24,7 @@ function example():WorkspaceData {
 const environment={mcp_enabled:{variable:'MCP_INSTALLED',configuredValue:'false',value:false}};
 const display=(v:Value|undefined)=>v===undefined?'Required':typeof v==='object'?'∞ Unlimited':typeof v==='boolean'?(v?'Enabled':'Disabled'):v.toLocaleString();
 export default function CatalogDemo(){
- const [data,setData]=useState(example),[page,setPage]=useState('Catalog'),[tierId,setTierId]=useState('business'),[error,setError]=useState('');
+ const [data,setData]=useState(example),[page,setPage]=useState('Catalog'),[tierId,setTierId]=useState('business'),[error,setError]=useState(''),[editingCatalog,setEditingCatalog]=useState(false);
  const org=data.organizations[0]!,tier=data.variants.find(v=>v.id===tierId)!,assigned=data.variants.find(v=>v.id===org.variantId)!;
  const definitions=data.privileges.filter(p=>!p.hidden);
  function valid(values:Record<string,Value>){return Object.entries(values).every(([key,v])=>{const p=data.privileges.find(p=>p.key===key);return p&&!valueError(p,v);});}
@@ -39,11 +39,12 @@ export default function CatalogDemo(){
   }catch(e){setError((e as Error).message);return false;}
  }
  return <section className="catalog-demo" aria-label="Interactive Privilege Catalog">
-  <header className="demo-header"><strong>ACME Workspace</strong><span>Interactive demo · changes stay in this page</span><button type="button" onClick={()=>{setData(example());setError('');setTierId('business');}}>Reset demo</button></header>
+  <header className="demo-header"><strong>ACME Workspace</strong><span>Demo · changes stay in this page</span><button type="button" onClick={()=>{setData(example());setError('');setTierId('business');setEditingCatalog(false);}}>Reset demo</button></header>
   <nav aria-label="Demo views">{['Catalog','Tiers','Organization'].map(name=><button type="button" key={name} aria-current={page===name?'page':undefined} onClick={()=>{setPage(name);setError('');}}>{name==='Catalog'?'Privilege Catalog':name}</button>)}</nav>
   <div className="demo-content">
+   {page==='Catalog'&&<div className="demo-catalog-action"><button type="button" onClick={()=>setEditingCatalog(!editingCatalog)}>{editingCatalog?'Finish editing':'Edit Catalog'}</button></div>}
    {error&&<p role="alert">{error}</p>}
-   {page==='Catalog'&&<Catalog workspace={{id:'acme',name:'ACME',role:'Owner',data,revision:1,environment}} save={save} canEdit busy={false}/>}
+   {page==='Catalog'&&<Catalog workspace={{id:'acme',name:'ACME',role:'Owner',data,revision:1,environment}} save={save} canEdit={editingCatalog} busy={false}/>}
    {page==='Tiers'&&<><label className="demo-select">Tier variant<select value={tierId} onChange={e=>setTierId(e.target.value)}>{data.variants.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label><ValuesEditor definitions={definitions} base={{}} values={tier.values} environment={environment} onChange={values=>setData({...data,variants:data.variants.map(v=>v.id===tierId?{...v,values}:v)})}/></>}
    {page==='Organization'&&<><label className="demo-select">Globex's tier<select aria-label="Globex tier" value={org.variantId} onChange={e=>setData({...data,organizations:[{...org,variantId:e.target.value,terms:{}}]})}>{data.variants.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label><ValuesEditor definitions={definitions} base={Object.fromEntries(definitions.filter(p=>Object.hasOwn(assigned.values,p.key)||p.default!==undefined).map(p=>[p.key,Object.hasOwn(assigned.values,p.key)?assigned.values[p.key]!:p.default!]))} values={org.terms} environment={environment} onChange={terms=>setData({...data,organizations:[{...org,terms}]})}/></>}
    {page!=='Catalog'&&<section className="demo-results" aria-label="Resolved values" aria-live="polite"><h3>Effective for Globex</h3>{valid(org.terms)&&valid(assigned.values)?definitions.map(p=>{let result;try{result=resolve(data,'globex',p.key,new Date('2026-11-10T12:00:00Z'),environment);}catch{return <div key={p.key}><span>{p.name}</span><strong>Value required</strong><small>Set a Tier value</small></div>;}return <div key={p.key}><span>{p.name}</span><strong>{display(result.value)}</strong><small>{({CONTRACT:'Organization override',VARIANT:'Tier variant',DEFAULT:'Catalog default',ENVIRONMENT:'Environment restriction',FROZEN:'Read-only default'} as Record<string,string>)[result.reason]??result.reason}</small></div>;}):<p>Correct the invalid value to evaluate.</p>}</section>}
