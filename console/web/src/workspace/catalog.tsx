@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {EnvironmentNotice} from '../ui.tsx';
+import {EnvironmentNotice} from '../privilege-controls.tsx';
 import {Field} from './fields.tsx';
 import {catalogDefinition,storedDefinition} from '../../../server/workspace/catalog-adapter.ts';
 import type {Privilege} from '../../../server/workspace/privilege-definition.ts';

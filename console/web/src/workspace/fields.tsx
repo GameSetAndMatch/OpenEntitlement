@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from "react";
 import { valueError, type Privilege, type Value } from "../../../server/workspace/model.ts";
 import type {EnvironmentOverrides} from "../../../server/environment.ts";
-import {EnvironmentNotice, Toggle } from "../ui.tsx";
+import {EnvironmentNotice, Toggle } from "../privilege-controls.tsx";
 
 export function Field({def,value,onChange}: {def:Privilege;value:Value|undefined;onChange:(value:Value|undefined)=>void}) {
   const id=useId(),ref=useRef<HTMLInputElement>(null);

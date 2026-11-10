@@ -1,10 +1,12 @@
 import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://openentitlement.dev',
   trailingSlash: 'always',
-  integrations: [starlight({
+  vite: { resolve: { alias: { '@openentitlement/core/authoring': new URL('../sdk-js/packages/core/src/authoring.ts', import.meta.url).pathname } } },
+  integrations: [react(), starlight({
     title: 'OpenEntitlement',
     description: 'An open-source entitlement service and protocol. Learn to resolve what an organization may do, and how much of it.',
     logo: { light: './public/logo.svg', dark: './public/logo-dark.svg', replacesTitle: false },
