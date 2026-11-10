@@ -73,3 +73,6 @@
 .product-screen[inert] { user-select:none; }
 .product-scenes>.sr-only,.product-scenes .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 @media(max-width:720px) { .product-scene { grid-template-columns:1fr; gap:20px; padding:32px 0; } .scene-copy p { max-width:40ch; margin:10px 0 12px; } .product-scene figure { padding:10px; } .product-screen .setup-value { grid-template-columns:minmax(0,1fr) 125px; gap:10px; padding:14px 12px; } .product-screen .catalog-feature { padding:12px; } }
+
+/* The Catalog scene shows Tag names on each Privilege; the console's Tag filter is not part of the illustration. */
+.product-screen > .panel.workspace-form { display: none; }

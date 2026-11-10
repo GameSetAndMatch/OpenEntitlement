@@ -23,7 +23,7 @@ const data=example();
 const noop=()=>{};
 const labels:Record<string,string>={CONTRACT:'Organization override',VARIANT:'Tier value',DEFAULT:'Catalog default',ENVIRONMENT:'Environment restriction'};
 export default function ProductScenes(){
- const catalogData={...data,tags:[],groups:data.groups.filter(g=>g.id==='assistant'),privileges:data.privileges.filter(p=>p.key!=='mcp_enabled')};
+ const catalogData={...data,groups:data.groups.filter(g=>g.id==='assistant'),privileges:data.privileges.filter(p=>p.key!=='mcp_enabled')};
  const org=data.organizations[0]!;
  return <div className="product-scenes">
   <section className="product-scene" aria-labelledby="define-privileges">
