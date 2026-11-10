@@ -47,13 +47,17 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 | `set_organization_terms` | Set, schedule or remove Organization terms, with an optional end date |
 | `set_user_terms`, `grant_allowance` | Application-user exceptions |
 
-Each write tool returns a preview with a short-lived `change_id`. `apply_change(change_id)` commits it, failing if the Workspace changed in the meantime (the existing revision check).
+Each write tool returns a preview with an opaque, unforgeable `change_id` that expires after five minutes. The server binds it to the authenticated Account, OAuth client, Workspace, exact operation, immutable validated payload and reason, and Workspace revision. The apply call supplies only that identifier; it cannot replace fields or a reason after preview.
+
+`apply_change(change_id)` rechecks the token/resource scope, current membership and operation Permission, selected Workspace and its MCP opt-in. A revision match is necessary but never substitutes for authorization. A changed selection, removed membership, reduced Permission, disabled MCP, expired token or expired preview refuses application. Applying as another Account or OAuth client is refused even if the caller otherwise has write access.
+
+Successful application atomically checks the revision, consumes the preview once, commits the mutation and records its audit entry. Concurrent/repeated apply calls cannot duplicate a change; a consumed preview is refused. A failed authorization, expiry or revision check makes no entitlement mutation. Changing Workspace selection invalidates outstanding previews for the previous Workspace.
 
 **No delete tools.** MCP never deletes Privileges, Groups, Tags, Tiers, variants, Organizations, members or API keys. Removing a value goes back to its inherited default through the same write tools, for example by removing an Organization term. Deletions stay in the console.
 
 ### Resources and prompts
 
-- **Resources:** the Catalog as JSON Schema (the shared contract from ADR-0006), and the glossary, so an agent uses the right words.
+- **Resources:** the Catalog using the existing [authoring contract](0002-privilege-catalog.md). The generated JSON Schema resource depends on [PR #38](https://github.com/open-entitlement/OpenEntitlement/pull/38) and [PR #39](https://github.com/open-entitlement/OpenEntitlement/pull/39), which must land and validate parity before that resource is advertised, and the glossary, so an agent uses the right words.
 - **Prompts:** "Negotiate a deal" (from a request to proposed Organization terms) and "Explain a refusal" (from an error to the missing entitlement and the cheapest Tier that grants it).
 
 ## Transport, sign-in and Workspace selection (decided)
@@ -79,6 +83,12 @@ Each tool call records a product event (`mcp_tool_called`, with `tool` and `work
 ## Acceptance scenarios (draft)
 
 - **No deletes:** asking the agent to delete an Organization yields no tool for it. The agent points the person to the console.
-- **Ordinary path:** a Manager's agent explains why Globex is limited to 25 seats, proposes Organization terms of 40 until March 31 with reason MSA-12, shows the preview, and applies it. The audit log records the Manager, the client and the reason.
+- **Ordinary path:** an Owner's agent explains why Globex is limited to 25 seats, proposes Organization terms of 40 until March 31 with reason MSA-12, shows the preview, and applies it. The audit log records the Owner, the client and the reason.
 - **Opt-in:** an Account belonging to two Workspaces, one with MCP enabled, sees only that one in `list_workspaces`. Selecting the other is refused. When the Owner disables MCP, the next tool call in an existing session is refused.
 - **Boundary case:** a User-role Account calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after another change to the Workspace fails with a conflict, and nothing changes.
+
+- **Manager authority:** a Manager may explain an Organization's decision but cannot preview or apply `set_organization_terms`; it receives the same Permission refusal as the console. This RFC does not expand the Manager Role.
+- **Preview identity:** another Account or OAuth client cannot apply a preview. Switching Workspaces invalidates the old preview; the change ID cannot be used to bypass selection.
+- **Revocation:** removing membership, demoting the Account or disabling MCP between preview and apply refuses the change, even when the Workspace revision is otherwise unchanged.
+- **Expiry and replay:** an expired preview makes no change. Two concurrent applications of a valid preview commit at most once; subsequent replay is refused and produces no second mutation audit entry.
+- **Immutable payload:** a person cannot change values or the reason through `apply_change`; a different proposal requires a new preview.
