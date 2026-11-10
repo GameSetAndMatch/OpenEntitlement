@@ -45,6 +45,22 @@ class CatalogModel(OpenEntitlementModel):
 
     model_config = ConfigDict(validate_default=True, use_enum_values=False)
 
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        schema = handler(core_schema)
+        # Optional means absent on the Catalog wire, never an explicit JSON null.
+        for field in schema.get("properties", {}).values():
+            if "anyOf" in field:
+                choices = [choice for choice in field["anyOf"] if choice != {"type": "null"}]
+                if len(choices) == 1:
+                    field.pop("anyOf")
+                    field.update(choices[0])
+                else:
+                    field["anyOf"] = choices
+            if field.get("default", ...) is None:
+                field.pop("default")
+        return schema
+
     @model_validator(mode="before")
     @classmethod
     def _reject_explicit_nulls(cls, value: Any) -> Any:

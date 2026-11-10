@@ -27,12 +27,29 @@ try{
  await page.getByRole('heading',{name:'Privilege Catalog',exact:true}).waitFor();
  const workspaceId=await page.getByLabel('Workspace',{exact:true}).inputValue();
  await page.getByRole('button',{name:'Create group',exact:true}).click();await page.getByLabel('Group title').fill('Product');await page.getByLabel('Group ID').fill('product');await page.getByLabel('Description',{exact:true}).fill('Customer capabilities');await save('Save group');
+ for(const [id,title,parent] of [['exports','Exports','product'],['analytics','Analytics','product'],['scheduled','Scheduled','exports']]){
+  await page.getByRole('button',{name:'Create group',exact:true}).click();await page.getByLabel('Group title').fill(title);await page.getByLabel('Group ID').fill(id);await page.getByLabel('Parent group').selectOption(parent);await save('Save group');
+ }
  await page.getByRole('button',{name:'Create tag',exact:true}).click();await page.getByLabel('Tag title').fill('Enterprise');await page.getByLabel('Tag ID').fill('enterprise');await save('Save tag');
  await page.getByRole('button',{name:'Create tag',exact:true}).click();await page.getByLabel('Tag title').fill('Integration');await page.getByLabel('Tag ID').fill('integration');await save('Save tag');
  await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Privilege title').fill('Maximum exports');await page.getByLabel('Privilege key').fill('max_exports');await page.getByLabel(/^Group/).selectOption('product');await page.getByRole('checkbox',{name:'Enterprise',exact:true}).check();await page.getByRole('checkbox',{name:'Integration',exact:true}).check();await page.getByLabel('Value type').selectOption('integer');await page.getByLabel('Allow unlimited',{exact:true}).check();
  await page.getByLabel('max_exports',{exact:true}).fill('-5');assert.match(await page.getByRole('alert').innerText(),/0 or greater/);
  await page.getByLabel('max_exports',{exact:true}).fill('5');await page.getByLabel('Unlimited max_exports').check();assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'∞');assert.equal(await page.getByLabel('max_exports',{exact:true}).isDisabled(),true);await page.getByLabel('Unlimited max_exports').uncheck();await save('Save privilege');
  await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Privilege title').fill('Retention');await page.getByLabel('Privilege key').fill('retention');await page.getByLabel(/^Group/).selectOption('product');await page.getByLabel('Value type').selectOption('enum');await page.getByLabel('Enum choices').fill('30d\n365d\n\n');await save('Save privilege');
+ for(const [key,title,group] of [['scheduled_enabled','Scheduled access','scheduled'],['reports_enabled','Reports access','analytics']]){
+  await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Privilege title').fill(title);await page.getByLabel('Privilege key').fill(key);await page.getByLabel(/^Group/).selectOption(group);await page.getByRole('checkbox',{name:'Integration',exact:true}).check();await save('Save privilege');
+ }
+ const productSection=page.getByRole('heading',{name:'Product',exact:true}).locator('xpath=ancestor::section[1]');
+ const exportsSection=page.getByRole('heading',{name:'Exports',exact:true}).locator('xpath=ancestor::section[1]');
+ await productSection.getByText('Reports access',{exact:true}).waitFor();await exportsSection.getByText('Scheduled access',{exact:true}).waitFor();
+ assert.equal(await exportsSection.getByText('Reports access',{exact:true}).count(),0);
+ await page.getByLabel('Filter by tag').selectOption('integration');
+ for(const title of ['Maximum exports','Scheduled access','Reports access'])await page.getByText(title,{exact:true}).waitFor();
+ assert.equal(await page.getByText('Retention',{exact:true}).count(),0);
+ await page.getByLabel('Filter by tag').selectOption('enterprise');
+ await page.getByText('Maximum exports',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Scheduled access',{exact:true}).count(),0);assert.equal(await page.getByText('Reports access',{exact:true}).count(),0);
+ await page.getByLabel('Filter by tag').selectOption('');
  await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByLabel('Tier name').fill('Pro');await page.getByLabel('Tier ID').fill('pro');await save('Save tier');
  await page.getByRole('button',{name:'Create variant',exact:true}).click();await page.getByLabel('Variant name').fill('Pro standard');await page.getByLabel('Variant ID').fill('pro');await page.getByLabel('Override max_exports').check();await page.getByLabel('max_exports',{exact:true}).fill('10');await save('Save variant');
  await page.getByRole('link',{name:'Organizations',exact:true}).click();await page.getByRole('button',{name:'Add organization',exact:true}).click();await page.getByLabel('Organization name').fill('Acme');await page.getByLabel('Organization ID').fill('acme');await page.getByLabel('Override max_exports').check();await page.getByLabel('max_exports',{exact:true}).fill('25');await save('Save organization');

@@ -177,3 +177,19 @@ def test_value_union_preserves_types_and_rejects_coercion() -> None:
     for value in (1.5, None, {}, {"unlimited": 1}):
         with pytest.raises(ValidationError):
             adapter.validate_python(value)
+
+
+@pytest.mark.parametrize("value", [True, "12"])
+def test_typed_custom_provider_cannot_turn_bad_limit_into_allowance(value: object) -> None:
+    from openentitlement.provider import AbstractProvider, ProviderMetadata
+
+    class TypedProvider(AbstractProvider):
+        metadata = ProviderMetadata(name="typed")
+
+        def resolve(self, privilege, ctx):
+            return ResolutionDetails[Limit](privilege=privilege.key, value=value, reason=Reason.PLAN)
+
+    catalog = Catalog(features=[feature("seats", "Seats", [integer("seat_max", default=0)])])
+    details = create_client(TypedProvider(), catalog).get_limit_details("seat_max")
+    assert details.reason is Reason.ERROR
+    assert details.value == 0

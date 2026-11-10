@@ -18,7 +18,12 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   if(story==='boolean-access')await page.getByRole('switch',{checked:true}).waitFor();
   assert.equal(await page.locator('#error-stack').isVisible(),false,`Story ${story} must render without errors`);
  }
- for(const story of ['grouped-and-tagged','authoring']){await page.goto(`${origin}/iframe.html?id=privilege-catalog--${story}&viewMode=story`);await page.getByLabel('Filter by tag').waitFor();assert.equal(await page.getByText('Internal privilege',{exact:true}).count(),0);if(story==='grouped-and-tagged')await page.waitForFunction(()=>document.querySelector('select')?.value==='integration');}
+ for(const story of ['grouped-and-tagged','authoring','nested-groups']){await page.goto(`${origin}/iframe.html?id=privilege-catalog--${story}&viewMode=story`);await page.getByLabel('Filter by tag').waitFor();assert.equal(await page.getByText('Internal privilege',{exact:true}).count(),0);if(story==='grouped-and-tagged')await page.waitForFunction(()=>document.querySelector('select')?.value==='integration');}
+ await page.waitForFunction(()=>document.querySelector('select')?.value==='enterprise');
+ await page.getByText('MCP access',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Reports',{exact:true}).count(),0);
+ assert.equal(await page.getByText('Scheduled exports',{exact:true}).count(),0);
+ assert.equal(await page.locator('#error-stack').isVisible(),false);
  for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
- assert.deepEqual(failures,[]);console.log('Twelve compiled Storybook stories rendered successfully in Chromium');
+ assert.deepEqual(failures,[]);console.log('Compiled Storybook stories rendered successfully in Chromium');
 }finally{await browser?.close();await new Promise(ok=>server.close(ok));}

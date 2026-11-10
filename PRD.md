@@ -35,7 +35,7 @@ Primary users:
 | Python SDK (`openentitlement-sdk`) and TypeScript SDK (`@openentitlement/core`) with in-memory, fixed and remote providers, hooks and `guard` | ✅ | `sdk-python/`, `sdk-js/` |
 | Postgres provider and advisory lock inside the core packages (`[postgres]` extra, `/postgres` entry point) | ✅ | #31 |
 | Stripe Entitlements adapter | ✅ removed before release (billing is not an entitlement source) | #30 |
-| Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; Pydantic is a core dependency | 🚧 | ADR-0006, #38 |
+| Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; strict Limit/Unlimited values and presence-preserving roundtrips; Pydantic is a core dependency | 🚧 | ADR-0006, #38 |
 | Python ≥ 3.11 | 🚧 | ADR-0006, #38 |
 | Zod as a regular TypeScript dependency, replacing the hand-written validators | 📋 next | ADR-0006 |
 | Opt-in short-lived decision cache in `RemoteProvider` (both SDKs) | 📋 next | — |
@@ -50,7 +50,7 @@ Primary users:
 | Contracts with private PDF evidence | ✅ | #13 |
 | Read-only YAML configuration view | ✅ | #19 |
 | Workspace control plane: OIDC sign-in, Workspaces, members and Roles, isolation, audit | ✅ preview | #22 |
-| Privilege Catalog editor: typed Privileges, Groups, Tags, hidden and read-only values | ✅ | #23, #24 |
+| Privilege Catalog editor: typed Privileges, Groups, Tags, hidden and read-only values | ✅ | #23, #24; nested hierarchy and cross-branch Tag regression coverage: #38 |
 | Boolean environment prerequisites (an installation can veto, never grant) | ✅ | #23 |
 | Tiers and Tier variants (standard, trial, grace), Organization terms | ✅ preview | #22, #27 |
 | Application-user entitlements: personal terms and grants | ✅ | #27 |

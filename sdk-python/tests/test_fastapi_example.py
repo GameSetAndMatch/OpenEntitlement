@@ -74,3 +74,24 @@ def test_openapi_schema_uses_camel_case_property_names(api: TestClient) -> None:
     privilege = next(v for k, v in schemas.items() if k.startswith("BooleanPrivilege"))
     assert {"groupId", "envOverride"} <= set(privilege["properties"])
     assert not any("_" in name for s in schemas.values() for name in s.get("properties", {}))
+
+
+def test_sparse_catalog_response_roundtrips(api: TestClient) -> None:
+    from openentitlement.privileges import PrivilegeCatalog
+
+    raw = {"groups": [{"id": "root", "title": "Root"}],
+           "privileges": [{"type": "boolean", "key": "enabled", "title": "Enabled"}]}
+    response = api.post("/privilege-catalog", json=raw)
+    assert response.status_code == 200
+    result = response.json()
+    assert "parentId" not in result["groups"][0]
+    assert not {"default", "groupId", "envOverride"} & result["privileges"][0].keys()
+    assert PrivilegeCatalog.model_validate(result) == PrivilegeCatalog.model_validate(raw)
+    assert api.post("/privilege-catalog", json=result).status_code == 200
+
+
+def test_openapi_optional_catalog_fields_disallow_null(api: TestClient) -> None:
+    schemas = api.get("/openapi.json").json()["components"]["schemas"]
+    for schema in schemas.values():
+        if "groupId" in schema.get("properties", {}):
+            assert "null" not in str(schema["properties"]["groupId"])

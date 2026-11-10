@@ -51,7 +51,12 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     async function put(section:string,entry:unknown,expected=200){const result=await call(path+"/"+section,a,{revision,reason:"configure",entry},"PUT");assert.equal(result.status,expected,JSON.stringify(result.data));if(result.status===200)revision=result.data.revision;return result;}
     await put("groups",{id:"product",name:"Product",description:"Product capabilities"});
     await put("groups",{id:"exports",name:"Exports",parentId:"product"});
-    await put("groups",{id:"product",name:"Product",parentId:"exports"},400);
+    await put("groups",{id:"analytics",name:"Analytics",parentId:"product"});
+    await put("groups",{id:"scheduled",name:"Scheduled",parentId:"exports"});
+    await put("groups",{id:"product",name:"Product",parentId:"scheduled"},400);
+    const afterCycle = (await call(path,a)).data;
+    assert.equal(afterCycle.revision,revision,"Rejected cycles must not change the revision");
+    assert.equal(afterCycle.data.groups.find((g:any)=>g.id==="product").parentId,undefined);
     await put("features",{id:"exports",name:"Exports",groupId:"exports"});
     await put("privileges",{key:"exports.max",name:"Exports",featureId:"exports",type:"integer",default:5},400);
     await put("privileges",{key:"max_exports",name:"Maximum exports",featureId:"exports",type:"integer",minimum:0,unlimited:true,default:5});
