@@ -7,7 +7,7 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Py
 | Package | Depends on | Contents |
 |---|---|---|
 | `openentitlement-sdk` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
-| `openentitlement-postgres` | `psycopg>=3.1` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, [`schema.sql`](packages/openentitlement-postgres/src/openentitlement_postgres/schema.sql) |
+| `openentitlement-sdk[postgres]` → `openentitlement.postgres` | `psycopg>=3.1` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, [`schema.sql`](packages/openentitlement/src/openentitlement/postgres/schema.sql) |
 
 ## Python-first authoring and business walkthrough
 
@@ -19,7 +19,7 @@ See [ACME: a Workspace and its entitlements](../docs/guides/acme-workspace.md) f
 from openentitlement import (
     Catalog, Plan, UNLIMITED, EntitlementLimitExceeded, create_client, feature, boolean, integer, enum, to_http_problem,
 )
-from openentitlement_postgres import PostgresProvider, PostgresAdvisoryLock
+from openentitlement.postgres import PostgresProvider, PostgresAdvisoryLock  # pip install "openentitlement-sdk[postgres]"
 
 # 1. Definitions live in code (spec §1.1)
 catalog = Catalog([

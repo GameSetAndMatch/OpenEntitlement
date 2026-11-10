@@ -6,8 +6,6 @@
 !sdk-js/packages/
 !sdk-js/packages/core/
 !sdk-js/packages/core/**
-!sdk-js/packages/postgres/
-!sdk-js/packages/postgres/**
 !spec/
 !spec/assets/
 !spec/assets/catalog.json

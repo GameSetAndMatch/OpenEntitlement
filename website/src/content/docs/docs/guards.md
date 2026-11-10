@@ -38,9 +38,9 @@ await client.guard('project_max', 1, { organizationId }, {
 });
 ```
 
-Configure the client with `lock: new PostgresAdvisoryLock({ pool })` from `@openentitlement/postgres`. Without it, the default in-process lock protects only that client lock instance, not multiple processes or independent clients.
+Configure the client with `lock: new PostgresAdvisoryLock({ pool })` from `@openentitlement/core/postgres` (install `pg` alongside the core). Without it, the default in-process lock protects only that client lock instance, not multiple processes or independent clients.
 
-Python provides the same pattern using `PostgresAdvisoryLock`, `count(tx)`, and `act(tx)` callbacks.
+Python provides the same pattern using `PostgresAdvisoryLock` from `openentitlement.postgres` (`pip install "openentitlement-sdk[postgres]"`), `count(tx)`, and `act(tx)` callbacks.
 
 ## Pools and personal allowances
 

@@ -1,6 +1,6 @@
 # TypeScript quality checks and npm releases
 
-The TypeScript SDK libraries publish to npm as `@openentitlement/core` and `@openentitlement/postgres`. The running service/administration app is private in npm metadata and is distributed as a Docker image, not a public npm app package.
+The TypeScript SDK libraries publish to npm as one package, `@openentitlement/core`. Its `/postgres` entry point needs the optional peer dependency `pg`. The running service/administration app is private in npm metadata and is distributed as a Docker image, not a public npm app package.
 
 ## Developer checks
 
@@ -22,7 +22,7 @@ Create an npm account and obtain publishing rights to the `@openentitlement` sco
 
 npm Trusted Publishing is configured in each existing package's settings. For packages that do not yet exist, an authorized maintainer must first bootstrap each package from the tested packed artifact using their own npm login/2FA. Do not assume PyPI's pending-publisher setup applies to npm. Never upload empty placeholder packages or store a maintainer's password in GitHub.
 
-For both packages, configure GitHub Actions as the Trusted Publisher:
+For `@openentitlement/core`, configure GitHub Actions as the Trusted Publisher:
 
 | Field | Value |
 |---|---|
@@ -36,9 +36,9 @@ Create the matching GitHub `npm` environment and restrict deployments to `npm-v*
 
 ## Release
 
-1. Update both package versions and adapter dependencies, refresh `sdk-js/package-lock.json`, and merge after CI passes.
+1. Update the package version, refresh `sdk-js/package-lock.json`, and merge after CI passes.
 2. Publish a GitHub release tagged `npm-v0.1.0` (or the matching version) from the tested main commit. A tag push alone does not publish.
-3. The workflow validates source/version, runs quality checks and tests, builds JavaScript and declarations, packs both packages, and tests installation outside the workspace. Then each package publishes using its own Trusted Publisher.
+3. The workflow validates source/version, runs quality checks and tests, builds JavaScript and declarations, packs the package, and tests installation outside the workspace, including the `/postgres` entry point with `pg`. Then it publishes using the Trusted Publisher.
 4. Stable releases use the npm `latest` tag; GitHub prereleases use `next`. Verify installation and provenance after publication.
 
-Publication across packages is not atomic. On an authentication failure, correct configuration and rerun failed jobs only. Do not overwrite a published version or change an already-published tarball; bump versions for artifact fixes. Test registry installation after all adapters and core are published.
+On an authentication failure, correct configuration and rerun failed jobs only. Do not overwrite a published version or change an already-published tarball; bump versions for artifact fixes. Test registry installation after publication.

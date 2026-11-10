@@ -2,10 +2,10 @@ name: Service container
 
 on:
   pull_request:
-    paths: ["console/**", "sdk-js/packages/core/**", "sdk-js/packages/postgres/**", "spec/assets/**", "Dockerfile", ".dockerignore", ".github/workflows/publish-docker.yml"]
+    paths: ["console/**", "sdk-js/packages/core/**", "spec/assets/**", "Dockerfile", ".dockerignore", ".github/workflows/publish-docker.yml"]
   push:
     branches: [main]
-    paths: ["console/**", "sdk-js/packages/core/**", "sdk-js/packages/postgres/**", "spec/assets/**", "Dockerfile", ".dockerignore", ".github/workflows/publish-docker.yml"]
+    paths: ["console/**", "sdk-js/packages/core/**", "spec/assets/**", "Dockerfile", ".dockerignore", ".github/workflows/publish-docker.yml"]
   release:
     types: [published]
 

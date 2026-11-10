@@ -48,7 +48,7 @@ export const fixedTarget: Target = {
 
 export async function postgresTarget(dsn: string): Promise<Target> {
   const { default: pg } = await import("pg");
-  const { PostgresProvider, PostgresAdvisoryLock, migrate } = await import("@openentitlement/postgres");
+  const { PostgresProvider, PostgresAdvisoryLock, migrate } = await import("@openentitlement/core/postgres");
   const pool = new pg.Pool({ connectionString: dsn, max: 25 });
   await migrate(pool);
   await pool.query("create table if not exists oe_conformance_counter (org text primary key, n integer not null)");
