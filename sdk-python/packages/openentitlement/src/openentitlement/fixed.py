@@ -12,7 +12,7 @@ from .values import UNLIMITED
 
 
 class FixedProvider(AbstractProvider):
-    metadata = ProviderMetadata("fixed")
+    metadata = ProviderMetadata(name="fixed")
     capabilities = Capabilities(fixed=True)
 
     def __init__(self, catalog: Catalog, values: Optional[Mapping[str, Any]] = None):

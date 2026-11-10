@@ -12,7 +12,6 @@ from enum import Enum
 from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
     StrictBool,
@@ -22,7 +21,8 @@ from pydantic import (
     TypeAdapter,
     model_validator,
 )
-from pydantic.alias_generators import to_camel
+
+from .model import OpenEntitlementModel
 
 MAX_SAFE_INTEGER = 2**53 - 1
 
@@ -39,19 +39,10 @@ class Visibility(str, Enum):
     EDITABLE = "editable"
 
 
-class CatalogModel(BaseModel):
-    """Shared configuration: immutable, no unknown fields, camelCase JSON."""
+class CatalogModel(OpenEntitlementModel):
+    """The shared model configuration (immutable, no unknown fields, camelCase JSON), plus validated defaults."""
 
-    model_config = ConfigDict(
-        extra="forbid",
-        frozen=True,
-        validate_default=True,
-        alias_generator=to_camel,
-        validate_by_name=True,
-        validate_by_alias=True,
-        serialize_by_alias=True,
-        use_enum_values=False,
-    )
+    model_config = ConfigDict(validate_default=True, use_enum_values=False)
 
     def to_dict(self) -> dict[str, Any]:
         """The Catalog JSON shape, with camelCase keys."""

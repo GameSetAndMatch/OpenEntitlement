@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import replace
 from datetime import datetime
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
@@ -70,7 +69,7 @@ class InMemoryProvider(FactsProvider):
     For quick setups, seed it directly (seeding bypasses audit, as it is configuration, not change)::
 
         InMemoryProvider(
-            plans=[Plan("free", "Free", rank=0), Plan("pro", "Pro", rank=1)],
+            plans=[Plan(id="free", name="Free", rank=0), Plan(id="pro", name="Pro", rank=1)],
             values={"free": {"seat_max": 3}, "pro": {"seat_max": 50}},
             assignments={"acme": "pro"},
         )
@@ -78,7 +77,7 @@ class InMemoryProvider(FactsProvider):
     Seeded values are not validated against a catalog; use the admin API for validated writes.
     """
 
-    metadata = ProviderMetadata("in-memory")
+    metadata = ProviderMetadata(name="in-memory")
     capabilities = Capabilities(overrides=True, grants=True, mutations=True, plan_catalog=True)
 
     def __init__(
@@ -97,7 +96,7 @@ class InMemoryProvider(FactsProvider):
             for key, v in vals.items():
                 self._store.values[(plan_id, key)] = v
         for org, plan_id in (assignments or {}).items():
-            self._store.assignments[org] = Assignment(org, plan_id)
+            self._store.assignments[org] = Assignment(organization_id=org, plan_id=plan_id)
 
     def facts(self) -> _Store:
         return self._store
@@ -131,8 +130,14 @@ class _Mutations:
             before = self._s.plan_map.get(plan.id)
             self._s.plan_map[plan.id] = plan
             return AuditEvent(
-                meta.actor, meta.reason, "plan", plan.id, "update" if before else "create",
-                before.to_dict() if before else None, plan.to_dict(), at,
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="plan",
+                entity_id=plan.id,
+                action="update" if before else "create",
+                before=before.to_dict() if before else None,
+                after=plan.to_dict(),
+                at=at,
             )
 
     def set_plan_value(
@@ -147,8 +152,14 @@ class _Mutations:
             before = self._s.values.get(k)
             self._s.values[k] = value
             return AuditEvent(
-                meta.actor, meta.reason, "planValue", f"{plan_id}:{privilege.key}",
-                "update" if existed else "create", before if existed else None, value, at,
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="planValue",
+                entity_id=f"{plan_id}:{privilege.key}",
+                action="update" if existed else "create",
+                before=before if existed else None,
+                after=value,
+                at=at,
             )
 
     def assign_plan(
@@ -163,15 +174,28 @@ class _Mutations:
                     raise NotFound(f"organization {organization_id!r} has no plan")
                 del self._s.assignments[organization_id]
                 return AuditEvent(
-                    meta.actor, meta.reason, "assignment", organization_id, "delete", before.to_dict(), None, at
+                    actor=meta.actor,
+                    reason=meta.reason,
+                    entity="assignment",
+                    entity_id=organization_id,
+                    action="delete",
+                    before=before.to_dict(),
+                    after=None,
+                    at=at,
                 )
             if plan_id not in self._s.plan_map:
                 raise NotFound(f"plan {plan_id!r} not found")
-            after = Assignment(organization_id, plan_id, channel)
+            after = Assignment(organization_id=organization_id, plan_id=plan_id, channel=channel)
             self._s.assignments[organization_id] = after
             return AuditEvent(
-                meta.actor, meta.reason, "assignment", organization_id, "update" if before else "create",
-                before.to_dict() if before else None, after.to_dict(), at,
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="assignment",
+                entity_id=organization_id,
+                action="update" if before else "create",
+                before=before.to_dict() if before else None,
+                after=after.to_dict(),
+                at=at,
             )
 
     def create_override(
@@ -198,14 +222,32 @@ class _Mutations:
                 reason=data.reason, starts_at=data.starts_at, expires_at=data.expires_at, created_by=meta.actor,
             )
             self._s.override_map[oid] = o
-            return AuditEvent(meta.actor, meta.reason, "override", oid, "create", None, o.to_dict(), at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="override",
+                entity_id=oid,
+                action="create",
+                before=None,
+                after=o.to_dict(),
+                at=at,
+            )
 
     def delete_override(self, override_id: str, meta: MutationMeta, at: datetime) -> AuditEvent:
         with self._lock:
             o = self._s.override_map.pop(override_id, None)
             if o is None:
                 raise NotFound(f"override {override_id!r} not found")
-            return AuditEvent(meta.actor, meta.reason, "override", override_id, "delete", o.to_dict(), None, at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="override",
+                entity_id=override_id,
+                action="delete",
+                before=o.to_dict(),
+                after=None,
+                at=at,
+            )
 
     def create_grant(
         self, data: GrantInput, privilege: PrivilegeDefinition, meta: MutationMeta, at: datetime
@@ -223,13 +265,31 @@ class _Mutations:
                 starts_at=data.starts_at, expires_at=data.expires_at, created_by=meta.actor,
             )
             self._s.grant_map[gid] = g
-            return AuditEvent(meta.actor, meta.reason, "grant", gid, "create", None, g.to_dict(), at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="grant",
+                entity_id=gid,
+                action="create",
+                before=None,
+                after=g.to_dict(),
+                at=at,
+            )
 
     def revoke_grant(self, grant_id: str, meta: MutationMeta, at: datetime) -> AuditEvent:
         with self._lock:
             g = self._s.grant_map.get(grant_id)
             if g is None or g.revoked_at is not None:
                 raise NotFound(f"active grant {grant_id!r} not found")
-            revoked = replace(g, revoked_at=at)
+            revoked = g.model_copy(update={"revoked_at": at})
             self._s.grant_map[grant_id] = revoked
-            return AuditEvent(meta.actor, meta.reason, "grant", grant_id, "revoke", g.to_dict(), revoked.to_dict(), at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="grant",
+                entity_id=grant_id,
+                action="revoke",
+                before=g.to_dict(),
+                after=revoked.to_dict(),
+                at=at,
+            )

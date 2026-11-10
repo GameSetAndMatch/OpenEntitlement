@@ -108,7 +108,12 @@ def parse_scope(text: str) -> dict[str, Optional[str]]:
 
 def ctx_of(scope_text: str, at: Optional[str] = None) -> EvaluationContext:
     s = parse_scope(scope_text)
-    return EvaluationContext(s["organization_id"] or "", s["subject_id"], s["resource_id"], ts(at) if at else None)
+    return EvaluationContext(
+        organization_id=s["organization_id"] or "",
+        subject_id=s["subject_id"],
+        resource_id=s["resource_id"],
+        now=ts(at) if at else None,
+    )
 
 
 STEPS: list[tuple[str, re.Pattern[str], Callable[..., None]]] = []
@@ -145,7 +150,9 @@ def _standard_plans(w: World) -> None:
     w.target.setup(w)
     for p in w.plans_fixture["plans"]:
         w.seeder.upsert_plan(
-            Plan(p["id"], p["name"], p.get("rank"), p.get("public", True), p.get("variantOf")), actor=ACTOR, reason=REASON
+            Plan(id=p["id"], name=p["name"], rank=p.get("rank"), public=p.get("public", True), variant_of=p.get("variantOf")),
+            actor=ACTOR,
+            reason=REASON,
         )
         for key, raw in p["values"].items():
             w.seeder.set_plan_value(p["id"], key, decode_value(raw), actor=ACTOR, reason=REASON)

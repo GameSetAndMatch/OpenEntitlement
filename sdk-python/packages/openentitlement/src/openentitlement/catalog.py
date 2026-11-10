@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Mapping, Optional, Sequence
+from typing import Annotated, Any, Iterable, Mapping, Optional, Sequence
+
+from pydantic import SkipValidation
 
 from .errors import InvalidArgument
+from .model import OpenEntitlementModel
 from .values import UNLIMITED, Value, is_int, is_unlimited
 
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -19,11 +21,13 @@ class ValueType(str, Enum):
     ENUM = "enum"
 
 
-@dataclass(frozen=True)
-class PrivilegeDefinition:
+class PrivilegeDefinition(OpenEntitlementModel):
+    """A privilege as the evaluation client sees it. :class:`Catalog` validates it eagerly."""
+
     key: str
     value_type: ValueType
-    default: Value
+    # Checked against value_type by Catalog (InvalidArgument), not on construction.
+    default: Annotated[Value, SkipValidation]
     unlimited_allowed: bool = False
     options: tuple[str, ...] = ()
     feature: str = ""  # filled in by the catalog
@@ -43,8 +47,7 @@ class PrivilegeDefinition:
         return f"{self.key} expects one of {list(self.options)}"
 
 
-@dataclass(frozen=True)
-class FeatureDefinition:
+class FeatureDefinition(OpenEntitlementModel):
     code: str
     name: str
     privileges: tuple[PrivilegeDefinition, ...]
@@ -132,7 +135,7 @@ class Catalog:
         gate = next(p for p in attached if p.key == f.gate_key)
         if gate.value_type is ValueType.ENUM:
             raise InvalidArgument(f"gate {gate.key!r} must be boolean or integer")
-        f = FeatureDefinition(f.code, f.name, tuple(attached), f.description, f.gate)
+        f = f.model_copy(update={"privileges": tuple(attached)})
         self._features[f.code] = f
         for p in attached:
             self._privileges[p.key] = p
@@ -188,11 +191,4 @@ class Catalog:
 
 
 def _with_feature(p: PrivilegeDefinition, code: str) -> PrivilegeDefinition:
-    return PrivilegeDefinition(
-        key=p.key,
-        value_type=p.value_type,
-        default=p.default,
-        unlimited_allowed=p.unlimited_allowed,
-        options=p.options,
-        feature=code,
-    )
+    return p.model_copy(update={"feature": code})

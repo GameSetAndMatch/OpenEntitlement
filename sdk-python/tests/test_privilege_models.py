@@ -13,7 +13,7 @@ from openentitlement.privileges import (
 )
 
 
-def test_privilege_dataclasses_round_trip_with_one_group_and_many_tags():
+def test_privilege_models_round_trip_with_one_group_and_many_tags():
     Group(id="mcp", title="MCP")
     Tag(id="enterprise", title="Enterprise")
     Tag(id="integration", title="Integration")

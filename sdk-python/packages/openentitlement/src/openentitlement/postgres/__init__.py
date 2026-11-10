@@ -1,7 +1,7 @@
 """Postgres provider and advisory lock (psycopg 3).
 
 Install with ``pip install "openentitlement-sdk[postgres]"``. Importing ``openentitlement``
-never loads this module, so the core stays dependency-free.
+never loads this module, so the core requires only Pydantic (ADR-0006).
 """
 
 from __future__ import annotations
@@ -74,14 +74,14 @@ class _Facts:
             "select organization_id, plan_id, channel from oe_assignment where organization_id = %s",
             (organization_id,),
         ).fetchone()
-        return Assignment(*row) if row else None
+        return _assignment(row) if row else None
 
     def plan(self, plan_id: str) -> Optional[Plan]:
         row = self.c.execute("select id, name, rank, public, variant_of from oe_plan where id = %s", (plan_id,)).fetchone()
-        return Plan(*row) if row else None
+        return _plan(row) if row else None
 
     def plans(self) -> Sequence[Plan]:
-        return [Plan(*r) for r in self.c.execute("select id, name, rank, public, variant_of from oe_plan").fetchall()]
+        return [_plan(r) for r in self.c.execute("select id, name, rank, public, variant_of from oe_plan").fetchall()]
 
     def plan_value(self, plan_id: str, privilege: str) -> tuple[bool, Any]:
         row = self.c.execute(
@@ -106,16 +106,24 @@ class _Facts:
         return [_grant(r) for r in rows]
 
 
+def _plan(r: Sequence[Any]) -> Plan:
+    return Plan(id=r[0], name=r[1], rank=r[2], public=r[3], variant_of=r[4])
+
+
+def _assignment(r: Sequence[Any]) -> Assignment:
+    return Assignment(organization_id=r[0], plan_id=r[1], channel=r[2])
+
+
 def _override(r: Sequence[Any]) -> Override:
     return Override(
-        id=r[0], scope=Scope(r[1], r[2], r[3]), privilege=r[4], value=decode_value(r[5]), plan_family=r[6],
+        id=r[0], scope=Scope(organization_id=r[1], subject_id=r[2], resource_id=r[3]), privilege=r[4], value=decode_value(r[5]), plan_family=r[6],
         reason=r[7], starts_at=r[8], expires_at=r[9], created_by=r[10],
     )
 
 
 def _grant(r: Sequence[Any]) -> Grant:
     return Grant(
-        id=r[0], scope=Scope(r[1], r[2]), privilege=r[3], amount=int(r[4]), reason=r[5], starts_at=r[6],
+        id=r[0], scope=Scope(organization_id=r[1], subject_id=r[2]), privilege=r[3], amount=int(r[4]), reason=r[5], starts_at=r[6],
         expires_at=r[7], revoked_at=r[8], created_by=r[9],
     )
 
@@ -127,7 +135,7 @@ class PostgresProvider(FactsProvider):
     (connections must be returned); prefer ``lambda: pool.connection()`` which is a context manager.
     """
 
-    metadata = ProviderMetadata("postgres")
+    metadata = ProviderMetadata(name="postgres")
     capabilities = Capabilities(overrides=True, grants=True, mutations=True, plan_catalog=True)
 
     def __init__(
@@ -203,8 +211,14 @@ class _Mutations:
                 (plan.id, plan.name, plan.rank, plan.public, plan.variant_of),
             )
             return AuditEvent(
-                meta.actor, meta.reason, "plan", plan.id, "update" if before else "create",
-                before.to_dict() if before else None, plan.to_dict(), at,
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="plan",
+                entity_id=plan.id,
+                action="update" if before else "create",
+                before=before.to_dict() if before else None,
+                after=plan.to_dict(),
+                at=at,
             )
 
         return self._tx(fn)
@@ -227,8 +241,14 @@ class _Mutations:
                 (plan_id, privilege.key, Jsonb(encode_value(value))),
             )
             return AuditEvent(
-                meta.actor, meta.reason, "planValue", f"{plan_id}:{privilege.key}",
-                "update" if row else "create", decode_value(row[0]) if row else None, value, at,
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="planValue",
+                entity_id=f"{plan_id}:{privilege.key}",
+                action="update" if row else "create",
+                before=decode_value(row[0]) if row else None,
+                after=value,
+                at=at,
             )
 
         return self._tx(fn)
@@ -244,12 +264,21 @@ class _Mutations:
                 "select organization_id, plan_id, channel from oe_assignment where organization_id = %s for update",
                 (organization_id,),
             ).fetchone()
-            before = Assignment(*row) if row else None
+            before = _assignment(row) if row else None
             if plan_id is None:
                 if before is None:
                     raise NotFound(f"organization {organization_id!r} has no plan")
                 c.execute("delete from oe_assignment where organization_id = %s", (organization_id,))
-                return AuditEvent(meta.actor, meta.reason, "assignment", organization_id, "delete", before.to_dict(), None, at)
+                return AuditEvent(
+                    actor=meta.actor,
+                    reason=meta.reason,
+                    entity="assignment",
+                    entity_id=organization_id,
+                    action="delete",
+                    before=before.to_dict(),
+                    after=None,
+                    at=at,
+                )
             if _Facts(c).plan(plan_id) is None:
                 raise NotFound(f"plan {plan_id!r} not found")
             c.execute(
@@ -258,10 +287,16 @@ class _Mutations:
                 " channel = excluded.channel, assigned_at = excluded.assigned_at",
                 (organization_id, plan_id, channel, at),
             )
-            after = Assignment(organization_id, plan_id, channel)
+            after = Assignment(organization_id=organization_id, plan_id=plan_id, channel=channel)
             return AuditEvent(
-                meta.actor, meta.reason, "assignment", organization_id, "update" if before else "create",
-                before.to_dict() if before else None, after.to_dict(), at,
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="assignment",
+                entity_id=organization_id,
+                action="update" if before else "create",
+                before=before.to_dict() if before else None,
+                after=after.to_dict(),
+                at=at,
             )
 
         return self._tx(fn)
@@ -305,7 +340,16 @@ class _Mutations:
                 )
             except psycopg.errors.UniqueViolation as e:
                 raise InvalidArgument(f"override id {oid!r} already exists") from e
-            return AuditEvent(meta.actor, meta.reason, "override", oid, "create", None, o.to_dict(), at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="override",
+                entity_id=oid,
+                action="create",
+                before=None,
+                after=o.to_dict(),
+                at=at,
+            )
 
         return self._tx(fn)
 
@@ -318,7 +362,16 @@ class _Mutations:
             ).fetchone()
             if row is None:
                 raise NotFound(f"override {override_id!r} not found")
-            return AuditEvent(meta.actor, meta.reason, "override", override_id, "delete", _override(row).to_dict(), None, at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="override",
+                entity_id=override_id,
+                action="delete",
+                before=_override(row).to_dict(),
+                after=None,
+                at=at,
+            )
 
         return self._tx(fn)
 
@@ -347,7 +400,16 @@ class _Mutations:
                 )
             except psycopg.errors.UniqueViolation as e:
                 raise InvalidArgument(f"grant id {gid!r} already exists") from e
-            return AuditEvent(meta.actor, meta.reason, "grant", gid, "create", None, g.to_dict(), at)
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="grant",
+                entity_id=gid,
+                action="create",
+                before=None,
+                after=g.to_dict(),
+                at=at,
+            )
 
         return self._tx(fn)
 
@@ -362,8 +424,17 @@ class _Mutations:
                 raise NotFound(f"active grant {grant_id!r} not found")
             c.execute("update oe_grant set revoked_at = %s where id = %s", (at, grant_id))
             before = _grant(row)
-            after = Grant(**{**before.__dict__, "revoked_at": at})
-            return AuditEvent(meta.actor, meta.reason, "grant", grant_id, "revoke", before.to_dict(), after.to_dict(), at)
+            after = before.model_copy(update={"revoked_at": at})
+            return AuditEvent(
+                actor=meta.actor,
+                reason=meta.reason,
+                entity="grant",
+                entity_id=grant_id,
+                action="revoke",
+                before=before.to_dict(),
+                after=after.to_dict(),
+                at=at,
+            )
 
         return self._tx(fn)
 

@@ -4,7 +4,7 @@ Prints a validated Privilege Catalog. It does not create a Workspace or publish
 values; use the authenticated Workspace console to manage those records.
 """
 
-from openentitlement.authoring import (
+from openentitlement import (
     BooleanPrivilege,
     Group,
     IntegerPrivilege,

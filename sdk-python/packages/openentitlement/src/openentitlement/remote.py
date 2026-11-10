@@ -36,7 +36,7 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
                 or not is_int(g.get("amount")) or not 0 < g["amount"] <= 9007199254740991
                 or ("subjectId" in g and (not isinstance(g["subjectId"], str) or not g["subjectId"]))):
             raise ValueError("invalid OEREP grant")
-        decoded.append(GrantApplied(g["id"], g["amount"], g.get("subjectId")))
+        decoded.append(GrantApplied(id=g["id"], amount=g["amount"], subject_id=g.get("subjectId")))
     total = sum(g.amount for g in decoded)
     if ((decoded and p.value_type is not ValueType.INTEGER)
             or len({g.id for g in decoded}) != len(decoded) or total > 9007199254740991
@@ -62,7 +62,7 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
 
 class RemoteProvider(AbstractProvider):
     """Connect to an OEREP server; decisions are never cached. Timeout is in seconds."""
-    metadata = ProviderMetadata("oerep")
+    metadata = ProviderMetadata(name="oerep")
     capabilities = Capabilities(overrides=True, grants=True, plan_catalog=True)
 
     def __init__(self, base_url: str, *, token: Optional[str] = None, timeout: float = 5.0):

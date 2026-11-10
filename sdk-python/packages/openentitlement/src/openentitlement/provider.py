@@ -3,25 +3,25 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, Protocol, Sequence, runtime_checkable
+
+from pydantic import StrictInt
 
 from .catalog import PrivilegeDefinition, ValueType
 from .details import EvaluationContext, ResolutionDetails
 from .errors import Conflict, InvalidArgument, InvalidValue
 from .facts import FactSource, Override, Plan, Scope, intervals_overlap
+from .model import OpenEntitlementModel, WireModel
 from .resolver import Need, resolve_from_facts, suggest_plan_from_facts
 from .values import encode_json, is_int
 
 
-@dataclass(frozen=True)
-class ProviderMetadata:
+class ProviderMetadata(OpenEntitlementModel):
     name: str
 
 
-@dataclass(frozen=True)
-class Capabilities:
+class Capabilities(OpenEntitlementModel):
     """Requirement 6.1.3."""
 
     overrides: bool = False
@@ -42,8 +42,7 @@ class Capabilities:
         return {k for k, v in names.items() if v}
 
 
-@dataclass(frozen=True)
-class MutationMeta:
+class MutationMeta(OpenEntitlementModel):
     actor: str
     reason: str
 
@@ -55,8 +54,7 @@ class MutationMeta:
             raise InvalidArgument("mutation requires a non-empty reason")
 
 
-@dataclass(frozen=True)
-class AuditEvent:
+class AuditEvent(WireModel):
     """Requirement 7.3.1."""
 
     actor: str
@@ -81,8 +79,7 @@ class AuditEvent:
         }
 
 
-@dataclass(frozen=True)
-class OverrideInput:
+class OverrideInput(OpenEntitlementModel):
     scope: Scope
     privilege: str
     value: Any
@@ -93,11 +90,10 @@ class OverrideInput:
     id: Optional[str] = None
 
 
-@dataclass(frozen=True)
-class GrantInput:
+class GrantInput(OpenEntitlementModel):
     scope: Scope
     privilege: str
-    amount: int
+    amount: StrictInt
     reason: str
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
@@ -146,7 +142,7 @@ class Provider(Protocol):
 class AbstractProvider:
     """Convenience base with no-op lifecycle and no optional capabilities."""
 
-    metadata = ProviderMetadata("abstract")
+    metadata = ProviderMetadata(name="abstract")
     capabilities = Capabilities()
     mutations: Optional[Mutations] = None
 

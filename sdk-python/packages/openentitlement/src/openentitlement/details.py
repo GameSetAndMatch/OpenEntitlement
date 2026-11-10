@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generic, Mapping, Optional, TypeVar, Union, cast
+from typing import Annotated, Any, Generic, Mapping, Optional, TypeVar, Union
+
+from pydantic import Field, SkipValidation, StrictInt
 
 from .errors import InvalidArgument
+from .model import OpenEntitlementModel, WireModel
 from .values import encode_value, is_int
 
 T = TypeVar("T")
 
-# Distinguish an omitted tenant from an explicitly invalid tenant during merging.
-_UNSET_ORGANIZATION = cast(str, object())
+# Context identifiers are checked at evaluation, not construction: an invalid context
+# resolves to reason ERROR / INVALID_CONTEXT instead of raising (spec §2, Requirement 2.1.x).
+ContextId = Annotated[Optional[str], SkipValidation]
 
 
 class Reason(str, Enum):
@@ -34,24 +37,38 @@ class ErrorCode(str, Enum):
     GENERAL = "GENERAL"
 
 
-@dataclass(frozen=True)
-class EvaluationContext:
-    """Spec §2. ``now`` is filled from the client's clock when absent."""
+class EvaluationContext(OpenEntitlementModel):
+    """Spec §2. ``now`` is filled from the client's clock when absent.
 
-    organization_id: str = _UNSET_ORGANIZATION
-    subject_id: Optional[str] = None
-    resource_id: Optional[str] = None
+    Identifiers are not validated on construction; :meth:`validation_error` reports
+    a missing or invalid tenant so evaluation can return INVALID_CONTEXT.
+    An omitted ``organization_id`` inherits the client default when merged; an
+    explicit ``None`` or ``""`` does not.
+    """
+
+    organization_id: ContextId = None
+    subject_id: ContextId = None
+    resource_id: ContextId = None
     now: Optional[datetime] = None
 
     def merged_with(self, other: Optional["EvaluationContext"]) -> "EvaluationContext":
         """Invocation fields take precedence (Requirement 2.2.1)."""
         if other is None:
             return self
-        return EvaluationContext(
-            organization_id=self.organization_id if other.organization_id is _UNSET_ORGANIZATION else other.organization_id,
-            subject_id=other.subject_id if other.subject_id is not None else self.subject_id,
-            resource_id=other.resource_id if other.resource_id is not None else self.resource_id,
-            now=other.now if other.now is not None else self.now,
+        own_tenant = "organization_id" not in other.model_fields_set
+        source = self if own_tenant else other
+        fields_set = {"subject_id", "resource_id", "now"}
+        if "organization_id" in source.model_fields_set:
+            fields_set.add("organization_id")
+        # Both inputs are already EvaluationContexts, so skip re-validation on the hot path.
+        return EvaluationContext._trusted(
+            fields_set,
+            {
+                "organization_id": source.organization_id,
+                "subject_id": other.subject_id if other.subject_id is not None else self.subject_id,
+                "resource_id": other.resource_id if other.resource_id is not None else self.resource_id,
+                "now": other.now if other.now is not None else self.now,
+            },
         )
 
     def validation_error(self) -> Optional[str]:
@@ -64,10 +81,9 @@ class EvaluationContext:
         return None
 
 
-@dataclass(frozen=True)
-class GrantApplied:
+class GrantApplied(WireModel):
     id: str
-    amount: int
+    amount: StrictInt
     subject_id: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -77,9 +93,13 @@ class GrantApplied:
         return d
 
 
-@dataclass(frozen=True)
-class ResolutionDetails(Generic[T]):
-    """Spec §4.3: the counterpart of OpenFeature's FlagEvaluationDetails."""
+class ResolutionDetails(WireModel, Generic[T]):
+    """Spec §4.3: the counterpart of OpenFeature's FlagEvaluationDetails.
+
+    Its JSON form (``to_dict``, ``model_dump_json``, FastAPI responses) is the OEREP v1
+    details object: camelCase keys, absent optional members omitted, UNLIMITED as
+    ``{"unlimited": true}``.
+    """
 
     privilege: str
     value: T
@@ -89,7 +109,7 @@ class ResolutionDetails(Generic[T]):
     feature: Optional[str] = None
     plan_id: Optional[str] = None
     plan_value: Any = None
-    has_plan_value: bool = False
+    has_plan_value: bool = Field(default=False, exclude=True)
     override_id: Optional[str] = None
     required_plan: Optional[str] = None
     error_code: Optional[ErrorCode] = None
@@ -97,7 +117,11 @@ class ResolutionDetails(Generic[T]):
     lock_domain: Optional[str] = None
 
     def with_(self, **changes: Any) -> "ResolutionDetails[Any]":
-        return replace(self, **changes)
+        """A copy with ``changes`` applied, like ``dataclasses.replace`` (not re-validated)."""
+        unknown = changes.keys() - type(self).__pydantic_fields__.keys()
+        if unknown:
+            raise TypeError(f"unknown ResolutionDetails fields: {sorted(unknown)}")
+        return self._evolve(changes)
 
     def to_dict(self) -> dict[str, Any]:
         """JSON form with spec field names (Requirement 4.3.3)."""
@@ -127,12 +151,11 @@ class ResolutionDetails(Generic[T]):
         return d
 
 
-@dataclass(frozen=True)
-class UsageBreakdown:
+class UsageBreakdown(WireModel):
     """Spec Requirement 3.3.2: consumption drawn from the pool and from the subject allowance."""
 
-    pool: int
-    subject: int = 0
+    pool: Annotated[StrictInt, Field(ge=0)]
+    subject: Annotated[StrictInt, Field(ge=0)] = 0
 
     def to_dict(self) -> dict[str, int]:
         return {"pool": self.pool, "subject": self.subject}
@@ -142,17 +165,17 @@ Usage = Union[int, UsageBreakdown, Mapping[str, int]]
 
 
 def normalize_usage(current: Any) -> UsageBreakdown:
+    if isinstance(current, UsageBreakdown):
+        return current
     if is_int(current):
-        u = UsageBreakdown(pool=current)
-    elif isinstance(current, UsageBreakdown):
-        u = current
+        pool, subject = current, 0
     elif isinstance(current, Mapping):
-        u = UsageBreakdown(pool=current.get("pool"), subject=current.get("subject", 0))
+        pool, subject = current.get("pool"), current.get("subject", 0)
     else:
         raise InvalidArgument(f"current must be an int or a usage breakdown, got {current!r}")
-    if not (is_int(u.pool) and is_int(u.subject)) or u.pool < 0 or u.subject < 0:
+    if not (is_int(pool) and is_int(subject)) or pool < 0 or subject < 0:
         raise InvalidArgument(f"usage must be non-negative integers, got {current!r}")
-    return u
+    return UsageBreakdown._trusted({"pool", "subject"}, {"pool": pool, "subject": subject})
 
 
 def usage_to_json(current: Any) -> Any:

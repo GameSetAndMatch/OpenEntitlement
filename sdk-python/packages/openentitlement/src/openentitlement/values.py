@@ -47,6 +47,26 @@ class Unlimited:
 
     __lt__ = __le__ = __gt__ = __ge__ = _no_order
 
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: Any) -> Any:
+        """Validate UNLIMITED or ``{"unlimited": true}``; serialize as ``{"unlimited": true}``."""
+        from pydantic_core import core_schema
+
+        return core_schema.no_info_plain_validator_function(
+            decode_unlimited,
+            serialization=core_schema.plain_serializer_function_ser_schema(lambda _: {"unlimited": True}),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "title": "Unlimited",
+            "properties": {"unlimited": {"const": True, "type": "boolean"}},
+            "required": ["unlimited"],
+            "additionalProperties": False,
+        }
+
 
 UNLIMITED = Unlimited()
 
@@ -93,6 +113,13 @@ def decode_value(raw: Any) -> Any:
             return UNLIMITED
         raise ValueError(f"not an OpenEntitlement value: {raw!r}")
     return raw
+
+
+def decode_unlimited(raw: Any) -> "Unlimited":
+    """Accept UNLIMITED itself or its JSON form; anything else is a validation error."""
+    if raw is UNLIMITED or (isinstance(raw, dict) and len(raw) == 1 and raw.get("unlimited") is True):
+        return UNLIMITED
+    raise ValueError('expected UNLIMITED or {"unlimited": true}')
 
 
 def encode_json(obj: Any) -> Any:
