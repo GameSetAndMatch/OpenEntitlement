@@ -1,6 +1,6 @@
 {
   "name": "@openentitlement/console",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "OpenEntitlement service: OEREP evaluation API, audited administration, and console.",
   "license": "Apache-2.0",
@@ -25,7 +25,8 @@
     "@openentitlement/postgres": "file:../sdk-js/packages/postgres",
     "openid-client": "6.8.9",
     "pg": "^8.13.0",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@storybook/addon-a11y": "10.6.6",

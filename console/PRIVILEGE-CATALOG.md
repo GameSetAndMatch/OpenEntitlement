@@ -57,28 +57,10 @@ The workspace console uses **Privilege Catalog → Tiers → Organizations**. It
 
 Existing preview Feature containers are presented as Groups without discarding metadata or stored entitlement values. The internal preview storage and older administrative endpoints retain their compatibility representation; the new authoring endpoint and YAML snapshots use `title`, `visibility`, `group_id`, `tags` and `env_override`.
 
-## Python dataclasses
+## Python first: Pydantic authoring
 
-```python
-from openentitlement import (
-    BooleanPrivilege, Group, PrivilegeCatalog, Tag, Visibility,
-)
+Install `openentitlement-sdk[authoring]`, then use `openentitlement.authoring.Privilege` and its `BooleanPrivilege`, `IntegerPrivilege` and `StringEnumPrivilege` subclasses. These are strict Pydantic models with `model_dump_json(exclude_none=True)`, `model_validate_json()` and schema introspection. [The ACME walkthrough](../docs/guides/acme-workspace.md) covers the whole Workspace, Groups, Tags, Tiers, Organizations and user exceptions.
 
-catalog = PrivilegeCatalog(
-    groups=(Group(id="mcp", title="MCP"),),
-    tags=(Tag(id="enterprise", title="Enterprise"),),
-    privileges=(BooleanPrivilege(
-        key="mcp_enabled",
-        title="MCP access",
-        description="Allow MCP access when installed.",
-        visibility=Visibility.EDITABLE,
-        default=False,
-        env_override="MCP_INSTALLED",
-        group_id="mcp",
-        tags=("enterprise",),
-    ),),
-)
-encoded = catalog.to_json()
-```
+The existing root-level dataclasses remain compatible for callers that want a standard-library-only SDK. Both authoring interfaces reuse the same domain constraints and serialize the same Catalog shape. Pydantic is an optional extra, not a runtime evaluation dependency.
 
-`IntegerPrivilege` and `StringEnumPrivilege` have their own constrained defaults and do not accept `env_override`. `Privilege.from_dict()` validates a serialized definition; `PrivilegeCatalog.from_dict()` also validates Group/Tag references and hierarchy. These authoring dataclasses use only the standard library and do not replace the existing OEREP v1 evaluation classes.
+TypeScript/browser/server authoring shares `PrivilegeSchema` and `PrivilegeCatalogSchema` from `@openentitlement/core/authoring` with optional Zod. Unknown fields and invalid typed values fail; no coercion of strings into booleans or numbers is performed.

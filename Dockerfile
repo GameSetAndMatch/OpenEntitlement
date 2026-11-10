@@ -8,7 +8,8 @@ COPY console/package*.json ./console/
 WORKDIR /app/console
 RUN npm ci
 COPY console/ ./
-RUN npm run build && npm prune --omit=dev
+RUN ln -s ../console/node_modules /app/sdk-js/node_modules \
+    && npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime
 LABEL org.opencontainers.image.source="https://github.com/GameSetAndMatch/openentitlement" \

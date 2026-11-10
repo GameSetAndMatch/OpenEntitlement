@@ -62,11 +62,27 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     await put("variants",{id:"pro_grace",name:"Pro grace",tierId:"pro",kind:"grace",values:{retention:"30d",max_exports:1}});
     await put("organizations",{id:"acme",name:"Acme",variantId:"pro",terms:{max_exports:25}});
     assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports"})).data.value,25);
+    const alice={organizationId:"acme",subjectId:"external|alice",name:"Alice",terms:{max_exports:30},grants:{max_exports:5}};
+    await put("subjects",alice);
+    let otherRevision=wb.data.revision;
+    for(const [section,entry] of [["privileges",{key:"max_exports",name:"Exports",type:"integer",default:1}],["tiers",{id:"pro",name:"Pro",rank:1}],["variants",{id:"pro",name:"Pro",tierId:"pro",kind:"standard"}],["organizations",{id:"acme",name:"Other Acme",variantId:"pro",terms:{max_exports:999}}],["subjects",{...alice,terms:{max_exports:777},grants:{}}]]){
+      const configured=await call(`/api/workspaces/${wb.data.id}/${section}`,b,{entry,revision:otherRevision,reason:"Same identifiers in another Workspace"},"PUT");assert.equal(configured.status,200);otherRevision=configured.data.revision;
+    }
+    assert.equal((await call(`/api/workspaces/${wb.data.id}/evaluate`,b,{organizationId:"acme",subjectId:alice.subjectId,privilege:"max_exports"})).data.value,777);
+
+    assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports",subjectId:alice.subjectId})).data.value,35);
+    assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports",subjectId:"bob"})).data.value,25);
+    assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports",subjectId:null})).status,400);
+    assert.equal((await call(path+"/subjects",u,{revision,reason:"unauthorized",entry:alice},"PUT")).status,403);
+    assert.equal((await call(path+"/subjects",b,{revision,reason:"other workspace",entry:alice},"PUT")).status,404);
+    await put("subjects",{...alice,terms:{max_exports:-5}},422);
+
     await put("organizations",{id:"acme",name:"Acme",variantId:"pro",terms:{max_exports:-5}},422);
     const stale=await call(path+"/groups",a,{revision:1,reason:"stale",entry:{id:"stale",name:"Stale"}},"PUT");assert.equal(stale.status,409);
     assert.equal((await call(path+"/keys",u)).status,403);
     const key=await call(path+"/keys",a,{name:"Backend",scope:"evaluate",reason:"test"});assert.equal(key.status,201);
     const secret=key.data.secret;
+    assert.equal((await call("/api/evaluate",{authorization:`Bearer ${secret}`},{organizationId:"acme",privilege:"max_exports",subjectId:alice.subjectId})).data.value,35);
     const keyList=await call(path+"/keys",a);assert.equal(JSON.stringify(keyList.data).includes(secret),false);
     assert.equal((await call("/api/evaluate",{authorization:`Bearer ${secret}`},{organizationId:"acme",privilege:"max_exports"})).data.value,25);
     assert.equal((await call("/api/evaluate",{authorization:`Bearer ${secret}`},{organizationId:"only_in_b",privilege:"max_exports",workspaceId:wb.data.id})).status,404);
@@ -97,7 +113,7 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
       await assert.rejects(direct.query("UPDATE oe_cp_state SET workspace_id=$1 WHERE workspace_id=$2",[wb.data.id,wa.data.id]),/row-level security/);
       await direct.query("ROLLBACK");
       await put("tags",{id:"enterprise",title:"Enterprise"});await put("tags",{id:"integration",title:"Integration"});
-    const canonical={key:"canonical_limit",title:"Canonical limit",description:"A grouped and tagged privilege",type:"integer",default:2,visibility:"read_only",group_id:"product",tags:["enterprise","integration"]};
+    const canonical={key:"canonical_limit",title:"Canonical limit",description:"A grouped and tagged privilege",type:"integer",default:2,minimum:0,unlimited:false,visibility:"read_only",group_id:"product",tags:["enterprise","integration"]};
     await put("catalog",canonical);
     await put("catalog",{...canonical,key:"bad_environment",env_override:"MCP_INSTALLED"},422);
     await put("catalog",{...canonical,key:"bad_tags",tags:["missing"]},400);
@@ -107,6 +123,10 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
   }finally{direct.release();}
     const parallel=await Promise.all(Array.from({length:12},(_,n)=>store.read(n%2?owner:other,n%2?wa.data.id:wb.data.id)));
     for(let n=0;n<parallel.length;n++)assert.equal(parallel[n]!.id,n%2?wa.data.id:wb.data.id);
+    const idlePid=(await store.pool.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const disconnected=new Promise<void>(ok=>store.pool.once("error",()=>ok()));
+    await admin.query("SELECT pg_terminate_backend($1)",[idlePid]);await disconnected;
+    assert.equal((await call(path,a)).status,200,"Idle database errors must not terminate the service; a new connection can serve the next request");
     const history=await call(path+"/audit",a);assert.ok(history.data.some((e:any)=>e.actor===owner.id&&e.action==="catalog:write"));
     await call("/auth/logout",u,{},"POST");assert.equal((await call(path,u)).status,401);
     // Restart the service with the same database; workspace and negotiated terms persist.
@@ -118,6 +138,23 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"mcp_enabled"})).data.value,false);
     assert.equal((await call(path+"/privileges",p,{entry:{...definition,envVariable:"INVALID_BOOLEAN"},revision,reason:"invalid binding"},"PUT")).status,422);
     const keyForEnv=await call(path+"/keys",p,{name:"Environment evaluation",scope:"evaluate",reason:"test"});assert.equal((await call("/api/evaluate",{authorization:`Bearer ${keyForEnv.data.secret}`},{organizationId:"acme",privilege:"mcp_enabled",environment:{}})).data.value,false);
+    assert.equal((await call(path,a)).data.data.subjects[0].subjectId,alice.subjectId);
+    await running.close();running=await startWorkspaceServer({databaseUrl:dbUrl,port:appPort,env:{...runtimeEnv,OE_DEPLOYMENT_MODE:"saas"},auth:authConfig({OE_APP_URL:origin,OE_OIDC_ISSUER:issuer.url,OE_OIDC_LOCAL_HTTP:"true"})});
+    assert.equal((await call(path,a)).data.hosting.subjectEntitlements,false);
+    await put("subjects",alice,403);
+    assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"max_exports",subjectId:alice.subjectId})).status,403);
+    assert.equal((await call("/api/evaluate",{authorization:`Bearer ${keyForEnv.data.secret}`},{organizationId:"acme",privilege:"max_exports",subjectId:alice.subjectId})).status,403);
+    assert.equal((await call(path+"/evaluate",a,{organizationId:"acme",privilege:"max_exports"})).data.value,25);
+    await put("hosting",{tier:"enterprise"},403);
+    const upgrade=await call(path+"/hosting",p,{entry:{tier:"enterprise"},revision,reason:"Enable Enterprise user scope"},"PUT");assert.equal(upgrade.status,200);revision=upgrade.data.revision;
+    assert.equal(upgrade.data.hosting.subjectEntitlements,true);
+    assert.equal((await call("/api/evaluate",{authorization:`Bearer ${keyForEnv.data.secret}`},{organizationId:"acme",privilege:"max_exports",subjectId:alice.subjectId})).data.value,35);
+    const downgrade=await call(path+"/hosting",p,{entry:{tier:"pro"},revision,reason:"Downgrade retains data"},"PUT");assert.equal(downgrade.status,200);revision=downgrade.data.revision;
+    assert.equal((await call(path,a)).data.data.subjects.length,1);
+    const removed=await call(path+"/subjects",a,{entry:{organizationId:"acme",subjectId:alice.subjectId},revision,reason:"Remove personal exception"},"DELETE");assert.equal(removed.status,200);revision=removed.data.revision;
+    assert.equal((await call(path,a)).data.data.subjects.length,0);
+    assert.ok((await call(path+"/audit",a)).data.some((e:any)=>e.actor===platform.id&&e.action==="hosting:write"));
+
     assert.equal((await call(path+"/privileges",p,{entry:{...definition,key:"bound_number",type:"integer",default:5},revision,reason:"unsupported integer"},"PUT")).status,400);
     const {envVariable:_env,...unbound}=definition;assert.equal((await call(path+"/privileges",a,{entry:unbound,revision,reason:"unlink env"},"PUT")).status,403);
   }finally{

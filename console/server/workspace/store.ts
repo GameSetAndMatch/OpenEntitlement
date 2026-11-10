@@ -9,7 +9,7 @@ const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 export const token = () => randomBytes(32).toString("base64url");
 export class WorkspaceStore {
   pool: pg.Pool;
-  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }); }
+  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }); this.pool.on("error",(error:Error & {code?:string})=>console.error("Workspace database connection lost",error.code??"UNKNOWN")); }
   async initialize() {
     const db = await this.pool.connect();
     try {
@@ -70,6 +70,7 @@ export class WorkspaceStore {
     catch (e) { await db.query("ROLLBACK"); throw e; } finally { db.release(); }
   }
   private async authorize(db: pg.PoolClient, account: Account, id: string, action?: Action) {
+    if(action==="hosting:write"&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change Cloud service tiers",403);
     const row = (await db.query("SELECT d.name,m.role FROM oe_cp_directory d LEFT JOIN oe_cp_members m ON m.workspace_id=d.id AND m.account_id=$2 WHERE d.id=$1",[id,account.id])).rows[0];
     if (!row || (!account.platformAdmin && !row.role)) throw new WorkspaceError("Workspace not found",404);
     if (action && !account.platformAdmin && row.role !== "Owner" && !(row.role === "Manager" && action === "members:manage")) throw new WorkspaceError("Your role does not allow this action",403);

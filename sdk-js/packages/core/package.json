@@ -1,6 +1,6 @@
 {
   "name": "@openentitlement/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vendor-neutral entitlements API: features, limits, plans, overrides, grants. Reference SDK for the OpenEntitlement spec.",
   "license": "Apache-2.0",
   "type": "module",
@@ -9,6 +9,11 @@
       "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./authoring": {
+      "source": "./src/authoring.ts",
+      "types": "./dist/authoring.d.ts",
+      "default": "./dist/authoring.js"
     }
   },
   "files": [
@@ -38,5 +43,13 @@
     "url": "git+https://github.com/GameSetAndMatch/openentitlement.git",
     "directory": "sdk-js/packages/core"
   },
-  "homepage": "https://openentitlement.dev/docs/"
+  "homepage": "https://openentitlement.dev/docs/",
+  "peerDependencies": {
+    "zod": "^4.6.7"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
+  }
 }

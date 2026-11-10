@@ -18,7 +18,7 @@ The reference service, SDKs, and providers implement these contracts. Another im
 
 ## A worked decision
 
-Consider an integer privilege `projects.max` that allows unlimited values and defaults to zero. An organization has:
+Consider an integer privilege `project_max` that allows unlimited values and defaults to zero. An organization has:
 
 - A plan value of **50**.
 - An active organization override of **80**, bound to its current plan family.

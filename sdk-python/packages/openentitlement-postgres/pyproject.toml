@@ -1,11 +1,11 @@
 [project]
 name = "openentitlement-postgres"
-version = "0.1.1"
+version = "0.2.0"
 description = "Postgres provider and advisory lock for OpenEntitlement."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
-dependencies = ["openentitlement-sdk==0.1.1", "psycopg>=3.1"]
+dependencies = ["openentitlement-sdk==0.2.0", "psycopg>=3.1"]
 
 [build-system]
 requires = ["hatchling"]

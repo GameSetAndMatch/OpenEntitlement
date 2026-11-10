@@ -16,18 +16,18 @@ async function post(path: string, body: unknown, token = "eval-test") {
 
 test("remote SDK preserves plans, overrides, grants, subject pools, enums and unlimited", async () => {
   const c = client();
-  assert.equal(await c.getLimit("seats.max", { organizationId: "hooli" }), 3);
-  const override = await c.getDetails("seats.max", { organizationId: "acme" });
+  assert.equal(await c.getLimit("seat_max", { organizationId: "hooli" }), 3);
+  const override = await c.getDetails("seat_max", { organizationId: "acme" });
   assert.equal(override.value, 250); assert.equal(override.reason, Reason.OVERRIDE); assert.equal(override.planValue, 100);
-  const grants = await c.getDetails("api_calls.monthly", { organizationId: "globex", subjectId: "hank" });
+  const grants = await c.getDetails("api_calls_monthly", { organizationId: "globex", subjectId: "hank" });
   assert.equal(grants.value, 155000); assert.equal(grants.grants.length, 2); assert.equal(grants.reason, Reason.GRANT);
-  assert.equal(await c.getLimit("api_calls.monthly", { organizationId: "acme" }), UNLIMITED);
-  assert.equal(await c.getEnum("reports.retention", { organizationId: "globex" }), "90d");
+  assert.equal(await c.getLimit("api_calls_monthly", { organizationId: "acme" }), UNLIMITED);
+  assert.equal(await c.getEnum("report_retention", { organizationId: "globex" }), "90d");
   assert.equal(await c.isEnabled("sso", { organizationId: "hooli" }), false);
   assert.equal(await c.isEnabled("sso", { organizationId: "acme" }), true);
-  await assert.rejects(c.requireWithin("projects.max", 1, 1, { organizationId: "hooli" }), (e: any) => e.requiredPlan === "pro");
-  assert.equal(await c.requiredPlan("reports.retention", "365d", { organizationId: "globex" }), "business");
-  const stale = await c.getDetails("projects.max", { organizationId: "umbrella" });
+  await assert.rejects(c.requireWithin("project_max", 1, 1, { organizationId: "hooli" }), (e: any) => e.requiredPlan === "pro");
+  assert.equal(await c.requiredPlan("report_retention", "365d", { organizationId: "globex" }), "business");
+  const stale = await c.getDetails("project_max", { organizationId: "umbrella" });
   assert.equal(stale.value, 50); assert.equal(stale.staleOverrides.length, 1);
 });
 
@@ -39,11 +39,11 @@ test("bulk matches single resolution; caller context time controls expiry", asyn
     const single = await (await post(`resolve/${d.privilege}`, { context })).json();
     assert.deepEqual(single, d);
   }
-  const admin = await fetch(`${service.url}/api/organizations/hooli/grants`, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer admin-test" }, body: JSON.stringify({ privilege: "projects.max", amount: 2, reason: "dated grant", startsAt: "2026-11-01T00:00:00Z", expiresAt: "2026-11-04T00:00:00Z" }) });
+  const admin = await fetch(`${service.url}/api/organizations/hooli/grants`, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer admin-test" }, body: JSON.stringify({ privilege: "project_max", amount: 2, reason: "dated grant", startsAt: "2026-11-01T00:00:00Z", expiresAt: "2026-11-04T00:00:00Z" }) });
   assert.equal(admin.status, 200);
   const c = client();
-  assert.equal(await c.getLimit("projects.max", { organizationId: "hooli", now: new Date("2026-11-03T00:00:00Z") }), 3);
-  assert.equal(await c.getLimit("projects.max", { organizationId: "hooli", now: new Date("2026-11-04T00:00:00Z") }), 1);
+  assert.equal(await c.getLimit("project_max", { organizationId: "hooli", now: new Date("2026-11-03T00:00:00Z") }), 3);
+  assert.equal(await c.getLimit("project_max", { organizationId: "hooli", now: new Date("2026-11-04T00:00:00Z") }), 1);
 });
 
 test("data plane enforces token separation, request validation and method errors", async () => {
@@ -52,7 +52,7 @@ test("data plane enforces token separation, request validation and method errors
   assert.equal((await post("resolve", { context: { organizationId: 42 } })).status, 400);
   assert.equal((await post("resolve", { context: { organizationId: "hooli", now: "tomorrow" } })).status, 400);
   assert.equal((await post("resolve/unknown", { context: { organizationId: "hooli" } })).status, 404);
-  assert.equal((await post("suggest/projects.max", { context: { organizationId: "hooli" }, need: -1 })).status, 400);
+  assert.equal((await post("suggest/project_max", { context: { organizationId: "hooli" }, need: -1 })).status, 400);
   assert.equal((await fetch(`${service.url}/oerep/v1/resolve`, { headers: { authorization: "Bearer eval-test" } })).status, 405);
   const admin = await fetch(`${service.url}/api/plans`, { headers: { authorization: "Bearer eval-test" } });
   assert.equal(admin.status, 401);
@@ -60,16 +60,16 @@ test("data plane enforces token separation, request validation and method errors
 
 test("auth failures, outages, timeouts and malformed wire metadata fail closed", async () => {
   const badAuth = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, token: "wrong" }) });
-  assert.equal((await badAuth.getDetails("seats.max", { organizationId: "acme" })).reason, Reason.ERROR);
-  const malformed = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seats.max", value: 999, reason: "PLAN", grants: [{ id: "g", amount: -10 }], staleOverrides: [] })) }) });
-  const d = await malformed.getDetails("seats.max", { organizationId: "acme" });
+  assert.equal((await badAuth.getDetails("seat_max", { organizationId: "acme" })).reason, Reason.ERROR);
+  const malformed = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 999, reason: "PLAN", grants: [{ id: "g", amount: -10 }], staleOverrides: [] })) }) });
+  const d = await malformed.getDetails("seat_max", { organizationId: "acme" });
   assert.equal(d.reason, Reason.ERROR); assert.equal(d.errorCode, ErrorCode.GENERAL); assert.equal(d.requiredPlan, undefined);
-  const p = catalog.privilege("seats.max")!;
+  const p = catalog.privilege("seat_max")!;
   assert.throws(() => decodeRemoteDetails({ privilege: "other", value: 10, reason: "PLAN", grants: [], staleOverrides: [] }, p));
   const slow = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, timeoutMs: 1, fetch: async (_url, init) => { await new Promise((resolve) => setTimeout(resolve, 10)); init!.signal!.throwIfAborted(); throw new Error("unreachable"); } }) });
-  assert.equal((await slow.getDetails("seats.max", { organizationId: "acme" })).reason, Reason.ERROR);
+  assert.equal((await slow.getDetails("seat_max", { organizationId: "acme" })).reason, Reason.ERROR);
   const down = createClient({ catalog, provider: new RemoteProvider({ baseUrl: "http://127.0.0.1:1" }) });
-  assert.equal((await down.getDetails("seats.max", { organizationId: "acme" })).reason, Reason.ERROR);
+  assert.equal((await down.getDetails("seat_max", { organizationId: "acme" })).reason, Reason.ERROR);
 });
 
 test("Postgres service persists administrative changes across restart", { skip: !process.env.OE_PG_DSN }, async () => {
@@ -83,12 +83,12 @@ test("Postgres service persists administrative changes across restart", { skip: 
   };
   try {
     await admin(`plans/${plan}`, { name: "Persistence test", reason: "test" });
-    await admin(`plans/${plan}/values`, { values: { "seats.max": 42 }, reason: "test" });
+    await admin(`plans/${plan}/values`, { values: { "seat_max": 42 }, reason: "test" });
     await admin(`organizations/${org}/plan`, { planId: plan, reason: "test" });
     await running.close();
     running = await startServer(cfg);
     const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: running.url, token: "eval-test" }) });
-    assert.equal(await c.getLimit("seats.max", { organizationId: org }), 42);
+    assert.equal(await c.getLimit("seat_max", { organizationId: org }), 42);
   } finally {
     await running.close();
     const { default: pg } = await import("pg");
@@ -113,10 +113,10 @@ test("malformed requests return protocol errors without terminating the service"
 
 test("remote quota checks reject grants for another subject or above the resolved total", async () => {
   for (const grants of [[{ id: "g", amount: 100, subjectId: "bob" }], [{ id: "g", amount: 100, subjectId: "alice" }], [{ id: "g", amount: 5 }, { id: "g", amount: 5 }]]) {
-    const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seats.max", value: 10, reason: "GRANT", grants, staleOverrides: [] })) }) });
+    const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants, staleOverrides: [] })) }) });
     const ctx = { organizationId: "acme", subjectId: "alice" };
-    const details = await c.getDetails("seats.max", ctx);
+    const details = await c.getDetails("seat_max", ctx);
     assert.equal(details.reason, Reason.ERROR);
-    await assert.rejects(c.requireWithin("seats.max", 0, 100, ctx));
+    await assert.rejects(c.requireWithin("seat_max", 0, 100, ctx));
   }
 });

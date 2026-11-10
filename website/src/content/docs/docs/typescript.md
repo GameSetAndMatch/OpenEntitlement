@@ -33,9 +33,9 @@ const client = createClient({
 });
 
 const context = { organizationId: 'acme' };
-console.log(await client.getLimit('seats.max', context)); // 250
+console.log(await client.getLimit('seat_max', context)); // 250
 console.log(await client.isEnabled('sso', context));      // true
-console.log(await client.getDetails('seats.max', context));
+console.log(await client.getDetails('seat_max', context));
 ```
 
 ## Gate a request
@@ -43,7 +43,7 @@ console.log(await client.getDetails('seats.max', context));
 `isEnabled` checks a feature's gate privilege. `getLimit` returns an integer or `UNLIMITED`. `getEnum` returns a declared option. `getDetails` returns the explanation.
 
 ```ts
-await client.requireWithin('projects.max', 4, 1, { organizationId: 'globex' });
+await client.requireWithin('project_max', 4, 1, { organizationId: 'globex' });
 // Current 4 + requested 1 fits Pro's limit of 5.
 ```
 

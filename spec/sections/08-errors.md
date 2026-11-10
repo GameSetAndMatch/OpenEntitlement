@@ -40,7 +40,7 @@ Entitlement errors are designed for **UIs that upsell**. A locked feature should
 >   "error": "entitlement_required",
 >   "code": "entitlement_limit_exceeded",
 >   "feature": "projects",
->   "privilege": "projects.max",
+>   "privilege": "project_max",
 >   "limit": 5,
 >   "current": 5,
 >   "requested": 1,

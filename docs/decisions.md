@@ -8,6 +8,7 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 | [ADR-0002](../ADR-0002.md) | Historical accepted design, partially superseded by ADR-0003/0004; AWS-first, Tenant UI terminology and implicit Stripe-free access are not current requirements |
 | [ADR-0003](../ADR-0003.md) | Accepted: Workspace control plane, Privilege Catalog, Group/Tag cardinality and compatibility boundaries |
 | [ADR-0004](../ADR-0004.md) | Accepted: boolean-only restrictive environment prerequisites, separate visibility, usage/billing boundaries |
+| [ADR-0005](../ADR-0005.md) | Accepted: user-scoped inheritance, Cloud capability packaging and optional typed authoring |
 | [RFC-0001](rfcs/0001-entitlements-v0.2.md) | Proposed historical contract refinement; retain unresolved parts explicitly, not as implemented requirements |
 | [RFC-0002](rfcs/0002-privilege-catalog.md) | Accepted reference authoring contract; not a normative OEREP version bump |
 | [RFC-0003](rfcs/0003-consumption-dashboard.md) | Proposed read-only consumption view; blocked on a real application/metering usage source |

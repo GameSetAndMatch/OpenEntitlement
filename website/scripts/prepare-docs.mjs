@@ -7,6 +7,7 @@ const root = resolve(import.meta.dirname, '../..');
 const docs = resolve(root, 'website/src/content/docs');
 const repo = 'https://github.com/GameSetAndMatch/openentitlement/blob/main/';
 const files = [
+  { source: 'docs/guides/acme-workspace.md', target: 'docs/acme-workspace.md', title: 'ACME Workspace walkthrough' },
   { source: 'GLOSSARY.md', target: 'reference/glossary.md', title: 'Glossary' },
   ...((await readdir(resolve(root, 'spec/sections'))).filter((f) => f.endsWith('.md')).sort().map((f) => ({ source: `spec/sections/${f}`, target: `specification/${f}`, title: f.replace(/^\d+-/, '').replace('.md', '').replaceAll('-', ' ') }))),
 ];

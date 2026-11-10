@@ -25,6 +25,8 @@ Quote-to-Cash is integration context: agreed commercial rights may become entitl
 - A missing default is a requirement for explicit variant values, never an implicit zero, false or unlimited. Hidden, read-only and environment-linked locked values need defaults.
 - Usage is supplied by the application or a metering adapter. A consumption dashboard distinguishes reported usage, missing data and staleness; it does not manufacture counters or turn read-only evaluation into consumption.
 
+Cloud packaging may distinguish Organization-only Pro from Enterprise user scope. Subject support remains part of the open protocol/SDKs and self-hosted service; it is not proprietary wire behavior. See [ADR-0005](ADR-0005.md).
+
 ## How to keep this direction durable
 
 Use [GLOSSARY.md](GLOSSARY.md) for language, accepted ADRs for settled trade-offs, and RFCs for evolving contracts. See [the decision index](docs/decisions.md) for status and implementation boundaries. The existing normative specification remains authoritative for released OEREP/SDK behavior; accepted product direction does not silently create a new wire-protocol version.

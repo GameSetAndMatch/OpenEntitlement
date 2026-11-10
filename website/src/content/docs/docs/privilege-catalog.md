@@ -27,6 +27,6 @@ privileges:
 
 `env_override` exists only on boolean definitions and means **entitlement AND environment**. `false` vetoes access; `true` never grants access beyond the tier or contract. Integer and string-enum definitions reject that field. Hidden, read-only and environment-linked privileges need defaults; editable privileges without defaults require values in every tier variant.
 
-The workspace console supports Group and Tag management, Tag filtering and typed privilege authoring. The Python SDK also provides validated `BooleanPrivilege`, `IntegerPrivilege`, `StringEnumPrivilege`, `Group`, `Tag` and `PrivilegeCatalog` dataclasses for JSON serialization.
+The workspace console supports Group and Tag management, Tag filtering and typed privilege authoring. For strict Pydantic authoring, use `openentitlement-sdk[authoring]` and import from `openentitlement.authoring`. TypeScript uses the optional `@openentitlement/core/authoring` Zod schemas. See the [Python-first ACME walkthrough](/docs/acme-workspace/) for the whole Workspace model. The Python SDK also retains validated `BooleanPrivilege`, `IntegerPrivilege`, `StringEnumPrivilege`, `Group`, `Tag` and `PrivilegeCatalog` dataclasses for JSON serialization.
 
 See the [authoring guide](https://github.com/GameSetAndMatch/OpenEntitlement/blob/main/console/PRIVILEGE-CATALOG.md) for a complete Catalog example, API routes, migration behavior and standalone compatibility limits. The existing OEREP v1 transport and evaluation SDKs remain compatible.

@@ -87,7 +87,7 @@ export interface InMemorySeed {
 /**
  * Reference provider. Seed it directly for quick setups (seeding bypasses audit: it is configuration, not change):
  *
- *   new InMemoryProvider({ plans: [{ id: "pro", name: "Pro", rank: 1 }], values: { pro: { "seats.max": 50 } }, assignments: { acme: "pro" } })
+ *   new InMemoryProvider({ plans: [{ id: "pro", name: "Pro", rank: 1 }], values: { pro: { "seat_max": 50 } }, assignments: { acme: "pro" } })
  */
 export class InMemoryProvider extends FactsProvider {
   readonly metadata = { name: "in-memory" };

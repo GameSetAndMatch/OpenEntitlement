@@ -20,7 +20,7 @@ Serialization depends on *where the usage lives* (usually the application's data
 ### 5.2. guard
 
 ```ts
-await client.guard("projects.max", 1, ctx, {
+await client.guard("project_max", 1, ctx, {
   count: (tx) => tx.query("select count(*) from projects where org_id = $1", [orgId]),
   act:   (tx) => tx.query("insert into projects ...", [...]),
 });

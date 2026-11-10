@@ -19,5 +19,6 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   assert.equal(await page.locator('#error-stack').isVisible(),false,`Story ${story} must render without errors`);
  }
  for(const story of ['grouped-and-tagged','authoring']){await page.goto(`${origin}/iframe.html?id=privilege-catalog--${story}&viewMode=story`);await page.getByLabel('Filter by tag').waitFor();assert.equal(await page.getByText('Internal privilege',{exact:true}).count(),0);if(story==='grouped-and-tagged')await page.waitForFunction(()=>document.querySelector('select')?.value==='integration');}
- assert.deepEqual(failures,[]);console.log('Ten compiled Storybook stories rendered successfully in Chromium');
+ for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
+ assert.deepEqual(failures,[]);console.log('Twelve compiled Storybook stories rendered successfully in Chromium');
 }finally{await browser?.close();await new Promise(ok=>server.close(ok));}

@@ -4,7 +4,7 @@
 
 Hooks use OpenFeature's [hook model](https://openfeature.dev/specification/sections/hooks), with four stages: `before`, `after`, `error`, and `finally`. There are two kinds:
 
-- **Evaluation hooks** run around every resolution (telemetry, logging, caching, metrics such as "how often do we deny `seats.max`?").
+- **Evaluation hooks** run around every resolution (telemetry, logging, caching, metrics such as "how often do we deny `seat_max`?").
 - **Mutation hooks** run around every administrative change. This is where the **audit trail** lives: every plan-value, assignment, override, and grant mutation emits `{actor, reason, before, after, at}`.
 
 ### 7.1. Evaluation hooks

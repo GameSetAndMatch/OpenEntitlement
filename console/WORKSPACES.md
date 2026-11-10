@@ -39,7 +39,7 @@ Accounts are identified by verified issuer and subject. `OE_PLATFORM_ADMIN_SUBJE
 
 Owners manage catalog, commercial values and access. Managers invite/remove Users or Managers; Users read. The final Owner cannot be removed or demoted. Invitations accepted by existing members leave their role unchanged and report that explicitly; an Owner must change roles through membership controls. Invitations are single-use, seven-day links bound to the invited verified email. The UI creates a link for manual sharing; it does not send email.
 
-HTTP-only session cookies, state, nonce, PKCE, signature verification, same-origin checks and session-bound CSRF protect interactive requests. Evaluation keys are shown once, hashed at rest, revocable, and bound to exactly one workspace. A key can call `POST /api/evaluate` with `organizationId`, `privilege`, and optional deterministic `now`; it cannot administer the console.
+HTTP-only session cookies, state, nonce, PKCE, signature verification, same-origin checks and session-bound CSRF protect interactive requests. Evaluation keys are shown once, hashed at rest, revocable, and bound to exactly one workspace. A key can call `POST /api/evaluate` with `organizationId`, `privilege`, and optional `subjectId` and deterministic `now`; it cannot administer the console.
 
 PostgreSQL FORCE RLS protects entitlement state and audit rows with transaction-local workspace context. Global identity, directory, memberships, invitations and key lookup use explicit application authorization. Runtime superuser/BYPASSRLS roles are rejected. Updates serialize with row locks and reject stale revisions instead of overwriting concurrent changes.
 
@@ -47,7 +47,7 @@ PostgreSQL FORCE RLS protects entitlement state and audit rows with transaction-
 
 A tier can define grace days. Before setting an Organization past due, create that tier's grace variant. The server snapshots a grace deadline on the transition; repeated past-due updates on the same tier do not extend it. Moving to a different tier starts that tier’s grace window (zero days restricts immediately). Reactivation ends that past-due episode; a later past-due transition starts a new window. During grace the grace variant's values apply; original assignment and negotiated terms remain stored. Reactivation restores them. At the deadline, the workspace's configured read-only or fallback-variant policy applies. Ended contracts bypass grace. The application must enforce the returned `readOnly` flag; evaluation does not delete or modify application data.
 
-This preview has no payment webhook adapter, automatic trial expiration, grant authoring, self-hosted file reconciliation, or bridge to the existing OEREP SDK transports. Its workspace API is a separate control-plane slice; existing standalone data is not automatically migrated. Production operation still needs a production identity provider, operational hardening and a deployment/recovery plan.
+This preview has no payment webhook adapter, automatic trial expiration, Organization-wide grant authoring, self-hosted file reconciliation, or bridge to the existing OEREP SDK transports. Its workspace API is a separate control-plane slice; existing standalone data is not automatically migrated. Production operation still needs a production identity provider, operational hardening and a deployment/recovery plan.
 
 ## Component development and regression tests
 
@@ -73,3 +73,10 @@ Audit records currently store full before/after workspace snapshots for each con
 Catalog values can also be environment-controlled, frozen or hidden; see [Environment overrides](ENVIRONMENT-OVERRIDES.md). UI snapshots omit hidden definitions and resolved environment values.
 
 The workspace authoring UI now uses the [Privilege Catalog](PRIVILEGE-CATALOG.md): typed definitions, one Group, multiple Tags, visibility and boolean-only `env_override`. Existing preview Feature containers remain compatible and are presented as Groups.
+
+
+## User scope and hosting
+
+See [User entitlements](USER-ENTITLEMENTS.md) and the [Python-first ACME walkthrough](../docs/guides/acme-workspace.md). `OE_DEPLOYMENT_MODE=self_hosted` (default) supports Organization/user scope. For Cloud, explicitly use `OE_DEPLOYMENT_MODE=saas`: Workspaces begin on Cloud Pro; only a Platform administrator can change their Cloud service tier to Enterprise in Settings. This is a manually audited capability assignment, not a billing/subscription integration. Custom customer Tiers never enable hosting features.
+
+Personal terms replace inherited Organization values; positive integer grants add an allowance. Values use the Catalog's types and constraints. Terms become inactive after a variant change; grants survive. Grace/fallback suspend personal exceptions; read-only and environment restrictions remain final. Subject IDs are opaque application identifiers, scoped to the Organization, not console membership Accounts. All changes, including removal, are audited. Workspace snapshots include visible user terms and grants; treat exports as customer configuration.

@@ -2,16 +2,16 @@
   "$comment": "Conformance catalog (spec §1.1). Definitions live in code; SDK runners load this file as if the application declared it.",
   "features": [
     { "code": "seats", "name": "Seats", "privileges": [
-      { "key": "seats.max", "valueType": "integer", "unlimitedAllowed": true, "default": 1 } ] },
+      { "key": "seat_max", "valueType": "integer", "unlimitedAllowed": true, "default": 1 } ] },
     { "code": "projects", "name": "Projects", "privileges": [
-      { "key": "projects.max", "valueType": "integer", "default": 0 } ] },
+      { "key": "project_max", "valueType": "integer", "default": 0 } ] },
     { "code": "api", "name": "API access", "privileges": [
-      { "key": "api_calls.monthly", "valueType": "integer", "unlimitedAllowed": true, "default": 0 } ] },
-    { "code": "sso", "name": "Single sign-on", "gate": "sso.enabled", "privileges": [
-      { "key": "sso.enabled", "valueType": "boolean", "default": false },
-      { "key": "sso.connections.max", "valueType": "integer", "default": 0 } ] },
-    { "code": "reports", "name": "Reports", "gate": "reports.enabled", "privileges": [
-      { "key": "reports.enabled", "valueType": "boolean", "default": false },
-      { "key": "reports.retention", "valueType": "enum", "options": ["7d", "90d", "365d"], "default": "7d" } ] }
+      { "key": "api_calls_monthly", "valueType": "integer", "unlimitedAllowed": true, "default": 0 } ] },
+    { "code": "sso", "name": "Single sign-on", "gate": "sso_enabled", "privileges": [
+      { "key": "sso_enabled", "valueType": "boolean", "default": false },
+      { "key": "sso_connection_max", "valueType": "integer", "default": 0 } ] },
+    { "code": "reports", "name": "Reports", "gate": "reports_enabled", "privileges": [
+      { "key": "reports_enabled", "valueType": "boolean", "default": false },
+      { "key": "report_retention", "valueType": "enum", "options": ["7d", "90d", "365d"], "default": "7d" } ] }
   ]
 }

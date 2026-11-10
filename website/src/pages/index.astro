@@ -7,9 +7,8 @@ const example = `const client = createClient({
 });
 
 await client.isEnabled('sso', { organizationId });
-await client.getLimit('seats.max', { organizationId });`;
+await client.getLimit('seat_max', { organizationId });`;
 const snippets = [
-  { id: 'typescript', label: 'TypeScript', filename: 'your-application.ts', badge: 'TS', docs: '/docs/typescript/', code: example },
   { id: 'python', label: 'Python', filename: 'your_application.py', badge: 'PY', docs: '/docs/python/', code: `from openentitlement import RemoteProvider, create_client
 
 client = create_client(
@@ -21,8 +20,9 @@ client = create_client(
 
 context = {'organization_id': organization_id}
 client.is_enabled('sso', context)
-client.get_limit('seats.max', context)` },
-  { id: 'http', label: 'HTTP / JSON', filename: 'resolve.http', badge: 'HTTP', docs: '/docs/oerep/', code: `POST /oerep/v1/resolve/seats.max HTTP/1.1
+client.get_limit('seat_max', context)` },
+  { id: 'typescript', label: 'TypeScript', filename: 'your-application.ts', badge: 'TS', docs: '/docs/typescript/', code: example },
+  { id: 'http', label: 'HTTP / JSON', filename: 'resolve.http', badge: 'HTTP', docs: '/docs/oerep/', code: `POST /oerep/v1/resolve/seat_max HTTP/1.1
 Host: entitlements.example.com
 Content-Type: application/json
 Authorization: Bearer <evaluation-token>
@@ -65,7 +65,7 @@ import '../styles/landing.css';
   </div>
   <div class="hero-visual" aria-label="Illustration of an explainable entitlement decision">
     <div class="visual-grid"></div><div class="small-label">ONE CUSTOMER. A CLEAR ANSWER.</div>
-    <div class="decision-card"><div class="decision-heading"><span class="customer-mark">A</span><div><strong>Acme</strong><small>Business plan</small></div><span class="live-pill">Resolved</span></div><div class="decision-value"><span>seats.max</span><strong>250<span> seats</span></strong></div><div class="decision-breakdown"><div><span>Plan default</span><span>100</span></div><div class="highlight"><span>Negotiated override</span><span>250</span></div><div><span>Effective entitlement</span><strong>250</strong></div></div><div class="decision-bottom"><span class="tiny-dot"></span> OVERRIDE <span class="separator">/</span> Every decision has a reason.</div></div>
+    <div class="decision-card"><div class="decision-heading"><span class="customer-mark">A</span><div><strong>Acme</strong><small>Business plan</small></div><span class="live-pill">Resolved</span></div><div class="decision-value"><span>seat_max</span><strong>250<span> seats</span></strong></div><div class="decision-breakdown"><div><span>Plan default</span><span>100</span></div><div class="highlight"><span>Negotiated override</span><span>250</span></div><div><span>Effective entitlement</span><strong>250</strong></div></div><div class="decision-bottom"><span class="tiny-dot"></span> OVERRIDE <span class="separator">/</span> Every decision has a reason.</div></div>
     <div class="protocol-note"><span class="code-bracket">{ }</span><div><strong>Your terms. Your infrastructure.</strong><small>Delivered through the open OEREP protocol.</small></div></div>
     <div class="visual-caption">Illustrative data from the included demo.</div>
   </div>
@@ -76,7 +76,7 @@ import '../styles/landing.css';
   <div class="architecture" aria-label="Application uses the SDK, which calls the OEREP service backed by memory or Postgres"><div><span class="arch-index">01</span><strong>Your application</strong><small>Features declared in code</small></div><span class="arrow" aria-hidden="true">→</span><div><span class="arch-index">02</span><strong>One SDK API</strong><small>TypeScript or Python</small></div><span class="arrow" aria-hidden="true">→</span><div class="arch-active"><span class="arch-index">03</span><strong>OpenEntitlement</strong><small>OEREP · your service · your data</small></div></div>
   <div class="code-section" data-snippet-example>
     <div class="code-copy"><h3>Write the gate.<br/>Let the agreement change.</h3><p>Check a feature. Read a limit. Inspect why a decision was made. Your application uses the same API whether a customer is on a standard plan or a negotiated contract.</p>
-      <a class="text-link" data-snippet-docs href="/docs/typescript/">Meet the SDK <span aria-hidden="true">→</span></a>
+      <a class="text-link" data-snippet-docs href="/docs/python/">Meet the SDK <span aria-hidden="true">→</span></a>
       <div class="language-tags" role="tablist" aria-label="Example language">
         {snippets.map((snippet, index) => <button type="button" role="tab" id={`tab-${snippet.id}`} aria-selected={index === 0 ? 'true' : 'false'} aria-controls={`snippet-${snippet.id}`} tabindex={index === 0 ? 0 : -1} data-docs={snippet.docs}>{snippet.label}</button>)}
       </div>
@@ -92,7 +92,7 @@ import '../styles/landing.css';
 </section>
 <section class="explorer-section" id="model"><div class="wrap"><div class="section-heading"><div><p class="eyebrow">STANDARD PLANS. REAL-WORLD EXCEPTIONS.</p><h2>Same product.<br/><em>Different agreements.</em></h2></div><p>A plan is the starting point. Overrides replace a value. Grants add quota. Switch between demo customers to see how the pieces fit.</p></div>
   <div class="explorer"><div class="explorer-controls"><span class="eyebrow">EXPLORE THE MODEL</span><div class="org-buttons" role="group" aria-label="Choose an example organization"><button data-org="hooli" aria-pressed="false">Hooli <small>Free</small></button><button data-org="globex" aria-pressed="false">Globex <small>Pro + grant</small></button><button data-org="acme" aria-pressed="true">Acme <small>Business + override</small></button></div><p>Illustrative examples, evaluated locally in this page. Run the quickstart to query the actual service.</p><a class="text-link" href="/docs/quickstart/">Run the live demo →</a></div>
-  <div class="explorer-results" aria-live="polite" aria-atomic="true"><div class="results-top"><div><span class="customer-mark" id="example-mark">A</span><h3 id="example-name">Acme</h3></div><span id="example-plan">Business plan</span></div><div class="result-row"><div><code>seats.max</code><small id="seats-note">Negotiated from 100 to 250</small></div><strong id="seats-value">250</strong><span class="reason" id="seats-reason">OVERRIDE</span></div><div class="result-row"><div><code>projects.max</code><small>Projects the organization may create</small></div><strong id="projects-value">50</strong><span class="reason neutral">PLAN</span></div><div class="result-row"><div><code>api_calls.monthly</code><small id="api-note">No finite cap</small></div><strong id="api-value">Unlimited</strong><span class="reason neutral" id="api-reason">PLAN</span></div><div class="result-row"><div><code>sso.enabled</code><small>Boolean feature gate</small></div><strong id="sso-value">Enabled</strong><span class="reason neutral">PLAN</span></div></div></div>
+  <div class="explorer-results" aria-live="polite" aria-atomic="true"><div class="results-top"><div><span class="customer-mark" id="example-mark">A</span><h3 id="example-name">Acme</h3></div><span id="example-plan">Business plan</span></div><div class="result-row"><div><code>seat_max</code><small id="seats-note">Negotiated from 100 to 250</small></div><strong id="seats-value">250</strong><span class="reason" id="seats-reason">OVERRIDE</span></div><div class="result-row"><div><code>project_max</code><small>Projects the organization may create</small></div><strong id="projects-value">50</strong><span class="reason neutral">PLAN</span></div><div class="result-row"><div><code>api_calls_monthly</code><small id="api-note">No finite cap</small></div><strong id="api-value">Unlimited</strong><span class="reason neutral" id="api-reason">PLAN</span></div><div class="result-row"><div><code>sso_enabled</code><small>Boolean feature gate</small></div><strong id="sso-value">Enabled</strong><span class="reason neutral">PLAN</span></div></div></div>
 </div></section>
 <section class="section wrap"><div class="section-heading"><div><p class="eyebrow">LESS COUPLING. MORE CLARITY.</p><h2>Open contracts.<br/><em>Inspectable decisions.</em></h2></div><p>OpenEntitlement resolves what an organization may do. Authentication, permissions, release flags, and usage counting stay with the systems that own them.</p></div><div class="feature-grid"><article><span class="feature-number">01 / OPEN CONTRACT</span><h3>A vendor-neutral contract.</h3><p>The specification defines the model and evaluation semantics. OEREP carries those decisions over HTTP using generic SDK providers.</p><a href="/docs/oerep/">Read the protocol →</a></article><article><span class="feature-number">02 / EXPLAINABLE VALUES</span><h3>More than yes or no.</h3><p>Return the effective value, plan value, applied grants, stale overrides, and reason. Make decisions support teams can understand.</p><a href="/docs/concepts/">Understand resolution →</a></article><article><span class="feature-number">03 / YOUR INFRASTRUCTURE</span><h3>Host it on your terms.</h3><p>Run the service with Postgres, try it in memory, or embed a provider. No billing account is required.</p><a href="/docs/self-hosting/">Self-host the service →</a></article></div></section>
 <section class="closing wrap"><div><p class="eyebrow">START WITH ONE ENTITLEMENT.</p><h2>Your first decision<br/>is a <em>curl away.</em></h2><p>Run the reference service and inspect the value, source, and reason behind a decision.</p><a class="button primary" href="/docs/quickstart/">Get started →</a></div><div class="closing-note"><span>OPEN DEVELOPMENT</span><p>The specification, reference service, SDKs, and conformance suite are Apache-2.0 licensed. The draft and its implementation are available for inspection.</p><a class="text-link" href={github}>Review the source ↗</a></div></section>

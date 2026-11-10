@@ -12,8 +12,8 @@ from openentitlement_stripe import StripeEntitlementsProvider, parse_lookup_key,
 
 CATALOG = Catalog(
     [
-        feature("seats", "Seats", [integer("seats.max", default=1, unlimited_allowed=True)]),
-        feature("sso", "SSO", [boolean("sso.enabled")]),
+        feature("seats", "Seats", [integer("seat_max", default=1, unlimited_allowed=True)]),
+        feature("sso", "SSO", [boolean("sso_enabled")]),
         feature("support", "Support", [boolean("support.enabled"), enum("support.tier", ["community", "priority"])], gate="support.enabled"),
     ]
 )
@@ -50,14 +50,14 @@ def client(transport: Any, **kw: Any):  # type: ignore[no-untyped-def]
 
 
 def test_lookup_key_convention() -> None:
-    assert parse_lookup_key("seats.max:50") == ("seats.max", "50")
-    assert parse_lookup_key("sso.enabled") == ("sso.enabled", None)
+    assert parse_lookup_key("seat_max:50") == ("seat_max", "50")
+    assert parse_lookup_key("sso_enabled") == ("sso_enabled", None)
 
 
 def test_paginates_and_picks_most_generous() -> None:
-    t = FakeTransport([["seats.max:10", "sso.enabled"], ["seats.max:50", "support.tier:priority"]])
+    t = FakeTransport([["seat_max:10", "sso_enabled"], ["seat_max:50", "support.tier:priority"]])
     _, c = client(t)
-    assert c.get_limit("seats.max") == 50
+    assert c.get_limit("seat_max") == 50
     assert "starting_after=ent_0_1" in t.calls[1]
     assert c.is_enabled("sso") and c.get_enum("support.tier") == "priority"
     assert c.is_enabled_details("support").reason is Reason.PLAN and not c.is_enabled("support")  # absent boolean
@@ -65,34 +65,34 @@ def test_paginates_and_picks_most_generous() -> None:
 
 
 def test_unlimited_and_mapping_precedence() -> None:
-    _, c = client(FakeTransport([["seats.max:unlimited"]]))
-    assert c.get_limit("seats.max") is UNLIMITED
-    _, c = client(FakeTransport([["pro-bundle"]]), mapping={"pro-bundle": {"seats.max": 25, "sso.enabled": True}})
-    assert c.get_limit("seats.max") == 25 and c.is_enabled("sso")
+    _, c = client(FakeTransport([["seat_max:unlimited"]]))
+    assert c.get_limit("seat_max") is UNLIMITED
+    _, c = client(FakeTransport([["pro-bundle"]]), mapping={"pro-bundle": {"seat_max": 25, "sso_enabled": True}})
+    assert c.get_limit("seat_max") == 25 and c.is_enabled("sso")
 
 
 def test_invalid_keys_are_ignored_and_unknown_customers_default() -> None:
-    _, c = client(FakeTransport([["seats.max:lots"]]))
-    assert c.get_limit_details("seats.max").reason is Reason.DEFAULT
-    assert c.get_limit_details("seats.max", {"organizationId": "other"}).reason is Reason.DEFAULT
+    _, c = client(FakeTransport([["seat_max:lots"]]))
+    assert c.get_limit_details("seat_max").reason is Reason.DEFAULT
+    assert c.get_limit_details("seat_max", {"organizationId": "other"}).reason is Reason.DEFAULT
 
 
 def test_api_errors_become_error_reason() -> None:
     _, c = client(FakeTransport([], status=401))
-    d = c.get_limit_details("seats.max")
+    d = c.get_limit_details("seat_max")
     assert d.reason is Reason.ERROR and d.value == 1
 
 
 def test_webhook_refreshes_cache_and_invalidates_when_truncated() -> None:
-    t = SequenceTransport([["seats.max:10"], ["seats.max:99"]])
+    t = SequenceTransport([["seat_max:10"], ["seat_max:99"]])
     p, c = client(t, cache_ttl=3600)
-    assert c.get_limit("seats.max") == 10
+    assert c.get_limit("seat_max") == 10
     p.handle_event({"type": "entitlements.active_entitlement_summary.updated",
-                    "data": {"object": {"customer": "cus_1", "entitlements": {"data": [{"lookup_key": "seats.max:20"}], "has_more": False}}}})
-    assert c.get_limit("seats.max") == 20 and len(t.calls) == 1
+                    "data": {"object": {"customer": "cus_1", "entitlements": {"data": [{"lookup_key": "seat_max:20"}], "has_more": False}}}})
+    assert c.get_limit("seat_max") == 20 and len(t.calls) == 1
     p.handle_event({"type": "entitlements.active_entitlement_summary.updated",
                     "data": {"object": {"customer": "cus_1", "entitlements": {"data": [], "has_more": True}}}})
-    assert c.get_limit("seats.max") == 99 and len(t.calls) == 2
+    assert c.get_limit("seat_max") == 99 and len(t.calls) == 2
 
 
 def _sign(payload: bytes, secret: str, ts: int) -> str:

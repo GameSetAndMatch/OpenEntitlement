@@ -7,7 +7,7 @@ description: How plan values, overrides, grants, and defaults produce an explain
 
 A **feature** is a named capability. A **privilege** is one typed dimension: a boolean, a non-negative integer, or an ordered enum. The **catalog** declares these definitions and defaults.
 
-`projects.max` might be an integer privilege. `sso.enabled` might be a boolean gate. `reports.retention` might be an enum ordered as `7d`, `90d`, `365d`.
+`project_max` might be an integer privilege. `sso_enabled` might be a boolean gate. `report_retention` might be an enum ordered as `7d`, `90d`, `365d`.
 
 ## The resolution model
 

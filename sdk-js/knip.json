@@ -8,5 +8,10 @@
         "scripts/**/*.mjs"
       ]
     }
+  },
+  "ignoreIssues": {
+    "packages/core/package.json": [
+      "optionalPeerDependencies"
+    ]
   }
 }

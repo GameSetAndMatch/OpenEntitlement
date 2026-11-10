@@ -7,12 +7,12 @@ import {emptyData} from '../server/workspace/model.ts';
 test('typed Privileges have visibility, one Group, multiple Tags and a boolean-only environment field',()=>{
  const input={key:'mcp_enabled',title:'MCP access',description:'Allow MCP access',type:'boolean',visibility:'read_only',default:false,env_override:'MCP_INSTALLED',group_id:'mcp',tags:['enterprise','integration']};
  assert.deepEqual(parsePrivilege(input),input);
- assert.throws(()=>parsePrivilege({...input,type:'integer'}),/Unknown integer Privilege field: env_override/);
- assert.throws(()=>parsePrivilege({...input,type:'enum'}),/Unknown enum Privilege field: env_override/);
- assert.throws(()=>parsePrivilege({...input,group_ids:['mcp','other']}),/Unknown/);
+ assert.throws(()=>parsePrivilege({...input,type:'integer'}),/env_override/);
+ assert.throws(()=>parsePrivilege({...input,type:'enum'}),/env_override/);
+ assert.throws(()=>parsePrivilege({...input,group_ids:['mcp','other']}),/group_ids/);
  assert.throws(()=>parsePrivilege({...input,tags:['same','same']}),/unique/);
- assert.throws(()=>parsePrivilege({...input,visibility:'frozen'}),/visibility/);
- assert.throws(()=>parsePrivilege({key:'seats',title:'Seats',type:'integer',default:true}),/out of bounds/);
+ assert.throws(()=>parsePrivilege({...input,visibility:'frozen'}),/editable/);
+ assert.throws(()=>parsePrivilege({key:'seats',title:'Seats',type:'integer',default:true}),/Invalid input/);
  assert.throws(()=>parsePrivilege({key:'mode',title:'Mode',type:'enum',enum:['read'],default:'write'}),/choices/);
  const typed:IntegerPrivilege={key:'seats',title:'Seats',description:'',visibility:'editable',tags:[],type:'integer'};
  // @ts-expect-error Integer privileges cannot carry an environment binding.

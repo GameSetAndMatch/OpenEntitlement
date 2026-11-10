@@ -48,3 +48,7 @@ docker run --rm --name openentitlement \
 The PostgreSQL host must be reachable from inside the container; `localhost` means the container itself. The server migrates its tables and starts without demo plans. Configure the admin token in the console connection settings, then create plans and assignments. Keep database data in persistent storage and arrange backups. Use `OE_SEED=demo` only for empty disposable demo databases.
 
 Mount a custom catalog read-only and set `OE_CATALOG` to its container path if needed. Use a TLS reverse proxy for remote hosting. Evaluation tokens cover the service instance; your backend must authorize organization access. Pin a version or image digest for deployments, as `edge` and `latest` move. See the [service guide](../../console/README.md) for API and provider details.
+
+## Sample Catalog key migration
+
+The current source sample uses flat keys (`seat_max`, `project_max`, `sso_enabled`) with grouping metadata kept separate. Older image releases may have `seats.max`, `projects.max` and `sso.enabled`. This is not an automatic database migration. Before upgrading an existing seeded install, export/preserve its Catalog, set `OE_CATALOG` to that compatible file or pin the previous image, and migrate values, overrides, grants and application checks under an explicit maintenance plan. Building a fresh local image uses the new sample keys. Do not claim a newly documented source example works with an older published image.

@@ -1,6 +1,6 @@
 {
   "name": "@openentitlement/stripe",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Stripe Entitlements adapter for OpenEntitlement (no Stripe SDK dependency).",
   "license": "Apache-2.0",
   "type": "module",
@@ -19,7 +19,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@openentitlement/core": "0.1.0"
+    "@openentitlement/core": "0.2.0"
   },
   "publishConfig": {
     "access": "public"

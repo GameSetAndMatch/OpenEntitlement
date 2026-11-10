@@ -19,6 +19,8 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Trial** | A time-limited variant of a Tier, not a commercial Tier itself. |
 | **Grace period** | A bounded period of defined rights after a qualifying contract-status change. |
 | **Organization** | An entitled customer managed within a Workspace. Distinct from the Workspace, Account and technical Tenant. |
+| **Application user** | An Organization-scoped Subject whose entitlement values may inherit or have personal terms/grants. Not a console Account or membership Role. |
+| **Cloud service tier** | OpenEntitlement hosted capabilities (Pro or Enterprise), managed by the platform; distinct from customer-defined Tiers. |
 | **Subject** | A person, service account or other actor to whom an entitlement may apply. |
 | **Resource** | An application object that may be subject to an entitlement. |
 | **Contract** | The link between agreed commercial terms and an Organization's entitled rights. |

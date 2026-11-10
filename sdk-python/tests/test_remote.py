@@ -29,30 +29,30 @@ def remote():
 
 def test_python_reads_own_server(remote):
     c, _, _ = remote
-    assert c.get_limit("seats.max", {"organization_id": "hooli"}) == 3
-    d = c.get_details("seats.max", {"organization_id": "acme"})
+    assert c.get_limit("seat_max", {"organization_id": "hooli"}) == 3
+    d = c.get_details("seat_max", {"organization_id": "acme"})
     assert d.reason == Reason.OVERRIDE and d.value == 250 and d.plan_value == 100
-    assert c.get_limit("api_calls.monthly", {"organization_id": "acme"}) is UNLIMITED
-    d = c.get_details("api_calls.monthly", {"organization_id": "globex", "subject_id": "hank"})
+    assert c.get_limit("api_calls_monthly", {"organization_id": "acme"}) is UNLIMITED
+    d = c.get_details("api_calls_monthly", {"organization_id": "globex", "subject_id": "hank"})
     assert d.reason == Reason.GRANT and d.value == 155000 and len(d.grants) == 2
-    assert c.get_enum("reports.retention", {"organization_id": "globex"}) == "90d"
+    assert c.get_enum("report_retention", {"organization_id": "globex"}) == "90d"
     assert c.is_enabled("sso", {"organization_id": "acme"})
     assert not c.is_enabled("sso", {"organization_id": "hooli"})
     with pytest.raises(EntitlementLimitExceeded) as exc:
-        c.require_within("projects.max", 1, 1, {"organization_id": "hooli"})
+        c.require_within("project_max", 1, 1, {"organization_id": "hooli"})
     assert exc.value.required_plan == "pro"
-    assert c.required_plan("reports.retention", "365d", {"organization_id": "globex"}) == "business"
-    d = c.get_details("projects.max", {"organization_id": "umbrella", "now": datetime(2026, 11, 3, tzinfo=timezone.utc)})
+    assert c.required_plan("report_retention", "365d", {"organization_id": "globex"}) == "business"
+    d = c.get_details("project_max", {"organization_id": "umbrella", "now": datetime(2026, 11, 3, tzinfo=timezone.utc)})
     assert d.value == 50 and len(d.stale_overrides) == 1
 
 
 def test_auth_and_bad_responses_fail_closed(remote):
     _, url, catalog = remote
     c = create_client(provider=RemoteProvider(url, token="bad"), catalog=catalog)
-    d = c.get_details("seats.max", {"organization_id": "acme"})
+    d = c.get_details("seat_max", {"organization_id": "acme"})
     assert d.reason == Reason.ERROR and d.required_plan is None
-    p = catalog.privilege("seats.max")
-    for bad in [None, {}, {"privilege": "seats.max", "value": 9, "reason": "PLAN", "grants": [{"id": "x", "amount": -1}], "staleOverrides": []}]:
+    p = catalog.privilege("seat_max")
+    for bad in [None, {}, {"privilege": "seat_max", "value": 9, "reason": "PLAN", "grants": [{"id": "x", "amount": -1}], "staleOverrides": []}]:
         with pytest.raises((ValueError, KeyError)):
             decode_remote_details(bad, p)
 
@@ -82,12 +82,12 @@ def test_invalid_remote_grants_and_unlimited_never_inflate_quota():
         for grants in ([{"id": "g", "amount": 100, "subjectId": "bob"}],
                        [{"id": "g", "amount": 100, "subjectId": "alice"}],
                        [{"id": "g", "amount": 5}, {"id": "g", "amount": 5}]):
-            payload.update(privilege="seats.max", value=10, reason="GRANT", grants=grants, staleOverrides=[])
-            assert c.get_details("seats.max", ctx).reason is Reason.ERROR
+            payload.update(privilege="seat_max", value=10, reason="GRANT", grants=grants, staleOverrides=[])
+            assert c.get_details("seat_max", ctx).reason is Reason.ERROR
             with pytest.raises(EntitlementLimitExceeded):
-                c.require_within("seats.max", 0, 100, ctx)
+                c.require_within("seat_max", 0, 100, ctx)
         payload.update(value={"unlimited": 1}, grants=[])
-        assert c.get_details("seats.max", ctx).reason is Reason.ERROR
+        assert c.get_details("seat_max", ctx).reason is Reason.ERROR
     finally:
         server.shutdown()
         server.server_close()
