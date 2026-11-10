@@ -9,8 +9,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "openentitlement",
     "openentitlement-postgres",
+    "openentitlement-sdk",
     "openentitlement-stripe",
     "openentitlement-workspace",
 ]
@@ -788,43 +788,43 @@ wheels = [
 ]
 
 [[package]]
-name = "openentitlement"
-version = "0.1.0"
-source = { editable = "packages/openentitlement" }
-
-[[package]]
 name = "openentitlement-postgres"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/openentitlement-postgres" }
 dependencies = [
-    { name = "openentitlement" },
+    { name = "openentitlement-sdk" },
     { name = "psycopg" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "openentitlement", editable = "packages/openentitlement" },
+    { name = "openentitlement-sdk", editable = "packages/openentitlement" },
     { name = "psycopg", specifier = ">=3.1" },
 ]
 
 [[package]]
+name = "openentitlement-sdk"
+version = "0.1.1"
+source = { editable = "packages/openentitlement" }
+
+[[package]]
 name = "openentitlement-stripe"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/openentitlement-stripe" }
 dependencies = [
-    { name = "openentitlement" },
+    { name = "openentitlement-sdk" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "openentitlement", editable = "packages/openentitlement" }]
+requires-dist = [{ name = "openentitlement-sdk", editable = "packages/openentitlement" }]
 
 [[package]]
 name = "openentitlement-workspace"
 version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "openentitlement" },
     { name = "openentitlement-postgres" },
+    { name = "openentitlement-sdk" },
     { name = "openentitlement-stripe" },
 ]
 
@@ -842,8 +842,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openentitlement", editable = "packages/openentitlement" },
     { name = "openentitlement-postgres", editable = "packages/openentitlement-postgres" },
+    { name = "openentitlement-sdk", editable = "packages/openentitlement" },
     { name = "openentitlement-stripe", editable = "packages/openentitlement-stripe" },
 ]
 
