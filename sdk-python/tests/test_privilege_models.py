@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from pydantic import ValidationError
 from openentitlement.privileges import (
     BooleanPrivilege,
     Group,
@@ -33,9 +34,9 @@ def test_privilege_dataclasses_round_trip_with_one_group_and_many_tags():
 
 def test_env_override_is_only_a_boolean_model_field():
     for kind in ("integer", "enum"):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValidationError):
             Privilege.from_dict({"key": "value", "title": "Value", "type": kind, "env_override": "SETTING"})
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         Privilege.from_dict({"key": "value", "title": "Value", "type": "boolean", "group_ids": ["one", "two"]})
     with pytest.raises(ValueError):
         BooleanPrivilege(key="access", title="Access", default=False, tags=("same", "same"))
