@@ -318,3 +318,11 @@ def test_keys_are_flat_dotted_keys_are_rejected():
     with pytest.raises(InvalidArgument, match="seat.max"):
         Catalog([feature("seats", "Seats", [integer("seat.max")])])
     assert Catalog([feature("seats", "Seats", [integer("seat_max")])]).privilege("seat_max").key == "seat_max"
+
+
+@pytest.mark.parametrize("invalid", ["seat\n", "seat\nmax", " seat", "seat ", "seat.max"])
+def test_identifiers_match_the_entire_string(invalid):
+    with pytest.raises(InvalidArgument):
+        Catalog([feature(invalid, "Seats", [integer("seat_max")])])
+    with pytest.raises(InvalidArgument):
+        Catalog([feature("seats", "Seats", [integer(invalid)])])

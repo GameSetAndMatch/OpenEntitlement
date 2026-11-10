@@ -101,7 +101,7 @@ class Catalog:
             self._add(f)
 
     def _add(self, f: FeatureDefinition) -> None:
-        if not KEY_PATTERN.match(f.code):
+        if not KEY_PATTERN.fullmatch(f.code):
             raise InvalidArgument(f"invalid feature code {f.code!r}")
         if f.code in self._features:
             raise InvalidArgument(f"duplicate feature code {f.code!r}")
@@ -116,7 +116,7 @@ class Catalog:
             raise InvalidArgument(f"gate {f.gate!r} is not a privilege of feature {f.code!r}")
         attached = []
         for p in f.privileges:
-            if not KEY_PATTERN.match(p.key):
+            if not KEY_PATTERN.fullmatch(p.key):
                 raise InvalidArgument(f"invalid privilege key {p.key!r}")
             if p.key in self._privileges or sum(1 for q in f.privileges if q.key == p.key) > 1:
                 raise InvalidArgument(f"duplicate privilege key {p.key!r}")
