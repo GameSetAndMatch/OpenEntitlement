@@ -82,13 +82,13 @@ def test_unlimited_is_distinct_and_unordered() -> None:
     "features",
     [
         [feature("Bad", "x", [boolean("a")])],
-        [feature("a", "A", [boolean("a.x"), boolean("a.y")])],  # no gate
-        [feature("a", "A", [enum("a.tier", ["x"])])],  # enum gate
-        [feature("a", "A", [boolean("a.x")]), feature("b", "B", [boolean("a.x")])],  # dup key
-        [feature("a", "A", [integer("a.max", default=-1)])],
-        [feature("a", "A", [integer("a.max", default=UNLIMITED)])],  # unlimited not allowed
+        [feature("a", "A", [boolean("a_x"), boolean("a_y")])],  # no gate
+        [feature("a", "A", [enum("a_tier", ["x"])])],  # enum gate
+        [feature("a", "A", [boolean("a_x")]), feature("b", "B", [boolean("a_x")])],  # dup key
+        [feature("a", "A", [integer("a_max", default=-1)])],
+        [feature("a", "A", [integer("a_max", default=UNLIMITED)])],  # unlimited not allowed
         [feature("a", "A", [])],
-        [feature("a", "A", [boolean("a.x")], gate="b.y")],
+        [feature("a", "A", [boolean("a_x")], gate="b_y")],
     ],
 )
 def test_invalid_catalogs_fail_eagerly(features: list[Any]) -> None:
@@ -312,3 +312,9 @@ def test_guard_resolves_once_before_count_and_checks_same_snapshot():
     with pytest.raises(EntitlementLimitExceeded):
         c.guard("project_max", 2, {"organization_id": "acme"}, count=count, act=lambda tx: order.append("act"))
     assert order == ["resolve", "count"]
+
+
+def test_keys_are_flat_dotted_keys_are_rejected():
+    with pytest.raises(InvalidArgument, match="seat.max"):
+        Catalog([feature("seats", "Seats", [integer("seat.max")])])
+    assert Catalog([feature("seats", "Seats", [integer("seat_max")])]).privilege("seat_max").key == "seat_max"

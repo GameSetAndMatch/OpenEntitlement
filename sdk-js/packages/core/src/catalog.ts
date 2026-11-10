@@ -3,7 +3,7 @@
 import { InvalidArgument } from "./errors.ts";
 import { decodeValue, isInt, isUnlimited, UNLIMITED, type Value } from "./values.ts";
 
-export const KEY_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/;
+export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 export type ValueType = "boolean" | "integer" | "enum";
 

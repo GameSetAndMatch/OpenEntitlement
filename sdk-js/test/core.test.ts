@@ -61,13 +61,13 @@ describe("UNLIMITED", () => {
 describe("catalog validation is eager", () => {
   const bad = [
     [feature("Bad", "x", [boolean("a")])],
-    [feature("a", "A", [boolean("a.x"), boolean("a.y")])],
-    [feature("a", "A", [enumeration("a.tier", ["x"])])],
-    [feature("a", "A", [boolean("a.x")]), feature("b", "B", [boolean("a.x")])],
-    [feature("a", "A", [integer("a.max", { default: -1 })])],
-    [feature("a", "A", [integer("a.max", { default: UNLIMITED })])],
+    [feature("a", "A", [boolean("a_x"), boolean("a_y")])],
+    [feature("a", "A", [enumeration("a_tier", ["x"])])],
+    [feature("a", "A", [boolean("a_x")]), feature("b", "B", [boolean("a_x")])],
+    [feature("a", "A", [integer("a_max", { default: -1 })])],
+    [feature("a", "A", [integer("a_max", { default: UNLIMITED })])],
     [feature("a", "A", [])],
-    [feature("a", "A", [boolean("a.x")], { gate: "b.y" })],
+    [feature("a", "A", [boolean("a_x")], { gate: "b_y" })],
   ];
   for (const [i, f] of bad.entries()) it(`rejects invalid catalog #${i}`, () => assert.throws(() => new Catalog(f), InvalidArgument));
 });

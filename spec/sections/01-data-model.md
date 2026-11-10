@@ -27,7 +27,7 @@ The model has two halves. Keep them apart:
 
 #### Requirement 1.1.2
 
-> Feature codes and privilege keys MUST match `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$`. Feature codes MUST be unique within a catalog. Privilege keys MUST be unique within a catalog, and each privilege MUST belong to exactly one feature.
+> Feature codes and privilege keys MUST match `^[a-z][a-z0-9_]*$` (flat names that are valid identifiers in common languages; no dots). Feature codes MUST be unique within a catalog. Privilege keys MUST be unique within a catalog, and each privilege MUST belong to exactly one feature.
 
 Examples: feature `sso` with privileges `sso_enabled` and `sso_connection_max`; feature `seats` with privilege `seat_max`.
 

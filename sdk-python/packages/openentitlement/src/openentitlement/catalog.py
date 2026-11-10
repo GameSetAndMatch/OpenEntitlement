@@ -10,7 +10,7 @@ from typing import Any, Iterable, Mapping, Optional, Sequence
 from .errors import InvalidArgument
 from .values import UNLIMITED, Value, is_int, is_unlimited
 
-KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$")
+KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 class ValueType(str, Enum):

@@ -35,7 +35,7 @@ Feature: Resolution
   @spec-3.1.2
   Scenario: Unknown privileges resolve to an error, never throw
     Given organization "acme" is on plan "pro"
-    When I read the limit of "does.not.exist" for organization "acme"
+    When I read the limit of "does_not_exist" for organization "acme"
     Then the reason is "ERROR"
     And the error code is "PRIVILEGE_NOT_FOUND"
     And the value is 0
@@ -84,7 +84,7 @@ Feature: Resolution
 
   @spec-4.2.7
   Scenario: The generic resolve reports unknown privileges without a value
-    When I resolve "does.not.exist" for organization "acme"
+    When I resolve "does_not_exist" for organization "acme"
     Then the reason is "ERROR"
     And the error code is "PRIVILEGE_NOT_FOUND"
     And there is no value
