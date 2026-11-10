@@ -5,7 +5,6 @@ requires-python = ">=3.10"
 dependencies = [
   "openentitlement-sdk",
   "openentitlement-postgres",
-  "openentitlement-stripe",
 ]
 
 [dependency-groups]
@@ -29,7 +28,6 @@ members = ["packages/*"]
 [tool.uv.sources]
 openentitlement-sdk = { workspace = true }
 openentitlement-postgres = { workspace = true }
-openentitlement-stripe = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "conformance"]

@@ -1,7 +1,7 @@
 /**
  * Run spec/assets/gherkin against every available target.
  *
- *   npm test                                   # in-memory, fixed, Stripe (fake account)
+ *   npm test                                   # in-memory, fixed
  *   OE_PG_DSN=postgresql://... npm test        # + Postgres
  */
 
@@ -10,7 +10,7 @@ import { after, describe, it } from "node:test";
 import { Catalog } from "@openentitlement/core";
 import { parse, type Scenario } from "./gherkin.ts";
 import { runStep, World, type Target } from "./steps.ts";
-import { fixedTarget, memoryTarget, postgresTarget, stripeTarget } from "./targets.ts";
+import { fixedTarget, memoryTarget, postgresTarget } from "./targets.ts";
 
 const SPEC = new URL("../../spec/assets/", import.meta.url);
 const CATALOG = Catalog.fromJSON(JSON.parse(readFileSync(new URL("catalog.json", SPEC), "utf8")));
@@ -22,7 +22,7 @@ const SCENARIOS: Scenario[] = readdirSync(GHERKIN)
   .flatMap((f) => parse(new URL(f, GHERKIN).pathname));
 const CAPABILITY_TAGS = new Set(["overrides", "grants", "mutations", "plan-catalog", "fixed"]);
 
-const targets: Target[] = [memoryTarget, fixedTarget, stripeTarget];
+const targets: Target[] = [memoryTarget, fixedTarget];
 if (process.env.OE_PG_DSN) targets.push(await postgresTarget(process.env.OE_PG_DSN));
 
 function applies(t: Target, s: Scenario): boolean {

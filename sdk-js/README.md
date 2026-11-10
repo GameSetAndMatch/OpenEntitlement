@@ -8,7 +8,6 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). No
 |---|---|---|
 | `@openentitlement/core` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolveFromFacts` |
 | `@openentitlement/postgres` | peer `pg` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, `schema.sql` (same schema as Python) |
-| `@openentitlement/stripe` | nothing (`fetch`, `node:crypto`) | `StripeEntitlementsProvider`, `verifyWebhook` |
 
 ## Typed authoring
 
@@ -65,7 +64,7 @@ app.use((err, req, res, next) => {
 ```bash
 npm install
 npm run typecheck
-npm test                                    # unit tests + conformance (in-memory, fixed, Stripe fake)
+npm test                                    # unit tests + conformance (in-memory, fixed)
 OE_PG_DSN=postgresql://... npm test         # + Postgres conformance
 npm run build                               # emits dist/ for publishing
 ```

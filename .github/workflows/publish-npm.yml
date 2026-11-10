@@ -35,7 +35,7 @@ jobs:
           git merge-base --is-ancestor HEAD origin/main
           node --input-type=module - <<'JS'
           import { readFileSync } from 'node:fs';
-          for (const name of ['core', 'postgres', 'stripe']) {
+          for (const name of ['core', 'postgres']) {
             const p = JSON.parse(readFileSync(`sdk-js/packages/${name}/package.json`, 'utf8'));
             if (process.env.RELEASE_TAG !== `npm-v${p.version}`) throw Error(`Tag mismatch: ${p.name}`);
           }
@@ -46,7 +46,7 @@ jobs:
       - name: Pack distributions
         run: |
           mkdir npm-dist
-          for package in core postgres stripe; do
+          for package in core postgres; do
             npm pack --workspace "@openentitlement/$package" --prefix sdk-js --pack-destination "$GITHUB_WORKSPACE/npm-dist"
           done
       - name: Test installed tarballs outside the workspace
@@ -57,11 +57,10 @@ jobs:
           node --input-type=module - <<'JS'
           import { Catalog, FixedProvider, createClient, feature, integer } from '@openentitlement/core';
           import { PostgresProvider } from '@openentitlement/postgres';
-          import { StripeEntitlementsProvider } from '@openentitlement/stripe';
           const catalog = new Catalog([feature('projects', 'Projects', [integer('project_max')])]);
           const client = createClient({ catalog, provider: new FixedProvider(catalog, {'project_max': 5}) });
           if (await client.getLimit('project_max', {organizationId: 'demo'}) !== 5) throw Error('Incorrect limit');
-          if (!PostgresProvider || !StripeEntitlementsProvider) throw Error('Adapter export missing');
+          if (!PostgresProvider) throw Error('Adapter export missing');
           JS
       - uses: actions/upload-artifact@v4
         with:
@@ -79,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [core, postgres, stripe]
+        package: [core, postgres]
     steps:
       - uses: actions/setup-node@v4
         with:
