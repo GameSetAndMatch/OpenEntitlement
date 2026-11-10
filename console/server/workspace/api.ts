@@ -1,3 +1,4 @@
+import { productEvent } from "../telemetry.ts";
 import { z } from "zod";
 import { deploymentMode, hosting, requireSubjectEntitlements } from "./hosting.ts";
 import { subject, subjectIdentifier, validateSubjects } from "./subjects.ts";
@@ -19,6 +20,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     if(!Number.isFinite(now.getTime()))throw new WorkspaceError('Evaluation time must be an RFC 3339 timestamp with a timezone');
     return resolve(data,text(b.organizationId,'Organization'),text(b.privilege,'Privilege'),now,catalogEnvironment(data,env),id);
   };
+  const evaluatedWorkspaces=new Set<string>();
   return async (req: IncomingMessage,res: ServerResponse) => {
     const url=new URL(req.url ?? "/",auth.config.appUrl),path=url.pathname,method=req.method;
     if (path === "/auth/login" && method === "GET") { await auth.login(res); return true; }
@@ -29,7 +31,10 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
       const key=await store.key(req.headers.authorization?.replace(/^Bearer /,"") ?? "");
       if (!key || key.scope !== "evaluate") throw new WorkspaceError("Invalid evaluation key",401);
       const b=object(await readJson(req));
-      const data=await store.keyData(key.workspace_id);send(res,200,evaluate(data,b));return true;
+      const data=await store.keyData(key.workspace_id);const result=evaluate(data,b);
+      // The activation step: an application evaluated with a key. Reported once per Workspace per process, not per call.
+      if(!evaluatedWorkspaces.has(key.workspace_id)){evaluatedWorkspaces.add(key.workspace_id);productEvent(key.created_by,"api_evaluation_served",{workspace_id:key.workspace_id});}
+      send(res,200,result);return true;
     }
     const session=await auth.session(req),account=session.account;
     if (method !== "GET") auth.csrf(req,session);
@@ -38,8 +43,8 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     if (path === "/api/workspaces" && method === "GET") { send(res,200,await store.list(account));return true; }
     const body=method === "GET" ? {} : object(await readJson(req));
     const reason=() => text(body.reason,"Reason",2000);
-    if (path === "/api/workspaces" && method === "POST") { send(res,201,view(await store.create(account,text(body.name,"Workspace name"),reason())));return true; }
-    if (path === "/api/invitations/accept" && method === "POST") { send(res,200,await store.acceptInvite(account,text(body.token,"Invitation token")));return true; }
+    if (path === "/api/workspaces" && method === "POST") { const created=view(await store.create(account,text(body.name,"Workspace name"),reason()));productEvent(account.id,"workspace_created",{workspace_id:created.id});send(res,201,created);return true; }
+    if (path === "/api/invitations/accept" && method === "POST") { const accepted=await store.acceptInvite(account,text(body.token,"Invitation token"));productEvent(account.id,"invitation_accepted");send(res,200,accepted);return true; }
     const match=/^\/api\/workspaces\/([^/]+)(?:\/(groups|tags|catalog|features|privileges|tiers|variants|organizations|policy|audit|members|invitations|keys|evaluate|subjects|hosting))?(?:\/([^/]+))?$/.exec(path);
     if (!match) throw new WorkspaceError("Endpoint not found",404);
     const [,id,section,target]=match;
@@ -49,22 +54,22 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     if (section === "invitations" && method === "POST") {
       if (!["Owner","Manager","User"].includes(body.role))throw new WorkspaceError("Invalid role");
       const email=text(body.email,"Email");if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new WorkspaceError("Enter a valid email address");
-      send(res,201,await store.invite(account,id!,email,body.role,reason()));return true;
+      const invited=await store.invite(account,id!,email,body.role,reason());productEvent(account.id,"member_invited",{workspace_id:id,role:body.role});send(res,201,invited);return true;
     }
     if (section === "members" && method === "GET") { send(res,200,await store.members(account,id!));return true; }
     if (section === "members" && method === "PUT") {
       if (body.role !== null && !["Owner","Manager","User"].includes(body.role)) throw new WorkspaceError("Invalid role");
       const accountId=text(body.accountId,"Account ID");
       if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(accountId)) throw new WorkspaceError("Invalid Account ID");
-      await store.setMember(account,id!,accountId,body.role,reason());send(res,200,{});return true;
+      await store.setMember(account,id!,accountId,body.role,reason());productEvent(account.id,body.role===null?"member_removed":"member_role_changed",{workspace_id:id,role:body.role});send(res,200,{});return true;
     }
     if (section === "keys" && method === "GET") { send(res,200,await store.keys(account,id!));return true; }
     if (section === "keys" && method === "POST") {
       if (body.scope !== "evaluate") throw new WorkspaceError("Invalid key scope");
-      send(res,201,await store.createKey(account,id!,text(body.name,"Key name"),body.scope,reason()));return true;
+      const key=await store.createKey(account,id!,text(body.name,"Key name"),body.scope,reason());productEvent(account.id,"api_key_created",{workspace_id:id,scope:body.scope});send(res,201,key);return true;
     }
-    if (section === "keys" && target && method === "DELETE") { if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target))throw new WorkspaceError("API key not found",404); await store.revokeKey(account,id!,target,reason());send(res,200,{});return true; }
-    if (section === "evaluate" && method === "POST") { const workspace=await store.read(account,id!);send(res,200,evaluate(workspace.data,body));return true; }
+    if (section === "keys" && target && method === "DELETE") { if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target))throw new WorkspaceError("API key not found",404); await store.revokeKey(account,id!,target,reason());productEvent(account.id,"api_key_revoked",{workspace_id:id});send(res,200,{});return true; }
+    if (section === "evaluate" && method === "POST") { const workspace=await store.read(account,id!);const result=evaluate(workspace.data,body);productEvent(account.id,"console_evaluation_run",{workspace_id:id});send(res,200,result);return true; }
     if ((method !== "PUT" && !(method === "DELETE" && section === "subjects")) || !["groups","tags","catalog","features","privileges","tiers","variants","organizations","policy","subjects","hosting"].includes(section ?? "")) throw new WorkspaceError("Method not allowed",405);
     if (!Number.isSafeInteger(body.revision) || body.revision < 1) throw new WorkspaceError("Current workspace revision is required");
     const action=section==="hosting"?"hosting:write":section==="subjects"?"contracts:write":section === "groups" || section === "tags" || section === "catalog" || section === "features" || section === "privileges" ? "catalog:write" : section === "organizations" ? "contracts:write" : section === "policy" ? "contracts:write" : "tiers:write";
@@ -114,6 +119,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
       validateSubjects(data);
       catalogEnvironment(data,env);
     });
+    productEvent(account.id,"workspace_changed",{workspace_id:id,section,method});
     send(res,200,view(changed));return true;
   };
 }

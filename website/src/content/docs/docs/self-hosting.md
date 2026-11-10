@@ -61,8 +61,14 @@ The Postgres instance starts without demo plans. Create them through the audited
 | `PORT` | Defaults to `8787` |
 | `OE_SEED` | `demo` loads sample plans and organizations into a memory instance; the default (`none`) starts empty |
 | `OE_FIXED_VALUES` | JSON values required by a fixed provider's finite integer privileges |
+| `OE_POSTHOG_KEY` | Optional. Your own PostHog project API key (`phc_…`). Unset by default: the service then sends no analytics or error reports anywhere |
+| `OE_POSTHOG_HOST` | PostHog ingestion host for that key; defaults to `https://us.i.posthog.com` (use `https://eu.i.posthog.com` for EU cloud) |
 
 Use `OE_HOST=0.0.0.0` for container networking and terminate HTTPS at a reverse proxy. Configure both tokens for a hosted service; anonymous defaults are intended for local demos. Enter the admin token in the console's connection settings.
+
+## Analytics and error reporting
+
+Telemetry is off unless you set `OE_POSTHOG_KEY`. With your own key, the console sends product analytics, browser and server errors, session replays (all form inputs masked) and heatmaps to **your** PostHog project, and the browser's Content-Security-Policy widens only to your ingestion host. Server events identify people by Account ID, never by email, and never include entitlement values. See [docs/maintainers/analytics.md](https://github.com/open-entitlement/OpenEntitlement/blob/main/docs/maintainers/analytics.md) for the event list.
 
 ## Credential boundary
 

@@ -12,6 +12,7 @@
     "@astrojs/check": "0.9.12",
     "@astrojs/starlight": "0.42.8",
     "astro": "7.4.5",
+    "posthog-js": "1.447.6",
     "typescript": "6.0.3"
   },
   "devDependencies": {

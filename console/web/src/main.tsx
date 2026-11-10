@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { initTelemetry } from "./telemetry.ts";
 import { actor, api, token, formatValue, type Meta, type Plan, type Details, type AuditEvent } from "./api.ts";
 import { EnvironmentNotice, ReasonChip, Value, ValueInput, ReasonProvider, ToastProvider, useReason, useToast } from "./ui.tsx";
 import { ContractsPanel } from "./contracts.tsx";
@@ -118,6 +119,7 @@ function ChangeForm({ kind, privileges, onSave }: { kind: "override" | "grant"; 
   return <section className="panel"><h2>{kind === "override" ? "Negotiate an override" : "Add a quota grant"}</h2><p>{kind === "override" ? "Replace the tier value for this organization. Bound to its current tier family." : "Add quota on top of the current plan. Grants survive tier changes."}</p><form onSubmit={(e) => { e.preventDefault(); onSave({ privilege: key, ...(kind === "grant" ? { amount: value } : { value }), ...(subjectId ? { subjectId } : {}) }); }}><div className="two-cols"><label>Privilege<select value={key} onChange={(e) => { setKey(e.target.value); setValue(kind === "grant" ? 100 : defs.find((p) => p.key === e.target.value)?.default); }}>{defs.map((p) => <option key={p.key}>{p.key}</option>)}</select></label><div className="value-field"><span>{kind === "grant" ? "Amount" : "Value"}</span>{kind === "grant" ? <input aria-label="Grant amount" disabled={Boolean(def?.environment||def?.frozen)} type="number" required min="1" value={value} onChange={(e) => setValue(Number(e.target.value))}/> : def && <ValueInput def={def} value={value} onChange={setValue}/>}</div></div><EnvironmentNotice binding={kind==="grant"?def?.environment:undefined}/><label>Subject (optional)<input value={subjectId} onChange={(e) => setSubjectId(e.target.value)}/></label><button className="btn" disabled={Boolean(def?.environment||def?.frozen)}>{kind === "grant" ? "Add grant" : "Create override"}</button></form></section>;
 }
 
+void initTelemetry();
 if (location.pathname === "/app" || location.pathname.startsWith("/app/")) {
   void import("./workspace/app.tsx").then(({WorkspaceApp}) => createRoot(document.getElementById("root")!).render(<ToastProvider><ReasonProvider><WorkspaceApp/></ReasonProvider></ToastProvider>));
 } else {

@@ -20,6 +20,7 @@ import {
 } from "@openentitlement/core";
 import { HttpError, send, readJson } from "./http.ts";
 import { createContractsApi } from "./contracts-api.ts";
+import { reportError } from "./telemetry.ts";
 import type { ConsoleConfig, Runtime } from "./config.ts";
 
 const STATUS_BY_CODE: Record<string, number> = {
@@ -235,6 +236,7 @@ export function createApi(cfg: ConsoleConfig, rt: Runtime) {
         send(res, 403, { error: (e as any).code, message: String((e as any).message) }); // e.g. a vetoing mutation hook
       else {
         console.error(e);
+        reportError(e, { route: `${req.method} ${url.pathname}` });
         send(res, 500, { error: "INTERNAL", message: "internal error" });
       }
       return true;

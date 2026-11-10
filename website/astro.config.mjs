@@ -11,6 +11,7 @@ export default defineConfig({
     favicon: '/favicon.svg',
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/open-entitlement/OpenEntitlement' }],
     customCss: ['./src/styles/docs.css'],
+    components: { Head: './src/components/Head.astro' },
     editLink: { baseUrl: 'https://github.com/open-entitlement/OpenEntitlement/edit/main/website/src/content/docs/' },
     sidebar: [
       { label: 'Start here', items: [
