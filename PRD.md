@@ -23,10 +23,10 @@ Primary users:
 | Entitlement specification v0.1 (RFC 2119 requirements, Gherkin conformance suite) | ✅ | `spec/`, #1, #2 |
 | OEREP v1 remote evaluation protocol (single, bulk, upgrade suggestion) | ✅ | `spec/sections/10-remote-evaluation.md`, #1 |
 | Entitlements v0.2 proposal: Tier variants, contracts, JSON Schema definitions | ✅ proposed (RFC-0001) | #20 |
-| Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | 🚧 | branch `feat/flat-keys-only` |
+| Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | ✅ | #40, merged on `main` |
 | Privilege Catalog authoring contract: Groups, Tags, visibility | ✅ accepted (RFC-0002) | #24 |
 | Read-only consumption dashboard | 📋 proposed (RFC-0003), blocked on a real usage source | `docs/rfcs/0003-consumption-dashboard.md` |
-| Generated JSON Schema as the shared cross-language contract | 📋 next | ADR-0006 (in progress) |
+| Generated JSON Schema as the shared cross-language contract | 🚧 | ADR-0006, #39 |
 
 ### SDKs
 
@@ -35,10 +35,10 @@ Primary users:
 | Python SDK (`openentitlement-sdk`) and TypeScript SDK (`@openentitlement/core`) with in-memory, fixed and remote providers, hooks and `guard` | ✅ | `sdk-python/`, `sdk-js/` |
 | Postgres provider and advisory lock inside the core packages (`[postgres]` extra, `/postgres` entry point) | ✅ | #31 |
 | Stripe Entitlements adapter | ✅ removed before release (billing is not an entitlement source) | #30 |
-| Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; Pydantic is a core dependency | 🚧 | ADR-0006, branch `feat/camelcase-authoring-json` |
-| Python ≥ 3.11 | 🚧 | with ADR-0006 |
-| Zod as a regular TypeScript dependency, replacing the hand-written validators | 📋 next | ADR-0006 |
-| Opt-in short-lived decision cache in `RemoteProvider` (both SDKs) | 📋 next | — |
+| Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; strict Limit/Unlimited values and presence-preserving roundtrips; Pydantic is a core dependency | 🚧 | ADR-0006, #38 |
+| Python ≥ 3.11 | 🚧 | ADR-0006, #38 |
+| Zod as a regular TypeScript dependency, replacing the hand-written validators | 🚧 | ADR-0006, #39 |
+| Opt-in short-lived decision cache in `RemoteProvider` (both SDKs) | 🚧 | #35, stacked on #39 |
 | PyPI and npm publication via Trusted Publishing | ✅ workflows; 👤 first release pending | #7, #9, #28 |
 
 ### Service and console
@@ -50,7 +50,7 @@ Primary users:
 | Contracts with private PDF evidence | ✅ | #13 |
 | Read-only YAML configuration view | ✅ | #19 |
 | Workspace control plane: OIDC sign-in, Workspaces, members and Roles, isolation, audit | ✅ preview | #22 |
-| Privilege Catalog editor: typed Privileges, Groups, Tags, hidden and read-only values | ✅ | #23, #24 |
+| Privilege Catalog editor: typed Privileges, Groups, Tags, hidden and read-only values | ✅ | #23, #24; nested hierarchy and cross-branch Tag regression coverage: #38 |
 | Boolean environment prerequisites (an installation can veto, never grant) | ✅ | #23 |
 | Tiers and Tier variants (standard, trial, grace), Organization terms | ✅ preview | #22, #27 |
 | Application-user entitlements: personal terms and grants | ✅ | #27 |
@@ -74,7 +74,7 @@ Primary users:
 | Feature | Status | Where |
 |---|---|---|
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
-| Automatic website deployment to Cloudflare on every merge to `main` | 🚧 | this PR; 👤 needs the `CLOUDFLARE_API_TOKEN` secret |
+| Automatic website deployment to Cloudflare on every merge to `main` | ✅ workflow delivered; 🚧 trust hardening | #36; follow-up: main-only environment and revision verification; 👤 move production token into the environment |
 | Landing page rebuilt on the docs' theme and components, showing the current model | ✅ | #33 |
 | PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
 | PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |

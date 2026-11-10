@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Generic, Iterable, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, Mapping, Optional, Sequence, TypeVar, Union, cast
+
+from pydantic import ValidationError
 
 from .catalog import Catalog, PrivilegeDefinition, ValueType
 from .details import (
@@ -22,6 +23,7 @@ from .errors import (
     EntitlementLimitExceeded,
     FeatureNotEntitled,
     InvalidArgument,
+    InvalidValue,
     NotFound,
     NotSupported,
     ProviderNotReady,
@@ -30,6 +32,7 @@ from .errors import (
 from .facts import Plan, Scope
 from .hooks import Hook, HookContext, MutationContext, MutationHook
 from .lock import InProcessLock, Lock, lock_key
+from .model import OpenEntitlementModel
 from .provider import AuditEvent, GrantInput, MutationMeta, OverrideInput, Provider
 from .resolver import Need, check_within
 from .values import Limit, is_int, is_unlimited
@@ -61,17 +64,18 @@ class EvaluationError(Exception):
         self.details = details
 
 
-@dataclass(frozen=True)
-class GuardResult(Generic[R]):
+class GuardResult(OpenEntitlementModel, Generic[R]):
     result: R
-    details: ResolutionDetails[Any]
+    details: ResolutionDetails
 
+
+_HOOK_CONTEXT_FIELDS = frozenset(HookContext.__pydantic_fields__)
 
 ContextArg = Union[EvaluationContext, Mapping[str, Any], None]
 
 
 def to_context(ctx: ContextArg) -> Optional[EvaluationContext]:
-    """Accept an EvaluationContext or a dict with spec (camelCase) or Python (snake_case) names."""
+    """Accept an EvaluationContext or a dict. Prefer snake_case keys (organization_id); spec camelCase keys also work."""
     if ctx is None or isinstance(ctx, EvaluationContext):
         return ctx
     get = lambda *names: next((ctx[n] for n in names if n in ctx), None)  # noqa: E731
@@ -136,7 +140,9 @@ class EntitlementClient:
     def _merge(self, ctx: ContextArg) -> EvaluationContext:
         merged = self.context.merged_with(to_context(ctx))
         now = aware(merged.now) or aware(self.clock())
-        return EvaluationContext(merged.organization_id, merged.subject_id, merged.resource_id, now)
+        if now is merged.now:
+            return merged
+        return merged._evolve({"now": now})
 
     def _evaluate(
         self,
@@ -149,12 +155,17 @@ class EntitlementClient:
     ) -> ResolutionDetails[Any]:
         merged = self._merge(ctx)
         priv = self.catalog.privilege(key)
-        hctx = HookContext(
-            privilege=key,
-            value_type=priv.value_type if priv else None,
-            context=merged,
-            provider_metadata=self.provider.metadata,
-            feature=feature,
+        # Every field is already typed here; skip re-validation on the evaluation hot path.
+        hctx = HookContext._trusted(
+            _HOOK_CONTEXT_FIELDS,
+            {
+                "privilege": key,
+                "value_type": priv.value_type if priv else None,
+                "context": merged,
+                "provider_metadata": self.provider.metadata,
+                "feature": feature,
+                "hook_data": {},
+            },
         )
         details: Optional[ResolutionDetails[Any]] = None
         try:
@@ -374,9 +385,9 @@ class EntitlementClient:
             resolved = self.get_limit_details(privilege, merged)
             current = count(tx)
             details = self._check_resolved_limit(privilege, resolved, current, requested, merged)
-            return GuardResult(act(tx), details.with_(lock_domain=domain))
+            return GuardResult(result=act(tx), details=details.with_(lock_domain=domain))
 
-        return self.lock.run(lock_key(merged.organization_id, privilege), run)
+        return self.lock.run(lock_key(cast(str, merged.organization_id), privilege), run)
 
 
 class AdminClient:
@@ -392,12 +403,18 @@ class AdminClient:
         return p
 
     def _mutate(self, operation: str, arguments: dict[str, Any], actor: str, reason: str, fn: Callable[..., AuditEvent]) -> AuditEvent:
-        meta = MutationMeta(actor, reason)
+        meta = _build(MutationMeta, actor=actor, reason=reason)
         meta.check()
         mutations = getattr(self._c.provider, "mutations", None)
         if mutations is None or not self._c.provider.capabilities.mutations:
             raise NotSupported(f"provider {self._c.provider.metadata.name!r} does not support mutations")
-        mctx = MutationContext(operation, arguments, actor, reason, self._c.provider.metadata)
+        mctx = MutationContext(
+            operation=operation,
+            arguments=arguments,
+            actor=actor,
+            reason=reason,
+            provider_metadata=self._c.provider.metadata,
+        )
         hooks = self._c.mutation_hooks
         try:
             for h in hooks:
@@ -467,8 +484,9 @@ class AdminClient:
         id: Optional[str] = None,
     ) -> AuditEvent:
         p = self._privilege(privilege)
-        data = OverrideInput(
-            scope=Scope(organization_id, subject_id, resource_id),
+        data = _build(
+            OverrideInput,
+            scope=_build(Scope, organization_id=organization_id, subject_id=subject_id, resource_id=resource_id),
             privilege=privilege,
             value=value,
             reason=reason,
@@ -498,8 +516,9 @@ class AdminClient:
         id: Optional[str] = None,
     ) -> AuditEvent:
         p = self._privilege(privilege)
-        data = GrantInput(
-            scope=Scope(organization_id, subject_id),
+        data = _build(
+            GrantInput,
+            scope=_build(Scope, organization_id=organization_id, subject_id=subject_id),
             privilege=privilege,
             amount=amount,
             reason=reason,
@@ -513,6 +532,19 @@ class AdminClient:
         return self._mutate(
             "revokeGrant", {"grantId": grant_id}, actor, reason, lambda m, meta, at: m.revoke_grant(grant_id, meta, at)
         )
+
+
+M = TypeVar("M", bound=OpenEntitlementModel)
+
+
+def _build(model: type[M], **fields: Any) -> M:
+    """Construct a mutation input, reporting malformed arguments as InvalidArgument/InvalidValue."""
+    try:
+        return model(**fields)
+    except ValidationError as e:
+        locs = {str(err["loc"][0]) for err in e.errors() if err["loc"]}
+        error = InvalidValue if locs & {"amount", "value"} else InvalidArgument
+        raise error(f"invalid {model.__name__}: {e.errors(include_url=False)}") from e
 
 
 def create_client(

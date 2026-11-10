@@ -2,16 +2,16 @@ Connect to our [entitlement service](../console/README.md) using the generic `Re
 
 # OpenEntitlement, Python SDK
 
-Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Python ≥ 3.10, synchronous API.
+Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Python ≥ 3.11, synchronous API.
 
 | Package | Depends on | Contents |
 |---|---|---|
-| `openentitlement-sdk` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
+| `openentitlement-sdk` | `pydantic>=2.12,<3` | Pydantic models, API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
 | `openentitlement-sdk[postgres]` → `openentitlement.postgres` | `psycopg>=3.1` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, [`schema.sql`](packages/openentitlement/src/openentitlement/postgres/schema.sql) |
 
 ## Python-first authoring and business walkthrough
 
-See [ACME: a Workspace and its entitlements](../docs/guides/acme-workspace.md) for Groups, Tags, Catalog defaults, Tiers and variants, Organization terms and user exceptions. Optional strict Pydantic authoring lives in `openentitlement.authoring` (`openentitlement-sdk[authoring]`); the runtime SDK stays dependency-free.
+See [ACME: a Workspace and its entitlements](../docs/guides/acme-workspace.md) for Groups, Tags, Catalog defaults, Tiers and variants, Organization terms and user exceptions. The Privilege Catalog models (`PrivilegeCatalog`, `BooleanPrivilege`, `Group`, `Tag` …) are strict Pydantic models exported from `openentitlement`. Every SDK model is a frozen Pydantic model with snake_case attributes and camelCase JSON ([ADR-0006](../ADR-0006.md)). See [`examples/fastapi_app.py`](examples/fastapi_app.py) for FastAPI use.
 
 ## Quick start
 
@@ -41,7 +41,7 @@ client.admin.create_override("acme", "project_max", 12, actor="sales", reason="M
 client.admin.create_grant("acme", "project_max", 3, actor="support", reason="goodwill", subject_id="u_7")
 
 # 3. Gate (spec §4)
-ctx = {"organizationId": "acme", "subjectId": "u_7"}
+ctx = {"organization_id": "acme", "subject_id": "u_7"}
 client.is_enabled("sso", ctx)                    # False, details carry required_plan when a plan unlocks it
 client.get_limit("project_max", ctx)            # 15 (override 12 + personal grant 3)
 

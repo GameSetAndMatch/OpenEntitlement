@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, Optional
+
+from pydantic import Field
 
 from .catalog import ValueType
 from .details import EvaluationContext, ResolutionDetails
+from .model import OpenEntitlementModel
 from .provider import AuditEvent, ProviderMetadata
 
 
-@dataclass(frozen=True)
-class HookContext:
+class HookContext(OpenEntitlementModel):
     """Requirement 7.1.1."""
 
     privilege: str
@@ -19,7 +20,7 @@ class HookContext:
     context: EvaluationContext
     provider_metadata: ProviderMetadata
     feature: Optional[str] = None
-    hook_data: dict[str, Any] = field(default_factory=dict)
+    hook_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class Hook:
@@ -39,8 +40,7 @@ class Hook:
         return None
 
 
-@dataclass(frozen=True)
-class MutationContext:
+class MutationContext(OpenEntitlementModel):
     """Requirement 7.2.1."""
 
     operation: str

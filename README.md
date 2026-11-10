@@ -28,7 +28,7 @@ Run the [service and local demo](console/README.md), backed by memory or Postgre
 | [`console/`](console/README.md) | Our entitlement server, OEREP API, and administrative web console |
 | [`spec/`](spec/README.md) | Semantic specification and OEREP v1 [OpenAPI](spec/oerep.openapi.json) |
 | [`spec/assets/gherkin/`](spec/assets/gherkin/README.md) | Conformance suite: 11 feature files, tagged by requirement and provider capability |
-| [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk` (runtime core, zero deps; optional `[authoring]` and `[postgres]` extras) |
+| [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk` (core requires only Pydantic; optional `[postgres]` extra) |
 | [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core` (zero deps; optional `/authoring` and `/postgres` entry points) |
 | [`PRIOR_ART.md`](PRIOR_ART.md) | What exists, the vendor mapping table, where billing leaks, link check |
 | [`ADR-0001.md`](ADR-0001.md) | Why an open protocol plus our own entitlement server |

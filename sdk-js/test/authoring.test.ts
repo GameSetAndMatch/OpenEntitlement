@@ -16,7 +16,7 @@ test("optional Zod authoring has strict types, flat keys, metadata and normalize
         title: "Seats",
         type: "integer",
         default: 5,
-        group_id: "collaboration",
+        groupId: "collaboration",
         tags: ["licensed"],
       },
     ],
@@ -52,7 +52,7 @@ test("optional Zod authoring has strict types, flat keys, metadata and normalize
         title: "Seats",
         type: "integer",
         default: 5,
-        env_override: "MAX_SEATS",
+        envOverride: "MAX_SEATS",
       }),
     ZodError,
   );

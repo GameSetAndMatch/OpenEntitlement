@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, Protocol, Sequence
 
+from pydantic import StrictInt
+
+from .model import WireModel
 from .values import encode_value
 
 
-@dataclass(frozen=True)
-class Plan:
+class Plan(WireModel):
     id: str
     name: str
     rank: Optional[int] = None
@@ -32,8 +33,7 @@ class Plan:
         }
 
 
-@dataclass(frozen=True)
-class Assignment:
+class Assignment(WireModel):
     organization_id: str
     plan_id: str
     channel: Optional[str] = None
@@ -42,8 +42,7 @@ class Assignment:
         return {"organizationId": self.organization_id, "planId": self.plan_id, "channel": self.channel}
 
 
-@dataclass(frozen=True)
-class Scope:
+class Scope(WireModel):
     organization_id: str
     subject_id: Optional[str] = None
     resource_id: Optional[str] = None
@@ -56,8 +55,7 @@ class Scope:
         }
 
 
-@dataclass(frozen=True)
-class Override:
+class Override(WireModel):
     id: str
     scope: Scope
     privilege: str
@@ -82,12 +80,11 @@ class Override:
         }
 
 
-@dataclass(frozen=True)
-class Grant:
+class Grant(WireModel):
     id: str
     scope: Scope
     privilege: str
-    amount: int
+    amount: StrictInt
     reason: str
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None

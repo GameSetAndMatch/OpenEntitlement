@@ -6,8 +6,7 @@ so that every provider derives identical results from identical facts (Requireme
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 from .catalog import PrivilegeDefinition, ValueType
 from .details import (
@@ -21,7 +20,9 @@ from .details import (
     normalize_usage,
 )
 from .facts import FactSource, Override, Scope, within
-from .values import UNLIMITED, add_limit, is_int, is_unlimited
+from .model import OpenEntitlementModel
+from .values import UNLIMITED, Limit, add_limit, is_int, is_unlimited
+
 
 def _scope_matches(scope: Scope, ctx: EvaluationContext) -> bool:
     """Requirement 3.1.5 (organization equality is guaranteed by the fact query)."""
@@ -47,8 +48,9 @@ def resolve_from_facts(
     assert ctx.now is not None, "the client sets ctx.now before calling providers"
     now = ctx.now
     key = privilege.key
+    organization_id = cast(str, ctx.organization_id)  # the client validated the context
 
-    assignment = facts.assignment(ctx.organization_id)
+    assignment = facts.assignment(organization_id)
     plan = facts.plan(assignment.plan_id) if assignment is not None else None
     if assignment is not None and plan is None:
         return error_details(
@@ -71,7 +73,7 @@ def resolve_from_facts(
     # 3.1.5 / 3.1.6 / 3.1.9: overrides
     matching = [
         o
-        for o in facts.overrides(ctx.organization_id, key)
+        for o in facts.overrides(organization_id, key)
         if _scope_matches(o.scope, ctx) and within(now, o.starts_at, o.expires_at)
     ]
     active = [o for o in matching if family is not None and o.plan_family == family]
@@ -90,7 +92,7 @@ def resolve_from_facts(
     if privilege.value_type is ValueType.INTEGER:
         grants = [
             g
-            for g in facts.grants(ctx.organization_id, key)
+            for g in facts.grants(organization_id, key)
             if (g.revoked_at is None or g.revoked_at > now)
             and within(now, g.starts_at, g.expires_at)
             and (g.scope.subject_id is None or g.scope.subject_id == ctx.subject_id)
@@ -103,7 +105,7 @@ def resolve_from_facts(
                 g.id,
             )
         )
-        applied = tuple(GrantApplied(g.id, g.amount, g.scope.subject_id) for g in grants)
+        applied = tuple(GrantApplied(id=g.id, amount=g.amount, subject_id=g.scope.subject_id) for g in grants)
         if applied:
             value = add_limit(base, sum(g.amount for g in applied))
             if not is_unlimited(base):
@@ -127,11 +129,10 @@ def resolve_from_facts(
 # Limit checks (spec §3.3)
 
 
-@dataclass(frozen=True)
-class CheckResult:
+class CheckResult(OpenEntitlementModel):
     passed: bool
     limit: Any
-    available: Union[int, Any]
+    available: Optional[Limit]
     needed_plan_value: int
 
 
@@ -148,12 +149,12 @@ def check_within(details: ResolutionDetails[Any], current: Usage, requested: int
     remaining_subject = max(0, subject_allowance - usage.subject)
     needed = max(1, usage.pool + requested - remaining_subject - org_grants)
     if requested <= 0:
-        return CheckResult(True, value, UNLIMITED if is_unlimited(value) else None, needed)
+        return CheckResult(passed=True, limit=value, available=UNLIMITED if is_unlimited(value) else None, needed_plan_value=needed)
     if is_unlimited(value):
-        return CheckResult(True, value, UNLIMITED, needed)
+        return CheckResult(passed=True, limit=value, available=UNLIMITED, needed_plan_value=needed)
     pool_limit = value - subject_allowance
     available = remaining_subject + max(0, pool_limit - usage.pool)
-    return CheckResult(requested <= available, value, available, needed)
+    return CheckResult(passed=requested <= available, limit=value, available=available, needed_plan_value=needed)
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +179,7 @@ def suggest_plan_from_facts(
     facts: FactSource, privilege: PrivilegeDefinition, need: Need, ctx: EvaluationContext
 ) -> Optional[str]:
     """Requirement 3.4.2: lowest-ranked public base plan above the current one that satisfies ``need``."""
-    assignment = facts.assignment(ctx.organization_id)
+    assignment = facts.assignment(cast(str, ctx.organization_id))
     current = facts.plan(assignment.plan_id) if assignment else None
     candidates = [
         p

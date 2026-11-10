@@ -4,10 +4,20 @@ version = "0.2.0"
 description = "Vendor-neutral entitlements API: features, limits, plans, overrides, grants. Reference SDK for the OpenEntitlement spec."
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.10"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.12,<3"]
 keywords = ["entitlements", "plans", "limits", "quotas", "billing", "openfeature"]
-classifiers = ["License :: OSI Approved :: Apache Software License", "Programming Language :: Python :: 3", "Typing :: Typed"]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Framework :: Pydantic :: 2",
+  "Typing :: Typed",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -22,5 +32,9 @@ Repository = "https://github.com/open-entitlement/OpenEntitlement"
 Issues = "https://github.com/open-entitlement/OpenEntitlement/issues"
 
 [project.optional-dependencies]
-authoring = ["pydantic>=2.12,<3"]
 postgres = ["psycopg>=3.1"]
+
+[tool.deptry.per_rule_ignores]
+# pydantic_core ships with (and is pinned by) pydantic; its core_schema API is
+# Pydantic's documented way to declare custom types such as UNLIMITED.
+DEP003 = ["pydantic_core"]

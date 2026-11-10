@@ -72,7 +72,7 @@ Audit records currently store full before/after workspace snapshots for each con
 
 Catalog values can also be environment-controlled, frozen or hidden; see [Environment overrides](ENVIRONMENT-OVERRIDES.md). UI snapshots omit hidden definitions and resolved environment values.
 
-The workspace authoring UI now uses the [Privilege Catalog](PRIVILEGE-CATALOG.md): typed definitions, one Group, multiple Tags, visibility and boolean-only `env_override`. Existing preview Feature containers remain compatible and are presented as Groups.
+The workspace authoring UI now uses the [Privilege Catalog](PRIVILEGE-CATALOG.md): typed definitions, one Group, multiple Tags, visibility and boolean-only `envOverride`. Existing preview Feature containers remain compatible and are presented as Groups.
 
 
 ## User scope and hosting

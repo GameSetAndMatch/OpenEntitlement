@@ -12,16 +12,16 @@ The same account can join other Workspaces, but their Catalogs, Organizations an
 
 ## 2. Define the Privilege Catalog in Python
 
-The optional authoring extra uses Pydantic's `BaseModel`, typed validation, `model_validate_json()`, `model_dump_json()` and `model_json_schema()`:
+The SDK's models are Pydantic `BaseModel`s, with typed validation, `model_validate_json()`, `model_dump_json()` and `model_json_schema()`. Pydantic is the core's only required dependency ([ADR-0006](../../ADR-0006.md)); Python 3.11 or later is required:
 
 ```sh
-pip install 'openentitlement-sdk[authoring]>=0.2.0'
+pip install openentitlement-sdk
 ```
 
-From the source checkout, run `uv sync --project sdk-python --locked` and the executable [ACME Catalog example](../../sdk-python/examples/acme_catalog.py). The code below defines real models; it does not write to a server. The [Privilege class source](../../sdk-python/packages/openentitlement/src/openentitlement/authoring.py) shows the BaseModel fields and validators:
+From the source checkout, run `uv sync --project sdk-python --locked` and the executable [ACME Catalog example](../../sdk-python/examples/acme_catalog.py). The code below defines real models; it does not write to a server. The [Privilege class source](../../sdk-python/packages/openentitlement/src/openentitlement/privileges.py) shows the BaseModel fields and validators:
 
 ```python
-from openentitlement.authoring import (
+from openentitlement import (
     Privilege, IntegerPrivilege, BooleanPrivilege,
     PrivilegeCatalog, Group, Tag,
 )
@@ -44,12 +44,15 @@ catalog = PrivilegeCatalog(
     privileges=[seats],
 )
 payload = catalog.model_dump_json(exclude_none=True)
+assert '"groupId":"collaboration"' in payload  # JSON is camelCase
 assert PrivilegeCatalog.model_validate_json(payload) == catalog
 ```
 
+Python attributes and keyword arguments are snake_case (`group_id`). The JSON, JSON Schema and FastAPI responses use camelCase (`groupId`, `parentId`, `envOverride`). Validation accepts either spelling.
+
 Use `seat_max`, not a path such as `seat.max`. One Privilege has **at most one Group**, while `tags` can contain multiple existing Tags. A Group can have a parent; nesting never changes a Privilege key. `IntegerPrivilege(key="seat_max", title="Seats", default=-5)` raises a validation error. Boolean defaults reject strings such as `"false"`; this is strict validation, not coercion.
 
-`BooleanPrivilege` alone accepts `env_override`. `MCP_INSTALLED=false` can veto `mcp_enabled`, but `true` cannot grant commercially denied access. Installer/platform settings own that binding. `read_only` uses a Catalog default; `hidden` still evaluates while being omitted from normal controls. An editable Privilege without a default requires a value in every Tier variant. See the [complete Catalog contract](../../console/PRIVILEGE-CATALOG.md).
+`BooleanPrivilege` alone accepts `env_override` (`envOverride` in JSON). `MCP_INSTALLED=false` can veto `mcp_enabled`, but `true` cannot grant commercially denied access. Installer/platform settings own that binding. `read_only` uses a Catalog default; `hidden` still evaluates while being omitted from normal controls. An editable Privilege without a default requires a value in every Tier variant. See the [complete Catalog contract](../../console/PRIVILEGE-CATALOG.md).
 
 In the console, define the same Groups and Tags, then the Privileges. Python and Zod validate the same authoring JSON shape; **printing a Catalog does not import it into the Workspace**. The Configuration page exports a sanitized YAML snapshot; it is not an import mechanism.
 
@@ -131,12 +134,12 @@ const catalog = PrivilegeCatalogSchema.parse({
   privileges: [{
     key: 'seat_max', type: 'integer', title: 'Seats',
     default: 5, minimum: 0, unlimited: true,
-    group_id: 'collaboration', tags: ['licensed'],
+    groupId: 'collaboration', tags: ['licensed'],
   }],
 });
 ```
 
-The core SDK stays dependency-free unless this authoring subpath is used. [OpenFeature's Python SDK](https://github.com/open-feature/python-sdk) and [contrib repository](https://github.com/open-feature/python-sdk-contrib) are useful references for separating core APIs from optional providers; no provider compatibility is implied here.
+Under [ADR-0006](../../ADR-0006.md), the core SDKs depend only on widely adopted validation libraries: Pydantic in Python and Zod in TypeScript. Database drivers stay optional extras. [OpenFeature's Python SDK](https://github.com/open-feature/python-sdk) and [contrib repository](https://github.com/open-feature/python-sdk-contrib) are useful references for separating core APIs from optional providers; no provider compatibility is implied here.
 
 ## Keys are flat
 

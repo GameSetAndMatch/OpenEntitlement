@@ -10,8 +10,14 @@ concurrency:
 
 jobs:
   python:
+    name: python (${{ matrix.python }})
     timeout-minutes: 20
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the supported minimum (ADR-0006).
+        python: ["3.11", "3.12"]
     services:
       postgres:
         image: postgres:17
@@ -28,7 +34,7 @@ jobs:
         with: { node-version: 24 }
       - run: npm ci --prefix ../sdk-js
       - run: npm ci --prefix ../console
-      - run: uv sync --locked --python 3.12
+      - run: uv sync --locked --python ${{ matrix.python }}
       - run: uv run pre-commit run uv-lock-check --all-files
       - run: uv run pre-commit run deptry --all-files
       - run: uv run ruff check packages
