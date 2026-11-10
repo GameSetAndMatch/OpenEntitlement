@@ -54,13 +54,14 @@ jobs:
           uv venv --python 3.10 /tmp/oe-wheel-check
           uv pip install --python /tmp/oe-wheel-check/bin/python "$wheel"
           cd /tmp
-          # The core installs with no dependencies; the [postgres] extra adds only psycopg.
+          # The core requires only Pydantic (ADR-0006); the [postgres] extra adds only psycopg.
           /tmp/oe-wheel-check/bin/python - <<'PY'
           from importlib.metadata import requires
           import sys
           import openentitlement
           assert "psycopg" not in sys.modules, "importing the core must not load psycopg"
-          assert not [r for r in requires("openentitlement-sdk") if "extra ==" not in r], "core must have no required dependencies"
+          required = sorted(r.split(">")[0].split("<")[0].split("=")[0].strip() for r in requires("openentitlement-sdk") if "extra ==" not in r)
+          assert required == ["pydantic"], f"core may only require pydantic, found {required}"
           PY
           uv pip install --python /tmp/oe-wheel-check/bin/python "openentitlement-sdk[postgres] @ file://$wheel" "psycopg[binary]>=3.1"
           /tmp/oe-wheel-check/bin/python - <<'PY'

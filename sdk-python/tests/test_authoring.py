@@ -113,3 +113,12 @@ def test_pydantic_python_names_are_snake_case_and_json_is_camel_case():
     del snake["groupId"]
     assert Privilege.from_dict(camel) == Privilege.from_dict(snake)
     assert Group.model_validate({"id": "ai", "title": "AI", "parentId": "root"}).parent_id == "root"
+
+
+def test_unlimited_default_round_trips_as_the_wire_encoding():
+    seats = IntegerPrivilege(key="seat_max", title="  Seats  ", default={"unlimited": True}, unlimited=True)
+    assert seats.title == "Seats"
+    assert seats.to_dict()["default"] == {"unlimited": True}
+    assert IntegerPrivilege.model_validate_json(seats.to_json()) == seats
+    with pytest.raises(ValidationError, match="Unlimited is not allowed"):
+        IntegerPrivilege(key="seat_max", title="Seats", default={"unlimited": True})

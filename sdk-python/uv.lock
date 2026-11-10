@@ -798,11 +798,11 @@ wheels = [
 name = "openentitlement-sdk"
 version = "0.2.0"
 source = { editable = "packages/openentitlement" }
-
-[package.optional-dependencies]
-authoring = [
+dependencies = [
     { name = "pydantic" },
 ]
+
+[package.optional-dependencies]
 postgres = [
     { name = "psycopg" },
 ]
@@ -810,9 +810,9 @@ postgres = [
 [package.metadata]
 requires-dist = [
     { name = "psycopg", marker = "extra == 'postgres'", specifier = ">=3.1" },
-    { name = "pydantic", marker = "extra == 'authoring'", specifier = ">=2.12,<3" },
+    { name = "pydantic", specifier = ">=2.12,<3" },
 ]
-provides-extras = ["authoring", "postgres"]
+provides-extras = ["postgres"]
 
 [[package]]
 name = "openentitlement-workspace"
