@@ -11,7 +11,7 @@ Reviewed **2026-11-04** against public first-party documentation. Repository-onl
 - **Not established:** the reviewed material does not settle the question. This does not mean the vendor lacks the capability.
 - **Outside OE scope:** a vendor provides a broader function that OE currently leaves to the application or another system.
 
-No row certifies a vendor as OEREP-compatible. Same names do not guarantee equivalent semantics. The comparison is limited to Stripe Entitlements, Lago, Stigg, Schematic, and OpenMeter; other platforms are not implicitly assessed.
+No row certifies a vendor as OEREP-compatible. Same names do not guarantee equivalent semantics. The original matrices compare Stripe Entitlements, Lago, Stigg, Schematic and OpenMeter. A separately dated Revenera addition below uses the current accepted Privilege authoring language; other platforms are not implicitly assessed.
 
 ## Our implemented model versus the proposed refinement
 
@@ -126,3 +126,23 @@ These are proposed evaluation cases, not results from running vendor accounts:
 - “Outside OE scope” describes our chosen boundary; it is not a criticism of a broader vendor capability.
 - OpenFeature and Ossie inform interoperability design but are not entitlement-model peers in this matrix. Flexprice, Autumn, Polar, Kill Bill, and Planship remain separate research work.
 - Keep proposed plan/trial changes explicit in any later matrix update. This document changes neither SDK behavior nor the normative specification.
+
+## Revenera / FlexNet addition — 2026-11-09
+
+This extension uses the accepted Privilege Catalog direction in [ADR-0003](../../ADR-0003.md) and [RFC-0002](../rfcs/0002-privilege-catalog.md); it does not retroactively change the v0.1 baseline of the original matrices. Sources, API/SDK distinctions and open questions are detailed in the [Revenera connector spike](revenera-connector-spike.md). No live integration or conformance test was run.
+
+| OE direction | Revenera candidate | Difference / adapter policy |
+|---|---|---|
+| Typed Privilege | Licensable feature and license properties/count | Boolean rights and integer quantities are plausible mappings; enum ordering and unlimited encoding are not established. |
+| Tier / variant | Product, suite, feature bundle, license model | Commercial packaging is not automatically a Tier rank, trial or grace variant. Require explicit mapping. |
+| Organization | Customer/sold-to account | Preserve source account identity; distinguish users, devices and channel partners. |
+| Contract and terms | Entitlement and activatable line items | Verify aggregation, effective dates, status and source references. Provisioning is different from runtime allocation. |
+| Group and Tags | No equivalent established | Keep OE metadata separate until a reversible mapping is demonstrated; feature bundles are not proof of Group equivalence. |
+| Boolean environment prerequisite | No equivalent established | Retain OE's installer-owned AND constraint; do not infer deployment eligibility from a license response. |
+| Application-owned usage | Metered/token/concurrent licensing models | Units and allocation semantics differ. A licensing checkout cannot masquerade as read-only OE evaluation. |
+
+**Documented:** public FNO references describe account/catalog/entitlement APIs; the current Entitlement REST introduction explicitly labels the API beta and advises against production use. FlexNet Embedded SDK and CMAPI runtime licensing are separate targets. See [API introduction](https://developer.revenera.com/products/fno-api/apis/rest/entitlement/entitlement-service), [FNO API overview](https://developer.revenera.com/products/fno-api/api-overview), and [runtime licensing guide](https://docs.revenera.com/fne/2022_05/pdf/FNE_LicenseServerGuide_2022-05.pdf).
+
+**Mapping inference:** start with a server-side read-only management import, preserve provenance and freshness, and verify tenant/version/authentication before implementation. Runtime allocation would require a separate adapter contract.
+
+**Not established:** production API availability for the target customer, current SDK redistribution rights/platform coverage, exact default/unlimited/exception semantics and OEREP conformance. Revenera's broad commercial platform does not imply billing must own every entitlement. Its [billing article](https://www.revenera.com/blog/software-monetization/software-billing-is-already-a-nightmare-entitlement-management-shouldnt-be/) and [IAM eBook](https://resources.flexera.com/web/eloqua/pdf/E-Book%20-%20Entitlement%20Management%20vs%20Identity%20and%20Access%20Management.pdf) support separation with integration; marketing flows are not technical guarantees.

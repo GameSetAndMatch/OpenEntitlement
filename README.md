@@ -62,6 +62,10 @@ The Stripe adapter is tested against a fake account built from the response shap
 
 OEREP v1 is implemented in both SDKs and the reference service, with real cross-language HTTP integration tests. Roadmap: add-ons and change events. See [spec/README.md](spec/README.md#roadmap).
 
+## Project direction
+
+[Vision](VISION.md), [shared glossary](GLOSSARY.md), [decisions and RFCs](docs/decisions.md), and [contributor workflows](docs/agents/workflows.md) record the long-term direction and distinguish accepted design from released protocol behavior.
+
 ## License
 
 [Apache-2.0](LICENSE)
