@@ -1,0 +1,28 @@
+{
+  "description": "trailing newline tags",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seats",
+        "title": "Seats",
+        "type": "integer",
+        "unlimited": true,
+        "tags": [
+          "root\n"
+        ]
+      }
+    ],
+    "groups": [
+      {
+        "id": "root",
+        "title": "Root"
+      }
+    ],
+    "tags": [
+      {
+        "id": "root",
+        "title": "Root"
+      }
+    ]
+  }
+}

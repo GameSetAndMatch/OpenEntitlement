@@ -42,6 +42,14 @@ SCHEMA_ID = "https://openentitlement.dev/schemas/privilege-catalog.schema.json"
 
 
 class CatalogJsonSchema(GenerateJsonSchema):
+    def str_schema(self, schema: core_schema.StringSchema) -> JsonSchemaValue:
+        result = super().str_schema(schema)
+        # Rust regex uses a strict end anchor; Python/ECMA-262 $ also matches before
+        # a final newline. Make the exported JSON pattern preserve the model rule.
+        if result.get("pattern", "").endswith("$"):
+            result["pattern"] += r"(?![\s\S])"
+        return result
+
     def nullable_schema(self, schema: core_schema.NullableSchema) -> JsonSchemaValue:
         return self.generate_inner(schema["schema"])
 
@@ -59,7 +67,7 @@ class CatalogJsonSchema(GenerateJsonSchema):
             properties = definition.get("properties", {})
             literals = [name for name, prop in properties.items() if "const" in prop]
             if literals:
-                definition["required"] = [*definition.get("required", []), *literals]
+                definition["required"] = list(dict.fromkeys([*definition.get("required", []), *literals]))
         return {"$schema": self.schema_dialect, "$id": SCHEMA_ID, **result}
 
 

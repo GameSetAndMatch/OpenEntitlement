@@ -1,0 +1,6 @@
+{
+  "description": "null catalog privileges",
+  "catalog": {
+    "privileges": null
+  }
+}

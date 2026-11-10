@@ -62,7 +62,7 @@ const unique = (values: readonly unknown[]) =>
 const identifier = z
   .string()
   .max(80)
-  .regex(/^[a-z][a-z0-9_]*$/, "Expected a flat identifier");
+  .regex(/^[a-z][a-z0-9_]*$(?![\s\S])/, "Expected a flat identifier");
 const title = z.string().trim().min(1).max(200);
 const description = z.string().max(2000).default("");
 /** Integers that are exact in every supported language: 0..2^53-1. */
@@ -89,7 +89,7 @@ const booleanPrivilege = z
     envOverride: z
       .string()
       .regex(
-        /^[A-Z][A-Z0-9_]*$/,
+        /^[A-Z][A-Z0-9_]*$(?![\s\S])/,
         "envOverride must be an uppercase environment variable name",
       )
       .optional(),

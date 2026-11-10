@@ -15,5 +15,6 @@
         "group_id": "integrations"
       }
     ]
-  }
+  },
+  "pythonConvenience": true
 }

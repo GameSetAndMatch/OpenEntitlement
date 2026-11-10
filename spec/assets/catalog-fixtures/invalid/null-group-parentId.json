@@ -1,0 +1,13 @@
+{
+  "description": "null group parentId",
+  "catalog": {
+    "privileges": [],
+    "groups": [
+      {
+        "id": "root",
+        "title": "Root",
+        "parentId": null
+      }
+    ]
+  }
+}

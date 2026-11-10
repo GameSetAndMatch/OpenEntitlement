@@ -27,9 +27,9 @@ def _fixture(path: Path) -> dict:
 
 
 def _pydantic_accepts(catalog: object) -> bool:
-    # JSON input uses the camelCase aliases only; snake_case names are a Python-side convenience.
+    # Python deliberately accepts field names as well as the camelCase wire aliases.
     try:
-        PrivilegeCatalog.model_validate(catalog, by_alias=True, by_name=False)
+        PrivilegeCatalog.model_validate(catalog)
     except ValidationError:
         return False
     return True
@@ -59,12 +59,16 @@ def test_valid_fixture_is_accepted_by_pydantic_and_json_schema(path):
     catalog = _fixture(path)["catalog"]
     assert _pydantic_accepts(catalog)
     assert not list(VALIDATOR.iter_errors(catalog))
+    model = PrivilegeCatalog.model_validate(catalog)
+    serialized = json.loads(model.model_dump_json())
+    assert VALIDATOR.is_valid(serialized)
+    assert PrivilegeCatalog.model_validate(serialized) == model
 
 
 @pytest.mark.parametrize("path", INVALID, ids=lambda p: p.stem)
 def test_invalid_fixture_is_rejected_by_pydantic_and_json_schema(path):
     fixture = _fixture(path)
-    assert not _pydantic_accepts(fixture["catalog"])
+    assert _pydantic_accepts(fixture["catalog"]) == fixture.get("pythonConvenience", False)
     # Some rules (cross-references, cycles, unique items, bounds between fields) need the models.
     schema_accepts = VALIDATOR.is_valid(fixture["catalog"])
     assert schema_accepts == fixture.get("needsModelValidation", False)
