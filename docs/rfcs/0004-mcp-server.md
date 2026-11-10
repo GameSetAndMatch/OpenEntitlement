@@ -1,6 +1,6 @@
 # RFC-0004: An MCP server for the Workspace control plane
 
-- **Status:** draft. Authentication and Workspace selection decided (2026-11-10); other questions open. Not implemented.
+- **Status:** accepted direction (2026-11-10); all design questions answered. Not implemented.
 - **Date:** 2026-11-10
 - **Tracks:** [PRD.md](../../PRD.md), "Agents and integrations"
 
@@ -16,7 +16,7 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 
 ## Principles
 
-1. **Same authority as the console.** The agent acts as a real Account. Each tool checks that Account's Role and Permissions in the Workspace, exactly as the console API does. MCP never bypasses authorization.
+1. **Same authority as the console.** The agent acts as a real Account. Every Role can use MCP, and each tool checks that Account's Role and Permissions in the Workspace exactly as the console and API do. Each tool maps to an existing API operation. MCP never adds or bypasses authorization.
 2. **Every change is audited with a reason.** Write tools require a `reason`. The audit record names the Account and the MCP client, for example `alice@acme via Claude`.
 3. **Preview before apply.** A write tool first returns the resulting change: before and after values, the affected Organizations, and the resolved values that change. The change is applied only through a separate call that confirms that preview. Agents and their users see exactly what will happen.
 4. **Control plane only.** Applications keep evaluating through OEREP with API keys. MCP's evaluation tools exist to explain decisions to people, not to serve production traffic.
@@ -37,7 +37,7 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 | `explain_decision` | The resolved value of one Privilege for an Organization and an optional application user, with the reason and each layer (Catalog default → Tier variant → Organization terms → user terms and grants → environment) |
 | `get_audit_log` | Recent changes, filterable by entity |
 
-### Write tools (preview, then apply)
+### Write tools (preview, then apply), included in v1
 
 | Tool | Change |
 |---|---|
@@ -48,6 +48,8 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 | `set_user_terms`, `grant_allowance` | Application-user exceptions |
 
 Each write tool returns a preview with a short-lived `change_id`. `apply_change(change_id)` commits it, failing if the Workspace changed in the meantime (the existing revision check).
+
+**No delete tools.** MCP never deletes Privileges, Groups, Tags, Tiers, variants, Organizations, members or API keys. Removing a value goes back to its inherited default through the same write tools, for example by removing an Organization term. Deletions stay in the console.
 
 ### Resources and prompts
 
@@ -66,16 +68,17 @@ Each write tool returns a preview with a short-lived `change_id`. `apply_change(
 
 Each tool call records a product event (`mcp_tool_called`, with `tool` and `workspace_id`), and each applied change counts in the activation funnel like a console change. Events never include values or reasons (see `docs/maintainers/analytics.md`).
 
-## Open questions
+## Decisions
 
-1. ~~Authentication for v1.~~ **Decided:** per-Account sign-in through the MCP authorization flow, followed by an explicit Workspace choice, limited to Workspaces whose Owner enabled MCP. This means building an OAuth authorization server for MCP clients into the service.
-2. **Writes in v1, or read-only first?** Recommendation: ship reads and `explain_decision` first, then the write tools with preview and apply in a second step.
-3. **Who may use MCP inside an enabled Workspace?** Recommendation: every Role, limited by its Permissions. The Workspace-level switch is decided above.
-4. **Hosted plans.** Is MCP access part of every hosted plan, or a paid capability? Recommendation: available on every plan; hosted plan limits apply to the underlying operations.
-5. **Destructive operations** (deleting Privileges, Tiers or Organizations). Recommendation: not exposed through MCP in v1.
+1. **Sign-in:** per-Account sign-in through the MCP authorization flow, then the person chooses a Workspace. Only Workspaces whose Owner enabled MCP are available. This means building an OAuth authorization server for MCP clients into the service.
+2. **Scope of v1:** read, explain and write tools ship together, with writes always previewed before they're applied.
+3. **Who:** every Role, with the same Permissions as the console and API.
+4. **Plans:** MCP is included in every hosted plan. Plan limits apply to the underlying operations.
+5. **Deletes:** none through MCP.
 
 ## Acceptance scenarios (draft)
 
+- **No deletes:** asking the agent to delete an Organization yields no tool for it. The agent points the person to the console.
 - **Ordinary path:** a Manager's agent explains why Globex is limited to 25 seats, proposes Organization terms of 40 until March 31 with reason MSA-12, shows the preview, and applies it. The audit log records the Manager, the client and the reason.
 - **Opt-in:** an Account belonging to two Workspaces, one with MCP enabled, sees only that one in `list_workspaces`. Selecting the other is refused. When the Owner disables MCP, the next tool call in an existing session is refused.
 - **Boundary case:** a User-role Account calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after another change to the Workspace fails with a conflict, and nothing changes.

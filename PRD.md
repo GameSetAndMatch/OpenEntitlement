@@ -62,7 +62,7 @@ Primary users:
 
 | Feature | Status | Where |
 |---|---|---|
-| MCP server: agents explain decisions and manage the Catalog, Tiers, Organizations and user exceptions as a signed-in Account (per-Account OAuth sign-in, then the person picks a Workspace; Workspaces opt in), with Role checks, mandatory reasons, audit, and preview-then-apply writes | 📋 spec in progress | [RFC-0004](docs/rfcs/0004-mcp-server.md) |
+| MCP server: agents explain decisions and manage the Catalog, Tiers, Organizations and user exceptions as a signed-in Account (per-Account OAuth sign-in, then the person picks a Workspace; Workspaces opt in), same Permissions as the console and API for every Role, mandatory reasons, audit, preview-then-apply writes, no deletes, included in every plan | 📋 spec accepted, implementation next | [RFC-0004](docs/rfcs/0004-mcp-server.md) |
 
 ### Hosted service and self-hosting
 
