@@ -13,7 +13,7 @@ from typing import Any, Callable, Optional, Sequence, TypeVar
 import psycopg
 from psycopg.types.json import Jsonb
 
-from openentitlement import (
+from .. import (
     AuditEvent,
     Capabilities,
     FactsProvider,
@@ -24,9 +24,9 @@ from openentitlement import (
     OverrideInput,
     ProviderMetadata,
 )
-from openentitlement.catalog import PrivilegeDefinition
-from openentitlement.facts import Assignment, Grant, Override, Plan, Scope
-from openentitlement.provider import (
+from ..catalog import PrivilegeDefinition
+from ..facts import Assignment, Grant, Override, Plan, Scope
+from ..provider import (
     check_override_conflict,
     new_id,
     require_reason,
@@ -35,8 +35,8 @@ from openentitlement.provider import (
     validate_scope,
     validate_value,
 )
-from openentitlement.resolver import resolve_from_facts, suggest_plan_from_facts
-from openentitlement.values import decode_value, encode_json, encode_value
+from ..resolver import resolve_from_facts, suggest_plan_from_facts
+from ..values import decode_value, encode_json, encode_value
 
 __all__ = ["PostgresProvider", "PostgresAdvisoryLock", "schema_sql", "migrate"]
 __version__ = "0.1.0"
