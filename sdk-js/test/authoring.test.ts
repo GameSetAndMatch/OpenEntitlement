@@ -57,10 +57,15 @@ test("optional Zod authoring has strict types, flat keys, metadata and normalize
     ZodError,
   );
 });
-test("legacy runtime Catalog keys remain compatible rather than silently renamed", () => {
-  const catalog = new Catalog([
-    feature("seats", "Seats", [integer("seat.max")]),
-  ]);
-  assert.equal(catalog.privilege("seat.max")!.key, "seat.max");
-  assert.equal(catalog.privilege("seat_max"), undefined);
+test("runtime Catalog keys are flat: dotted keys are rejected", () => {
+  assert.throws(() => new Catalog([feature("seats", "Seats", [integer("seat.max")])]), /invalid privilege key "seat.max"/);
+  assert.equal(new Catalog([feature("seats", "Seats", [integer("seat_max")])]).privilege("seat_max")!.key, "seat_max");
+});
+
+
+test("runtime identifiers reject newlines, whitespace and dots in every segment", () => {
+  for (const invalid of ["seat\n", "seat\nmax", " seat", "seat ", "seat.max"]) {
+    assert.throws(() => new Catalog([feature(invalid, "Seats", [integer("seat_max")])]));
+    assert.throws(() => new Catalog([feature("seats", "Seats", [integer(invalid)])]));
+  }
 });

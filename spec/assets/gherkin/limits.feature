@@ -72,7 +72,7 @@ Feature: Limit checks
 
   @spec-3.3.6 @spec-3.1.2
   Scenario: Unknown privileges fail closed
-    When I require 1 more "does.not.exist" with current 0 for organization "acme"
+    When I require 1 more "does_not_exist" with current 0 for organization "acme"
     Then the check fails
 
   @spec-1.8.2

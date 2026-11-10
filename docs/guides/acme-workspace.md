@@ -138,6 +138,6 @@ const catalog = PrivilegeCatalogSchema.parse({
 
 The core SDK stays dependency-free unless this authoring subpath is used. [OpenFeature's Python SDK](https://github.com/open-feature/python-sdk) and [contrib repository](https://github.com/open-feature/python-sdk-contrib) are useful references for separating core APIs from optional providers; no provider compatibility is implied here.
 
-## Existing dotted keys
+## Keys are flat
 
-The v1 runtime SDK continues accepting existing keys such as `seat.max`. The new authoring API uses flat keys. Renaming a deployed Catalog key requires migrating its Tier/plan values, terms, grants and application checks together. This release does not silently rewrite stored customer data. If you depend on the previous built-in example Catalog, pin your image or provide that Catalog explicitly before adopting the new sample keys.
+Privilege keys and feature codes match `^[a-z][a-z0-9_]*$`, such as `seat_max`. Dotted keys like `seat.max` are rejected: they are not valid identifiers in Python or most languages, and they add no structure. Organize Privileges with Groups and Tags instead. Renaming a key you already use requires migrating its Tier values, terms, grants and application checks together.

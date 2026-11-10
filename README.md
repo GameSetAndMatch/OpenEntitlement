@@ -37,7 +37,7 @@ See the [glossary](GLOSSARY.md) for shared domain and review terminology.
 
 ## The model in one screen
 
-New authoring uses flat keys, a Privilege Catalog, one Group and multiple Tags, then Tiers → variants → Organizations → optional user exceptions. The compatibility SDK still uses its v1 Feature/Plan API and accepts deployed dotted keys; see the walkthrough before renaming persisted keys.
+New authoring uses flat keys, a Privilege Catalog, one Group and multiple Tags, then Tiers → variants → Organizations → optional user exceptions. The compatibility SDK still uses its v1 Feature/Plan API. Keys are always flat (`seat_max`); dotted keys are not accepted.
 
 - **Layers stay separate.** Authentication (401), RBAC (403), **entitlement (403 `entitlement_required` + `requiredPlan`)**, and feature flags (404). This spec covers only the entitlement layer.
 - **Definitions in code, values as data.** Features and privileges (`seat_max`, `sso_enabled`, `report_retention`) are declared by the app. Plan values, overrides, and grants are runtime data, audited.

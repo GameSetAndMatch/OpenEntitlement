@@ -23,6 +23,7 @@ Primary users:
 | Entitlement specification v0.1 (RFC 2119 requirements, Gherkin conformance suite) | ✅ | `spec/`, #1, #2 |
 | OEREP v1 remote evaluation protocol (single, bulk, upgrade suggestion) | ✅ | `spec/sections/10-remote-evaluation.md`, #1 |
 | Entitlements v0.2 proposal: Tier variants, contracts, JSON Schema definitions | ✅ proposed (RFC-0001) | #20 |
+| Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | 🚧 | branch `feat/flat-keys-only` |
 | Privilege Catalog authoring contract: Groups, Tags, visibility | ✅ accepted (RFC-0002) | #24 |
 | Read-only consumption dashboard | 📋 proposed (RFC-0003), blocked on a real usage source | `docs/rfcs/0003-consumption-dashboard.md` |
 | Generated JSON Schema as the shared cross-language contract | 📋 next | ADR-0006 (in progress) |

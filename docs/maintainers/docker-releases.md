@@ -49,6 +49,6 @@ The PostgreSQL host must be reachable from inside the container; `localhost` mea
 
 Mount a custom catalog read-only and set `OE_CATALOG` to its container path if needed. Use a TLS reverse proxy for remote hosting. Evaluation tokens cover the service instance; your backend must authorize organization access. Pin a version or image digest for deployments, as `edge` and `latest` move. See the [service guide](../../console/README.md) for API and provider details.
 
-## Sample Catalog key migration
+## Flat Catalog identifiers
 
-The current source sample uses flat keys (`seat_max`, `project_max`, `sso_enabled`) with grouping metadata kept separate. Older image releases may have `seats.max`, `projects.max` and `sso.enabled`. This is not an automatic database migration. Before upgrading an existing seeded install, export/preserve its Catalog, set `OE_CATALOG` to that compatible file or pin the previous image, and migrate values, overrides, grants and application checks under an explicit maintenance plan. Building a fresh local image uses the new sample keys. Do not claim a newly documented source example works with an older published image.
+Current SDKs and source images require flat keys such as `seat_max`, `project_max` and `sso_enabled`. Dotted keys are rejected; use nested Groups and Tags for structure. No automatic database rewrite is performed. If experimenting with data from an older build, rename its Catalog references, values, overrides, grants and application checks together before using this build. Pin an older image only if intentionally retaining its old behavior.
