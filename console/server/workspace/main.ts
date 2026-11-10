@@ -7,6 +7,7 @@ import { WorkspaceStore } from "./store.ts";
 import { workspaceApi } from "./api.ts";
 import { WorkspaceError } from "./model.ts";
 import { HttpError, send } from "../http.ts";
+import { cspSources, serveTelemetryConfig, serverErrors, setErrorSink, telemetryFromEnv, reportError } from "../telemetry.ts";
 
 export async function startWorkspaceServer(options: { databaseUrl: string; auth: AuthConfig; port?: number; host?: string; staticDir?: string; env?:NodeJS.ProcessEnv }) {
   const store=new WorkspaceStore(options.databaseUrl);
@@ -14,10 +15,13 @@ export async function startWorkspaceServer(options: { databaseUrl: string; auth:
     await store.initialize();
     const auth=await Authentication.create(options.auth,store),api=workspaceApi(auth,store,{...(options.env??process.env)});
     const root=resolve(options.staticDir ?? fileURLToPath(new URL("../../web/dist/",import.meta.url)));
+    const telemetry=telemetryFromEnv(options.env??process.env),errors=await serverErrors(telemetry,"workspace"),csp=cspSources(telemetry);
+    setErrorSink(errors);
     const server=createServer(async(req,res) => {
       try {
         res.setHeader("x-content-type-options","nosniff");res.setHeader("referrer-policy","same-origin");res.setHeader("cache-control","no-store");
         if (req.url === "/health") { send(res,200,{status:"ok"});return; }
+        if (serveTelemetryConfig(req,res,telemetry)) return;
         if (await api(req,res)) return;
         if (req.method !== "GET" && req.method !== "HEAD") throw new WorkspaceError("Method not allowed",405);
         const path=new URL(req.url!,options.auth.appUrl).pathname;
@@ -28,15 +32,16 @@ export async function startWorkspaceServer(options: { databaseUrl: string; auth:
         let content: Buffer,actual=file;
         try { content=await readFile(file); } catch { if(!path.startsWith("/app"))throw new WorkspaceError("Not found",404);actual=resolve(root,"index.html");content=await readFile(actual); }
         const types: Record<string,string>={".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css",".svg":"image/svg+xml"};
-        res.writeHead(200,{"content-type":types[extname(actual)]??"application/octet-stream","content-security-policy":"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});res.end(req.method === "HEAD" ? undefined : content);
+        res.writeHead(200,{"content-type":types[extname(actual)]??"application/octet-stream","content-security-policy":`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'${csp.connect}; worker-src 'self'${csp.worker}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`});res.end(req.method === "HEAD" ? undefined : content);
       } catch (e) {
         const status=e instanceof WorkspaceError || e instanceof HttpError ? e.status : 500;
+        if(status===500)reportError(e,{route:`${req.method} ${req.url?.split("?")[0]}`});
         send(res,status,{message:status===500?"The request could not be completed":(e as Error).message});
       }
     });
     await new Promise<void>((ok,fail)=>{server.once("error",fail);server.listen(options.port??18789,options.host??"127.0.0.1",ok);});
     const address=server.address();
-    return {server,store,url:`http://localhost:${typeof address === "object" ? address!.port : options.port}`,close:async()=>{await new Promise<void>(ok=>server.close(()=>ok()));await store.close();}};
+    return {server,store,url:`http://localhost:${typeof address === "object" ? address!.port : options.port}`,close:async()=>{await new Promise<void>(ok=>server.close(()=>ok()));await store.close();await errors.shutdown();}};
   } catch(e) {await store.close();throw e;}
 }
 if(import.meta.url===`file://${process.argv[1]}`){

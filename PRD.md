@@ -32,7 +32,7 @@ Primary users:
 | Feature | Status | Where |
 |---|---|---|
 | Python SDK (`openentitlement-sdk`) and TypeScript SDK (`@openentitlement/core`) with in-memory, fixed and remote providers, hooks and `guard` | ✅ | `sdk-python/`, `sdk-js/` |
-| Postgres provider and advisory lock inside the core packages (`[postgres]` extra, `/postgres` entry point) | 🚧 | #31 |
+| Postgres provider and advisory lock inside the core packages (`[postgres]` extra, `/postgres` entry point) | ✅ | #31 |
 | Stripe Entitlements adapter | ✅ removed before release (billing is not an entitlement source) | #30 |
 | Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; Pydantic is a core dependency | 🚧 | ADR-0006, branch `feat/camelcase-authoring-json` |
 | Python ≥ 3.11 | 🚧 | with ADR-0006 |
@@ -73,10 +73,10 @@ Primary users:
 | Feature | Status | Where |
 |---|---|---|
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
-| Landing page rebuilt on the docs' theme and components, showing the current model | 🚧 | branch `feat/website-starlight-home` |
-| PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals | 🚧 | branch `feat/posthog` |
-| PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | 🚧 | branch `feat/posthog` |
-| Funnel dashboards: website acquisition (landing → docs → quickstart → install → GitHub/Docker) and console activation (sign-in → Workspace → Privilege → Tier → Organization → API key → first evaluation) | 🚧 | branch `feat/posthog`; 👤 a PostHog personal API key is needed to create them |
+| Landing page rebuilt on the docs' theme and components, showing the current model | 🚧 | #33 |
+| PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
+| PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |
+| Funnel dashboards: website acquisition (landing → docs → quickstart → install → GitHub/Docker) and console activation (sign-in → Workspace → Privilege → Tier → Organization → API key → first evaluation) | ✅ created in PostHog; 📋 hosted console must set `OE_POSTHOG_KEY` to feed the activation funnel | #34, `tools/posthog/dashboards.mjs` |
 
 ### Project
 
@@ -89,8 +89,7 @@ Primary users:
 
 1. On PyPI and npm, change the trusted publisher owner from `GameSetAndMatch` to `open-entitlement` before the next release.
 2. Publish the first Python (`python-v…`) and npm (`npm-v…`) releases.
-3. Provide a PostHog personal API key with dashboard write access so the funnel dashboards can be created by script.
-4. In PostHog project settings, confirm session replay, heatmaps, web vitals and exception autocapture are enabled.
+3. In PostHog project settings, confirm session replay, heatmaps, web vitals and exception autocapture are enabled.
 
 ## Working agreements
 

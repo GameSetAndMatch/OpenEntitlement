@@ -1,0 +1,6 @@
+---
+// Starlight's default <head>, plus the site analytics script.
+import Default from '@astrojs/starlight/components/Head.astro';
+---
+<Default><slot /></Default>
+<script>import '../scripts/posthog.ts';</script>

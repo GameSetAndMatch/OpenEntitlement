@@ -6,6 +6,7 @@ import { extname, join, normalize } from "node:path";
 import { createOerep } from "./oerep.ts";
 import { createApi } from "./api.ts";
 import { buildRuntime, configFromEnv, type ConsoleConfig } from "./config.ts";
+import { serveTelemetryConfig, serverErrors, setErrorSink, telemetryFromEnv } from "./telemetry.ts";
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -21,8 +22,12 @@ export async function startServer(cfg: ConsoleConfig): Promise<{ server: Server;
   const rt = await buildRuntime(cfg);
   const api = createApi(cfg, rt);
   const oerep = createOerep(rt, cfg.evalToken);
+  const telemetry = telemetryFromEnv();
+  const errors = await serverErrors(telemetry, "console");
+  setErrorSink(errors);
   const server = createServer(async (req, res) => {
     try {
+      if (serveTelemetryConfig(req, res, telemetry)) return;
       if (await oerep(req, res)) return;
       if (await api(req, res)) return;
       if (req.method !== "GET" && req.method !== "HEAD") {
@@ -58,6 +63,7 @@ export async function startServer(cfg: ConsoleConfig): Promise<{ server: Server;
     close: async () => {
       await new Promise<void>((r) => server.close(() => r()));
       await rt.close();
+      await errors.shutdown();
     },
   };
 }
