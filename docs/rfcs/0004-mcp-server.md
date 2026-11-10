@@ -1,6 +1,6 @@
 # RFC-0004: An MCP server for the Workspace control plane
 
-- **Status:** draft; open questions below. Not implemented.
+- **Status:** draft. Authentication and Workspace selection decided (2026-11-10); other questions open. Not implemented.
 - **Date:** 2026-11-10
 - **Tracks:** [PRD.md](../../PRD.md), "Agents and integrations"
 
@@ -28,7 +28,8 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 
 | Tool | Returns |
 |---|---|
-| `list_workspaces` | Workspaces the Account belongs to, with its Role in each |
+| `list_workspaces` | Workspaces the signed-in Account belongs to **that have MCP enabled**, with its Role in each |
+| `select_workspace` | Sets the Workspace for the rest of the MCP session. Until one is selected, every other tool asks the agent to call `list_workspaces` and ask the person which Workspace to use |
 | `get_catalog` | Privileges, Groups and Tags, with types, defaults and visibility |
 | `list_tiers` | Tiers and their variants with values |
 | `list_organizations` | Organizations with their Tier variant, status and term count; filterable by Tier variant |
@@ -53,11 +54,13 @@ Each write tool returns a preview with a short-lived `change_id`. `apply_change(
 - **Resources:** the Catalog as JSON Schema (the shared contract from ADR-0006), and the glossary, so an agent uses the right words.
 - **Prompts:** "Negotiate a deal" (from a request to proposed Organization terms) and "Explain a refusal" (from an error to the missing entitlement and the cheapest Tier that grants it).
 
-## Transport and authentication (to decide)
+## Transport, sign-in and Workspace selection (decided)
 
-- **Remote:** a Streamable HTTP endpoint on the service (`/mcp`). Hosted at the console's domain and available in every self-hosted install.
-- **Credential:** see open question 1.
-- **Local:** an optional `npx @openentitlement/mcp` stdio bridge for clients without remote MCP support, forwarding to the same endpoint.
+- **Remote endpoint:** Streamable HTTP at `/mcp` on the service. Hosted at the console's domain and available in every self-hosted install.
+- **Per-Account sign-in.** The MCP client signs the person in with their own Account, using the MCP authorization flow (OAuth 2.1 with PKCE, authorization-server metadata and dynamic client registration). The service acts as the authorization server for MCP clients. People authenticate through the same identity provider as the console (Google on the hosted service, the configured OIDC provider when self-hosted). There are no shared or personal static tokens. Access tokens are short-lived, refreshable and revocable from the console. They're bound to the Account and to the `/mcp` resource.
+- **Choosing a Workspace.** After sign-in, the agent calls `list_workspaces` and **asks the person which Workspace to use**, then calls `select_workspace`. The selection lasts for the MCP session. Switching requires another `select_workspace`, which the agent should confirm with the person.
+- **Workspaces opt in.** MCP is **off by default**. An Owner enables it in Workspace settings, and it can be disabled again at any time. Only Workspaces with MCP enabled appear in `list_workspaces` or can be selected. Disabling MCP ends access for every MCP session on that Workspace at the next call. Enabling and disabling are audited.
+- **Local:** an optional `npx @openentitlement/mcp` stdio bridge for clients without remote MCP support. It runs the same sign-in flow and forwards to the same endpoint.
 
 ## Analytics
 
@@ -65,13 +68,14 @@ Each tool call records a product event (`mcp_tool_called`, with `tool` and `work
 
 ## Open questions
 
-1. **Authentication for v1.** Recommendation: a personal MCP access token per Account and Workspace, created in the console, carrying the Account's Role and revocable at any time. MCP's OAuth flow (dynamic client registration) follows later, because the service is today an OIDC client, not an authorization server.
+1. ~~Authentication for v1.~~ **Decided:** per-Account sign-in through the MCP authorization flow, followed by an explicit Workspace choice, limited to Workspaces whose Owner enabled MCP. This means building an OAuth authorization server for MCP clients into the service.
 2. **Writes in v1, or read-only first?** Recommendation: ship reads and `explain_decision` first, then the write tools with preview and apply in a second step.
-3. **Who may use MCP?** Recommendation: every Role, limited by its Permissions. A Workspace setting lets Owners disable MCP entirely.
+3. **Who may use MCP inside an enabled Workspace?** Recommendation: every Role, limited by its Permissions. The Workspace-level switch is decided above.
 4. **Hosted plans.** Is MCP access part of every hosted plan, or a paid capability? Recommendation: available on every plan; hosted plan limits apply to the underlying operations.
 5. **Destructive operations** (deleting Privileges, Tiers or Organizations). Recommendation: not exposed through MCP in v1.
 
 ## Acceptance scenarios (draft)
 
 - **Ordinary path:** a Manager's agent explains why Globex is limited to 25 seats, proposes Organization terms of 40 until March 31 with reason MSA-12, shows the preview, and applies it. The audit log records the Manager, the client and the reason.
-- **Boundary case:** a User-role token calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after another change to the Workspace fails with a conflict, and nothing changes.
+- **Opt-in:** an Account belonging to two Workspaces, one with MCP enabled, sees only that one in `list_workspaces`. Selecting the other is refused. When the Owner disables MCP, the next tool call in an existing session is refused.
+- **Boundary case:** a User-role Account calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after another change to the Workspace fails with a conflict, and nothing changes.
