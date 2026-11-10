@@ -59,6 +59,12 @@ Primary users:
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |
 | YAML import with diff preview and audited apply | 📋 | — |
 
+### Agents and integrations
+
+| Feature | Status | Where |
+|---|---|---|
+| MCP server: agents explain decisions and manage the Catalog, Tiers, Organizations and user exceptions as a signed-in Account (per-Account OAuth sign-in, then the person picks a Workspace; Workspaces opt in), same Permissions as the console and API for every Role, mandatory reasons, audit, preview-then-apply writes, no deletes, included in every plan | 📋 spec accepted, implementation next | [RFC-0004](docs/rfcs/0004-mcp-server.md) |
+
 ### Hosted service and self-hosting
 
 | Feature | Status | Where |
