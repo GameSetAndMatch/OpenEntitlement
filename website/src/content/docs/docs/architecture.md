@@ -23,7 +23,7 @@ Authentication, RBAC, release flags, pricing, payment, invoicing, usage aggregat
 
 The architecture follows OFREP's separation between generic SDK providers and compatible servers, while using entitlement-specific semantics. OpenEntitlement is an independent project, not an OpenFeature or CNCF project.
 
-[ADR-0001](https://github.com/GameSetAndMatch/openentitlement/blob/main/ADR-0001.md) records the architectural decision.
+[ADR-0001](https://github.com/open-entitlement/OpenEntitlement/blob/main/ADR-0001.md) records the architectural decision.
 
 ## A model that implementations can share
 

@@ -5,7 +5,7 @@ import { createMermaidRenderer } from 'mermaid-isomorphic';
 const renderMermaid = createMermaidRenderer();
 const root = resolve(import.meta.dirname, '../..');
 const docs = resolve(root, 'website/src/content/docs');
-const repo = 'https://github.com/GameSetAndMatch/openentitlement/blob/main/';
+const repo = 'https://github.com/open-entitlement/OpenEntitlement/blob/main/';
 const files = [
   { source: 'docs/guides/acme-workspace.md', target: 'docs/acme-workspace.md', title: 'ACME Workspace walkthrough' },
   { source: 'GLOSSARY.md', target: 'reference/glossary.md', title: 'Glossary' },
@@ -43,7 +43,7 @@ for (const file of files) {
       content = content.replace(blocks[index][0], `![${heading} diagram](/diagrams/${name})`);
     }
   }
-  const frontmatter = `---\ntitle: ${JSON.stringify(heading)}\neditUrl: ${JSON.stringify('https://github.com/GameSetAndMatch/openentitlement/edit/main/' + file.source)}\n---\n\n`;
+  const frontmatter = `---\ntitle: ${JSON.stringify(heading)}\neditUrl: ${JSON.stringify('https://github.com/open-entitlement/OpenEntitlement/edit/main/' + file.source)}\n---\n\n`;
   await mkdir(dirname(resolve(docs, file.target)), { recursive: true });
   await writeFile(resolve(docs, file.target), frontmatter + content);
 }

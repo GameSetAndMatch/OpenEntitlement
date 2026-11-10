@@ -10,9 +10,9 @@ export default defineConfig({
     description: 'An open-source entitlement service and protocol. Learn to resolve what an organization may do, and how much of it.',
     logo: { light: './public/logo.svg', dark: './public/logo-dark.svg', replacesTitle: false },
     favicon: '/favicon.svg',
-    social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/GameSetAndMatch/openentitlement' }],
+    social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/open-entitlement/OpenEntitlement' }],
     customCss: ['./src/styles/docs.css'],
-    editLink: { baseUrl: 'https://github.com/GameSetAndMatch/openentitlement/edit/main/website/src/content/docs/' },
+    editLink: { baseUrl: 'https://github.com/open-entitlement/OpenEntitlement/edit/main/website/src/content/docs/' },
     sidebar: [
       { label: 'Start here', items: [
         { label: 'Introduction', slug: 'docs' },

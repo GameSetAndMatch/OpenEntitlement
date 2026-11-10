@@ -12,7 +12,7 @@ RUN ln -s ../console/node_modules /app/sdk-js/node_modules \
     && npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime
-LABEL org.opencontainers.image.source="https://github.com/GameSetAndMatch/openentitlement" \
+LABEL org.opencontainers.image.source="https://github.com/open-entitlement/OpenEntitlement" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.description="OpenEntitlement reference service and administration console"
 ENV NODE_ENV=production OE_HOST=0.0.0.0 PORT=8787

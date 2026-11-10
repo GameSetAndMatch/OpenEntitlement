@@ -18,8 +18,8 @@ packages = ["src/openentitlement"]
 
 [project.urls]
 Homepage = "https://openentitlement.dev/docs/python/"
-Repository = "https://github.com/GameSetAndMatch/OpenEntitlement"
-Issues = "https://github.com/GameSetAndMatch/OpenEntitlement/issues"
+Repository = "https://github.com/open-entitlement/OpenEntitlement"
+Issues = "https://github.com/open-entitlement/OpenEntitlement/issues"
 
 [project.optional-dependencies]
 authoring = ["pydantic>=2.12,<3"]

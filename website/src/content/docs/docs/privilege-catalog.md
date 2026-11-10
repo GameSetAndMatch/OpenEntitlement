@@ -29,4 +29,4 @@ privileges:
 
 The workspace console supports Group and Tag management, Tag filtering and typed privilege authoring. For strict Pydantic authoring, use `openentitlement-sdk[authoring]` and import from `openentitlement.authoring`. TypeScript uses the optional `@openentitlement/core/authoring` Zod schemas. See the [Python-first ACME walkthrough](/docs/acme-workspace/) for the whole Workspace model. The Python SDK also retains validated `BooleanPrivilege`, `IntegerPrivilege`, `StringEnumPrivilege`, `Group`, `Tag` and `PrivilegeCatalog` dataclasses for JSON serialization.
 
-See the [authoring guide](https://github.com/GameSetAndMatch/OpenEntitlement/blob/main/console/PRIVILEGE-CATALOG.md) for a complete Catalog example, API routes, migration behavior and standalone compatibility limits. The existing OEREP v1 transport and evaluation SDKs remain compatible.
+See the [authoring guide](https://github.com/open-entitlement/OpenEntitlement/blob/main/console/PRIVILEGE-CATALOG.md) for a complete Catalog example, API routes, migration behavior and standalone compatibility limits. The existing OEREP v1 transport and evaluation SDKs remain compatible.
