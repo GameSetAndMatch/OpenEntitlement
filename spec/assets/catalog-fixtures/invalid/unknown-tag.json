@@ -1,0 +1,23 @@
+{
+  "description": "A Privilege's Tags exist in the Catalog",
+  "needsModelValidation": true,
+  "catalog": {
+    "tags": [
+      {
+        "id": "enterprise",
+        "title": "Enterprise"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "tags": [
+          "enterprise",
+          "mcp"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "description": "The enum default is one of its choices",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "retention",
+        "title": "Retention",
+        "type": "enum",
+        "enum": [
+          "30d",
+          "365d"
+        ],
+        "default": "7d"
+      }
+    ]
+  }
+}

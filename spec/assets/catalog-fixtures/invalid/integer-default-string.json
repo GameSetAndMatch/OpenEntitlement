@@ -1,0 +1,13 @@
+{
+  "description": "Numeric strings never pass as integers",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "default": "5"
+      }
+    ]
+  }
+}

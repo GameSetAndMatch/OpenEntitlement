@@ -1,0 +1,12 @@
+{
+  "description": "Titles have at most 200 characters",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "type": "integer"
+      }
+    ]
+  }
+}

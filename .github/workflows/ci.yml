@@ -37,7 +37,10 @@ jobs:
       - run: uv sync --locked --python ${{ matrix.python }}
       - run: uv run pre-commit run uv-lock-check --all-files
       - run: uv run pre-commit run deptry --all-files
-      - run: uv run ruff check packages
+      - run: uv run ruff check packages scripts tests/test_catalog_contract.py
+      - name: Committed Privilege Catalog JSON Schema matches the Pydantic models
+        run: uv run python scripts/export_schemas.py --check
+      # Includes tests/test_catalog_contract.py: shared fixtures against Pydantic and the JSON Schema.
       - run: uv run pytest -q
 
   typescript:
@@ -58,6 +61,8 @@ jobs:
         with: { node-version: 24 }
       - run: npm ci
       - run: npm run typecheck
+      # Includes test/catalog-contract.test.ts: shared fixtures against Zod, and Zod's
+      # JSON Schema against the committed Pydantic-generated schema.
       - run: npm test
       - run: npm run build
 

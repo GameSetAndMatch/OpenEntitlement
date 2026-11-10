@@ -1,0 +1,13 @@
+{
+  "description": "Groups reject unknown fields",
+  "catalog": {
+    "groups": [
+      {
+        "id": "a",
+        "title": "A",
+        "name": "A"
+      }
+    ],
+    "privileges": []
+  }
+}

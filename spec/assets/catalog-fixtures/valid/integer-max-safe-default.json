@@ -1,0 +1,13 @@
+{
+  "description": "2^53-1 is the largest portable integer",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "default": 9007199254740991
+      }
+    ]
+  }
+}

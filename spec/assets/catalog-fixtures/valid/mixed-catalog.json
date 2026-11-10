@@ -1,0 +1,53 @@
+{
+  "description": "All three types with metadata",
+  "catalog": {
+    "groups": [
+      {
+        "id": "integrations",
+        "title": "Integrations"
+      }
+    ],
+    "tags": [
+      {
+        "id": "enterprise",
+        "title": "Enterprise"
+      },
+      {
+        "id": "mcp",
+        "title": "MCP"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "default": false,
+        "tags": [
+          "mcp"
+        ]
+      },
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "groupId": "integrations",
+        "default": 10,
+        "maximum": 1000
+      },
+      {
+        "key": "retention",
+        "title": "Retention",
+        "type": "enum",
+        "enum": [
+          "30d",
+          "365d"
+        ],
+        "default": "365d",
+        "tags": [
+          "enterprise"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openentitlement.dev/schemas/privilege-catalog.schema.json",
+  "$defs": {
+    "BooleanPrivilege": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Description",
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility",
+          "default": "editable"
+        },
+        "groupId": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Group id",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "type": {
+          "const": "boolean",
+          "default": "boolean",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "type": "boolean",
+          "title": "Default"
+        },
+        "envOverride": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Env override",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "type"
+      ],
+      "title": "BooleanPrivilege",
+      "type": "object"
+    },
+    "Group": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Description",
+          "type": "string"
+        },
+        "parentId": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Parent id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "title": "Group",
+      "type": "object"
+    },
+    "IntegerPrivilege": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Description",
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility",
+          "default": "editable"
+        },
+        "groupId": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Group id",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "type": {
+          "const": "integer",
+          "default": "integer",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "$ref": "#/$defs/Unlimited"
+            }
+          ],
+          "title": "Default"
+        },
+        "minimum": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Minimum",
+          "type": "integer"
+        },
+        "maximum": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Maximum",
+          "type": "integer"
+        },
+        "unlimited": {
+          "default": false,
+          "title": "Unlimited",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "type"
+      ],
+      "title": "IntegerPrivilege",
+      "type": "object"
+    },
+    "StringEnumPrivilege": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Description",
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility",
+          "default": "editable"
+        },
+        "groupId": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Group id",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "type": {
+          "const": "enum",
+          "default": "enum",
+          "title": "Type",
+          "type": "string"
+        },
+        "enum": {
+          "items": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Enum",
+          "type": "array"
+        },
+        "default": {
+          "type": "string",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "enum",
+        "type"
+      ],
+      "title": "StringEnumPrivilege",
+      "type": "object"
+    },
+    "Tag": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 80,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "title": "Tag",
+      "type": "object"
+    },
+    "Unlimited": {
+      "additionalProperties": false,
+      "description": "The explicit absence of a cap. JSON: ``{\"unlimited\": true}``.",
+      "properties": {
+        "unlimited": {
+          "const": true,
+          "title": "Unlimited",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "unlimited",
+        "unlimited"
+      ],
+      "title": "Unlimited",
+      "type": "object"
+    },
+    "Visibility": {
+      "enum": [
+        "hidden",
+        "read_only",
+        "editable"
+      ],
+      "title": "Visibility",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "privileges": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "boolean": "#/$defs/BooleanPrivilege",
+            "enum": "#/$defs/StringEnumPrivilege",
+            "integer": "#/$defs/IntegerPrivilege"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/BooleanPrivilege"
+          },
+          {
+            "$ref": "#/$defs/IntegerPrivilege"
+          },
+          {
+            "$ref": "#/$defs/StringEnumPrivilege"
+          }
+        ]
+      },
+      "title": "Privileges",
+      "type": "array"
+    },
+    "groups": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Group"
+      },
+      "title": "Groups",
+      "type": "array"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Tag"
+      },
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "privileges"
+  ],
+  "title": "PrivilegeCatalog",
+  "type": "object"
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Absent, not null, means no default",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "default": null
+      }
+    ]
+  }
+}

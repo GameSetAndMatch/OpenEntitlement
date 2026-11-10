@@ -1,0 +1,14 @@
+{
+  "description": "envOverride exists only on boolean Privileges",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "default": 5,
+        "envOverride": "MAX_SEATS"
+      }
+    ]
+  }
+}

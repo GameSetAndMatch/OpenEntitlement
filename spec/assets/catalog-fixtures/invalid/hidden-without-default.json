@@ -1,0 +1,14 @@
+{
+  "description": "Hidden Privileges need a default",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "visibility": "hidden"
+      }
+    ]
+  }
+}

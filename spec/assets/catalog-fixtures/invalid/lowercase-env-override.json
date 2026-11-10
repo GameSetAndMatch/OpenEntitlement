@@ -1,0 +1,14 @@
+{
+  "description": "envOverride is an uppercase environment variable name",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "default": false,
+        "envOverride": "mcp_installed"
+      }
+    ]
+  }
+}

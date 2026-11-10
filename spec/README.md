@@ -24,6 +24,7 @@ It plays the role for entitlements that [OpenFeature](https://openfeature.dev/sp
 | 10 | [Remote evaluation](sections/10-remote-evaluation.md) | OEREP v1 HTTP contract, requests, responses, security and locking |
 | - | [Glossary](glossary.md) | terms |
 | - | [Conformance suite](assets/gherkin/README.md) | Gherkin features any provider can run |
+| - | [Privilege Catalog JSON Schema](schemas/privilege-catalog.schema.json) | generated authoring contract ([RFC-0002](../docs/rfcs/0002-privilege-catalog.md)), with [shared fixtures](assets/catalog-fixtures/README.md) |
 
 ## Scope: the entitlement layer only
 

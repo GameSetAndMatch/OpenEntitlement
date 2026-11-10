@@ -1,0 +1,17 @@
+{
+  "description": "Enum choices are unique",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "retention",
+        "title": "Retention",
+        "type": "enum",
+        "enum": [
+          "30d",
+          "30d"
+        ]
+      }
+    ]
+  }
+}

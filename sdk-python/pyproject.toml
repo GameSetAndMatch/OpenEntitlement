@@ -17,6 +17,7 @@ dev = [
     "pre-commit>=4.6.2",
     "commitizen>=4.19.3",
     "deptry>=0.25.1",
+    "jsonschema>=4.23",
 ]
 
 [tool.uv]

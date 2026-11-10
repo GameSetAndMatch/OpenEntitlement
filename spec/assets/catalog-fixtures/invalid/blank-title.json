@@ -1,0 +1,13 @@
+{
+  "description": "Titles are trimmed before the length check",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "   ",
+        "type": "integer"
+      }
+    ]
+  }
+}

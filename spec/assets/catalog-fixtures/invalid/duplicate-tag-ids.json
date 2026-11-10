@@ -1,0 +1,21 @@
+{
+  "description": "Tag identifiers are unique",
+  "needsModelValidation": true,
+  "catalog": {
+    "tags": [
+      {
+        "id": "enterprise",
+        "title": "Enterprise"
+      },
+      {
+        "id": "mcp",
+        "title": "MCP"
+      },
+      {
+        "id": "enterprise",
+        "title": "Enterprise"
+      }
+    ],
+    "privileges": []
+  }
+}

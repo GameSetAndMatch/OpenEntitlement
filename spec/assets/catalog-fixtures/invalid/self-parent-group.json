@@ -1,0 +1,14 @@
+{
+  "description": "A Group cannot contain itself",
+  "needsModelValidation": true,
+  "catalog": {
+    "groups": [
+      {
+        "id": "product",
+        "title": "Product",
+        "parentId": "product"
+      }
+    ],
+    "privileges": []
+  }
+}

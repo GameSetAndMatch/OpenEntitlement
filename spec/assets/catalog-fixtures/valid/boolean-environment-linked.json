@@ -1,0 +1,37 @@
+{
+  "description": "Boolean with envOverride, one Group and several Tags",
+  "catalog": {
+    "groups": [
+      {
+        "id": "integrations",
+        "title": "Integrations"
+      }
+    ],
+    "tags": [
+      {
+        "id": "enterprise",
+        "title": "Enterprise"
+      },
+      {
+        "id": "mcp",
+        "title": "MCP"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "description": "Permit MCP use when installed.",
+        "visibility": "editable",
+        "default": false,
+        "groupId": "integrations",
+        "tags": [
+          "enterprise",
+          "mcp"
+        ],
+        "envOverride": "MCP_INSTALLED"
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Keys are flat identifiers",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat.max",
+        "title": "Seats",
+        "type": "integer"
+      }
+    ]
+  }
+}

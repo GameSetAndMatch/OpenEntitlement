@@ -3,7 +3,7 @@ title: TypeScript SDK
 description: Connect a TypeScript application to an OEREP service with the reference SDK.
 ---
 
-The core SDK uses the platform `fetch` API and has no runtime dependencies. Start from a source checkout; package publication is not assumed here.
+The core SDK uses the platform `fetch` API. Its one runtime dependency is [Zod](https://zod.dev), which validates Privilege Catalogs in `@openentitlement/core/authoring`; `npm install @openentitlement/core` installs it. Start from a source checkout; package publication is not assumed here.
 
 ## Use the repository workspace
 
@@ -48,6 +48,19 @@ await client.requireWithin('project_max', 4, 1, { organizationId: 'globex' });
 ```
 
 `requireWithin` checks only; use [guard](/docs/guards/) when counting usage and acting must be serialized. Map an `EntitlementDenied` error with `toHttpProblem` for an RFC 9457-style 403 response.
+
+## Validate a Privilege Catalog
+
+```ts
+import { parseCatalog } from '@openentitlement/core/authoring';
+
+const catalog = parseCatalog({
+  groups: [{ id: 'collaboration', title: 'Collaboration' }],
+  privileges: [{ key: 'seat_max', type: 'integer', title: 'Seats', default: 5, groupId: 'collaboration' }],
+});
+```
+
+`parseCatalog` and `parsePrivilege` throw an `Error` listing every problem; `PrivilegeCatalogSchema` and `PrivilegeSchema` are the underlying Zod schemas for `safeParse` or form libraries. Keys are camelCase (`groupId`, `parentId`, `envOverride`). The same rules are published as a [JSON Schema](/docs/privilege-catalog/#shared-json-schema).
 
 The remote provider never caches decisions. Timeouts, HTTP failures, malformed responses, and catalog mismatches become evaluation errors using the local default. Evaluation tokens are backend credentials; do not put them in a browser bundle.
 

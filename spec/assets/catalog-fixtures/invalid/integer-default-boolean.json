@@ -1,0 +1,13 @@
+{
+  "description": "Booleans never pass as integers",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "default": true
+      }
+    ]
+  }
+}
