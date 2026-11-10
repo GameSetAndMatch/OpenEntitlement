@@ -6,7 +6,6 @@ export default defineConfig({
   trailingSlash: 'always',
   integrations: [starlight({
     title: 'OpenEntitlement',
-    disable404Route: true,
     description: 'An open-source entitlement service and protocol. Learn to resolve what an organization may do, and how much of it.',
     logo: { light: './public/logo.svg', dark: './public/logo-dark.svg', replacesTitle: false },
     favicon: '/favicon.svg',

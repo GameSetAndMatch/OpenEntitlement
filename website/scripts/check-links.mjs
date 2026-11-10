@@ -13,7 +13,9 @@ const origin = 'https://openentitlement.dev';
 const routeFor = (file) => '/' + relative(dist, file).replace(/index\.html$/, '');
 const errors = [];
 for (const [file, content] of cache) {
-  for (const match of content.matchAll(/(?:href|src)=["']([^"']+)["']/g)) {
+  // Starlight's themed 404 page declares a /404/ canonical URL; a not-found response has no canonical route to check.
+  const checked = routeFor(file) === '/404.html' ? content.replace(/<link rel="canonical"[^>]*>/, '') : content;
+  for (const match of checked.matchAll(/(?:href|src)=["']([^"']+)["']/g)) {
     const href = match[1].replaceAll('&amp;', '&');
     if (/^(?:data:|mailto:|tel:|javascript:)/.test(href)) continue;
     const url = new URL(href, origin + routeFor(file));
