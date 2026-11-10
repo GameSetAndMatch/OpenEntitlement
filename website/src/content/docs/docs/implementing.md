@@ -31,12 +31,12 @@ State unsupported capabilities explicitly. A backend that always takes the most 
 
 ## Run the shared scenarios
 
-Start with the [Gherkin suite](https://github.com/GameSetAndMatch/openentitlement/tree/main/spec/assets/gherkin) and its [execution rules](https://github.com/GameSetAndMatch/openentitlement/blob/main/spec/assets/gherkin/README.md). Scenarios are tagged by requirement and provider capability.
+Start with the [Gherkin suite](https://github.com/open-entitlement/OpenEntitlement/tree/main/spec/assets/gherkin) and its [execution rules](https://github.com/open-entitlement/OpenEntitlement/blob/main/spec/assets/gherkin/README.md). Scenarios are tagged by requirement and provider capability.
 
 The reference harnesses supply examples of target setup, fact seeding, and test counters:
 
-- [TypeScript targets](https://github.com/GameSetAndMatch/openentitlement/blob/main/sdk-js/conformance/targets.ts).
-- [Python targets](https://github.com/GameSetAndMatch/openentitlement/blob/main/sdk-python/conformance/targets.py).
+- [TypeScript targets](https://github.com/open-entitlement/OpenEntitlement/blob/main/sdk-js/conformance/targets.ts).
+- [Python targets](https://github.com/open-entitlement/OpenEntitlement/blob/main/sdk-python/conformance/targets.py).
 
 Run every applicable scenario. Explain capability-based skips; do not remove an untagged test to make an implementation pass. For a remote implementation, also test over a real HTTP boundary: encoding, authentication, invalid context, timeouts, malformed responses, and single/bulk consistency.
 

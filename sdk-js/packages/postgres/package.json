@@ -34,7 +34,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GameSetAndMatch/openentitlement.git",
+    "url": "git+https://github.com/open-entitlement/OpenEntitlement.git",
     "directory": "sdk-js/packages/postgres"
   },
   "homepage": "https://openentitlement.dev/docs/"

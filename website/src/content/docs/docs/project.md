@@ -15,7 +15,7 @@ The guides use a source checkout. They do not assume packages have been publishe
 
 The repository includes a Node service with memory or Postgres storage, an administrative console, and TypeScript and Python SDKs. Shared conformance scenarios exercise resolution, overrides, grants, limit checks, and error behavior.
 
-[Inspect the source](https://github.com/GameSetAndMatch/openentitlement), [read the specification](/specification/01-data-model/), or [view CI results](https://github.com/GameSetAndMatch/openentitlement/actions).
+[Inspect the source](https://github.com/open-entitlement/OpenEntitlement), [read the specification](/specification/01-data-model/), or [view CI results](https://github.com/open-entitlement/OpenEntitlement/actions).
 
 ## Adoption boundaries
 
@@ -27,6 +27,6 @@ The current plan model uses variants and family-bound overrides. Applications re
 
 ## Report a problem
 
-[Open an issue](https://github.com/GameSetAndMatch/openentitlement/issues) with the specification version or commit, SDK language, expected behavior, and a minimal reproducible example. Remove credentials and customer information from reports.
+[Open an issue](https://github.com/open-entitlement/OpenEntitlement/issues) with the specification version or commit, SDK language, expected behavior, and a minimal reproducible example. Remove credentials and customer information from reports.
 
 Contributions to the model, protocol, implementations, and documentation are welcome. See [contributing](/docs/contributing/) for development checks.

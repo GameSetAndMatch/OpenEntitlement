@@ -51,4 +51,4 @@ await client.requireWithin('project_max', 4, 1, { organizationId: 'globex' });
 
 The remote provider never caches decisions. Timeouts, HTTP failures, malformed responses, and catalog mismatches become evaluation errors using the local default. Evaluation tokens are backend credentials; do not put them in a browser bundle.
 
-[Full SDK source and examples](https://github.com/GameSetAndMatch/openentitlement/tree/main/sdk-js).
+[Full SDK source and examples](https://github.com/open-entitlement/OpenEntitlement/tree/main/sdk-js).

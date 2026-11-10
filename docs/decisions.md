@@ -18,9 +18,9 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 
 ## Current implementation slices
 
-- [#22](https://github.com/GameSetAndMatch/OpenEntitlement/pull/22): shared workspace preview, verified sign-in, membership, isolation, audit and commercial facts.
-- [#23](https://github.com/GameSetAndMatch/OpenEntitlement/pull/23): boolean environment prerequisites and visibility controls.
-- [#24](https://github.com/GameSetAndMatch/OpenEntitlement/pull/24): typed Privilege authoring, one Group/multiple Tags, dataclasses and terminology consolidation.
+- [#22](https://github.com/open-entitlement/OpenEntitlement/pull/22): shared workspace preview, verified sign-in, membership, isolation, audit and commercial facts.
+- [#23](https://github.com/open-entitlement/OpenEntitlement/pull/23): boolean environment prerequisites and visibility controls.
+- [#24](https://github.com/open-entitlement/OpenEntitlement/pull/24): typed Privilege authoring, one Group/multiple Tags, dataclasses and terminology consolidation.
 
 These references identify review scope, not a permanent release-status dashboard. Check the actual merged code/release before claiming availability. The legacy standalone service remains a separate compatibility entry point. Production workspace identity provisioning, complete SDK integration of that slice, advanced metering and enterprise assurance are not implied by these previews.
 

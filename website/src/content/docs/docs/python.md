@@ -61,4 +61,4 @@ For a shared pool with a subject allowance, usage is `{'pool': 4, 'subject': 0}`
 
 A remote failure resolves to the privilege's local default with reason `ERROR`. Use timezone-aware datetimes when providing `now` directly to the remote provider. The client normalizes naive datetimes as UTC.
 
-For atomic check-and-act, see [Guards & usage](/docs/guards/). [Full Python SDK source](https://github.com/GameSetAndMatch/openentitlement/tree/main/sdk-python).
+For atomic check-and-act, see [Guards & usage](/docs/guards/). [Full Python SDK source](https://github.com/open-entitlement/OpenEntitlement/tree/main/sdk-python).

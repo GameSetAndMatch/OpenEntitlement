@@ -34,7 +34,7 @@ If the base value is `UNLIMITED`, adding a grant leaves it unlimited. On the wir
 
 A JSON response with the right fields can still be wrong if it applies another subject's grant, changes override precedence, or silently uses a default tenant for invalid context. Compatibility requires the semantics as well as the schema.
 
-The [shared conformance scenarios](https://github.com/GameSetAndMatch/openentitlement/tree/main/spec/assets/gherkin) exercise the numbered requirements across implementations. The [implementer guide](/docs/implementing/) explains the expected evidence.
+The [shared conformance scenarios](https://github.com/open-entitlement/OpenEntitlement/tree/main/spec/assets/gherkin) exercise the numbered requirements across implementations. The [implementer guide](/docs/implementing/) explains the expected evidence.
 
 ## Adoption and change
 

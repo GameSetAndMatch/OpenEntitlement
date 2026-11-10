@@ -3,7 +3,7 @@ title: Contributing
 description: Run conformance checks and propose changes to entitlement behavior.
 ---
 
-OpenEntitlement is experimental and Apache-2.0 licensed. Start with the [glossary](/reference/glossary/) and numbered specification. Raise a concrete issue or pull request in the [GitHub repository](https://github.com/GameSetAndMatch/openentitlement).
+OpenEntitlement is experimental and Apache-2.0 licensed. Start with the [glossary](/reference/glossary/) and numbered specification. Raise a concrete issue or pull request in the [GitHub repository](https://github.com/open-entitlement/OpenEntitlement).
 
 ## Run the checks
 

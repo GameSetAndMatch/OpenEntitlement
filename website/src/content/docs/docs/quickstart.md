@@ -10,7 +10,7 @@ Run a local service, inspect the demo organizations, and evaluate a real entitle
 This walkthrough uses the current source Catalog (`seat_max`, `project_max`, and other flat keys). Until a Docker release containing these keys is published, build the image from this checkout; older published images retain their previous Catalog keys:
 
 ```sh
-git clone https://github.com/GameSetAndMatch/OpenEntitlement.git
+git clone https://github.com/open-entitlement/OpenEntitlement.git
 cd OpenEntitlement
 docker build -t openentitlement:local .
 docker run --rm -p 127.0.0.1:8787:8787 -e OE_SEED=demo openentitlement:local
@@ -19,7 +19,7 @@ docker run --rm -p 127.0.0.1:8787:8787 -e OE_SEED=demo openentitlement:local
 Or, from source (requires Git, npm, and **Node 24**; Node ≥22.18 also supports the source runner):
 
 ```sh
-git clone https://github.com/GameSetAndMatch/openentitlement.git
+git clone https://github.com/open-entitlement/OpenEntitlement.git
 cd openentitlement/console
 npm ci
 npm run build

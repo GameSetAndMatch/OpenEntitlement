@@ -3,7 +3,7 @@
 - **Status:** accepted for the reference workspace authoring model; not a new released OEREP contract
 - **Date:** 2026-11-09
 - **Decisions:** [ADR-0003](../../ADR-0003.md), [ADR-0004](../../ADR-0004.md)
-- **Implementation:** [PR #24](https://github.com/GameSetAndMatch/OpenEntitlement/pull/24), on the workspace and boolean-prerequisite layers in #22/#23
+- **Implementation:** [PR #24](https://github.com/open-entitlement/OpenEntitlement/pull/24), on the workspace and boolean-prerequisite layers in #22/#23
 
 ## Contract
 

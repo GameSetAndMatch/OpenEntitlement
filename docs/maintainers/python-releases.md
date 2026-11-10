@@ -8,9 +8,9 @@ In [PyPI account publishing](https://pypi.org/manage/account/publishing/), add a
 
 | PyPI project name | GitHub owner | Repository | Workflow filename | Environment |
 |---|---|---|---|---|
-| `openentitlement-sdk` | `GameSetAndMatch` | `OpenEntitlement` | `publish-python.yml` | `pypi` |
-| `openentitlement-postgres` | `GameSetAndMatch` | `OpenEntitlement` | `publish-python.yml` | `pypi-postgres` |
-| `openentitlement-stripe` | `GameSetAndMatch` | `OpenEntitlement` | `publish-python.yml` | `pypi-stripe` |
+| `openentitlement-sdk` | `open-entitlement` | `OpenEntitlement` | `publish-python.yml` | `pypi` |
+| `openentitlement-postgres` | `open-entitlement` | `OpenEntitlement` | `publish-python.yml` | `pypi-postgres` |
+| `openentitlement-stripe` | `open-entitlement` | `OpenEntitlement` | `publish-python.yml` | `pypi-stripe` |
 
 For a project already owned by your account, configure its publisher in that project's settings instead. Pending publishers do not reserve names. Verify availability before the first release. No PyPI password or API token belongs in repository secrets.
 
@@ -33,6 +33,6 @@ Publishing is not atomic across projects. If one matrix job fails, fix its publi
 
 ## Troubleshooting publication
 
-A successful main-branch build does not publish. Confirm a published `python-v<version>` release and the publish jobs themselves. If PyPI reports `invalid-publisher`, compare the exact case-sensitive repository name (`GameSetAndMatch/OpenEntitlement`), workflow filename and environment against the pending publisher. Recreate entries after a repository rename; GitHub URL redirects do not change an OIDC claim. The core distribution is `openentitlement-sdk`, but its import remains `openentitlement`. PostgreSQL and Stripe packages are optional adapters, not Tier variants.
+A successful main-branch build does not publish. Confirm a published `python-v<version>` release and the publish jobs themselves. If PyPI reports `invalid-publisher`, compare the exact case-sensitive repository name (`open-entitlement/OpenEntitlement`), workflow filename and environment against the pending publisher. Recreate entries after a repository rename; GitHub URL redirects do not change an OIDC claim. The core distribution is `openentitlement-sdk`, but its import remains `openentitlement`. PostgreSQL and Stripe packages are optional adapters, not Tier variants.
 
 The failed `python-v0.1.0` release used the previous distribution name; do not rerun it after changing the pending publisher. Merge this naming change and publish `python-v0.1.1` from the tested main commit.

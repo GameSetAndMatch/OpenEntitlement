@@ -7,7 +7,7 @@ The entitlement service is a Node application. The static documentation website 
 
 ## Docker Compose
 
-The repository ships two Compose files in [`deploy/`](https://github.com/GameSetAndMatch/openentitlement/tree/main/deploy). Both start with an empty workspace and open the console's setup screen.
+The repository ships two Compose files in [`deploy/`](https://github.com/open-entitlement/OpenEntitlement/tree/main/deploy). Both start with an empty workspace and open the console's setup screen.
 
 | File | Storage | Use it for |
 |---|---|---|
@@ -94,4 +94,4 @@ Access requires both the resolved entitlement and the environment variable to be
 
 Only boolean environment bindings are supported. `false` vetoes access; `true` preserves the customer’s existing entitlement and never grants additional access. Invalid or missing bound variables are errors; restart after changing the environment. Integer and string settings remain normal Catalog values.
 
-See the [Catalog environment guide](https://github.com/GameSetAndMatch/openentitlement/blob/main/console/ENVIRONMENT-OVERRIDES.md) for supported types, Compose examples and workspace administration.
+See the [Catalog environment guide](https://github.com/open-entitlement/OpenEntitlement/blob/main/console/ENVIRONMENT-OVERRIDES.md) for supported types, Compose examples and workspace administration.
