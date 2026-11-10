@@ -73,7 +73,8 @@ Primary users:
 | Feature | Status | Where |
 |---|---|---|
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
-| Landing page rebuilt on the docs' theme and components, showing the current model | 🚧 | #33 |
+| Automatic website deployment to Cloudflare on every merge to `main` | 🚧 | this PR; 👤 needs the `CLOUDFLARE_API_TOKEN` secret |
+| Landing page rebuilt on the docs' theme and components, showing the current model | ✅ | #33 |
 | PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
 | PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |
 | Funnel dashboards: website acquisition (landing → docs → quickstart → install → GitHub/Docker) and console activation (sign-in → Workspace → Privilege → Tier → Organization → API key → first evaluation) | ✅ created in PostHog; 📋 hosted console must set `OE_POSTHOG_KEY` to feed the activation funnel | #34, `tools/posthog/dashboards.mjs` |
