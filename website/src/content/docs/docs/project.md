@@ -21,7 +21,7 @@ The repository includes a Node service with memory or Postgres storage, an admin
 
 Application authentication and tenant authorization remain the caller's responsibility. Evaluation credentials are trusted service credentials covering the instance; do not expose them to a browser or untrusted tenant.
 
-Applications own usage storage, counting, reset windows, and consumption idempotency. The protocol does not reserve quota or process payments. Remote clients do not cache decisions in the current draft.
+Applications own usage storage, counting, reset windows, and consumption idempotency. The protocol does not reserve quota or process payments. Remote clients cache decisions only when the application opts in with a short TTL, and never for check-and-act paths.
 
 The current plan model uses variants and family-bound overrides. Applications relying on those semantics should consult the data-model specification before integrating.
 

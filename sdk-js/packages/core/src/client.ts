@@ -109,7 +109,9 @@ export class EntitlementClient {
     }
   }
 
-  async #evaluate(key: string, ctx: EvaluationContext | undefined, opts: { expect?: ValueType; fallback: unknown; feature?: string }): Promise<ResolutionDetails> {
+  async #evaluate(key: string, ctx: EvaluationContext | undefined, opts: { expect?: ValueType; fallback: unknown; feature?: string; fresh?: boolean; explicitTime?: boolean }): Promise<ResolutionDetails> {
+    // A caller-supplied `now` is a time-travel query: tell caching providers not to serve or store it.
+    const explicitTime = opts.explicitTime ?? (mergeContext(this.context, ctx).now !== undefined);
     const merged = this.#merge(ctx);
     const priv = this.catalog.privilege(key);
     const hctx: HookContext = {
@@ -130,7 +132,7 @@ export class EntitlementClient {
       for (const h of [...this.hooks].reverse()) await this.#safe("finally", () => h.finally?.(hctx, d));
       return d;
     }
-    const d = withFeature(await this.#resolve(key, priv, merged, opts));
+    const d = withFeature(await this.#resolve(key, priv, merged, { ...opts, explicitTime }));
     for (const h of [...this.hooks].reverse()) {
       if (d.reason === Reason.ERROR) await this.#safe("error", () => h.error?.(hctx, new EvaluationError(d)));
       else await this.#safe("after", () => h.after?.(hctx, d));
@@ -143,7 +145,7 @@ export class EntitlementClient {
     key: string,
     priv: PrivilegeDefinition | undefined,
     ctx: EvaluationContext & { now: Date },
-    opts: { expect?: ValueType; fallback: unknown },
+    opts: { expect?: ValueType; fallback: unknown; fresh?: boolean; explicitTime?: boolean },
   ): Promise<ResolutionDetails> {
     if (!priv) return errorDetails(key, opts.fallback, ErrorCode.PRIVILEGE_NOT_FOUND, `"${key}" is not in the catalog`);
     if (opts.expect && priv.valueType !== opts.expect)
@@ -154,7 +156,8 @@ export class EntitlementClient {
     if (initError !== undefined) return errorDetails(key, priv.default, ErrorCode.PROVIDER_NOT_READY, `initialize failed: ${String(initError)}`);
     let d: ResolutionDetails;
     try {
-      d = await this.provider.resolve(priv, ctx as ResolvedContext);
+      const options = { ...(opts.fresh ? { fresh: true } : {}), explicitTime: opts.explicitTime ?? true };
+      d = await this.provider.resolve(priv, ctx as ResolvedContext, options);
     } catch (e) {
       if (e instanceof ProviderNotReady) return errorDetails(key, priv.default, ErrorCode.PROVIDER_NOT_READY, e.message);
       return errorDetails(key, priv.default, ErrorCode.GENERAL, `provider error: ${String(e)}`); // Requirement 6.1.5
@@ -187,11 +190,15 @@ export class EntitlementClient {
 
   // ---------------------------------------------------------------- features (4.2.1, 4.2.2)
 
-  async isEnabledDetails(feature: string, ctx?: EvaluationContext): Promise<ResolutionDetails<boolean>> {
+  isEnabledDetails(feature: string, ctx?: EvaluationContext): Promise<ResolutionDetails<boolean>> {
+    return this.#isEnabledDetails(feature, ctx, false);
+  }
+
+  async #isEnabledDetails(feature: string, ctx: EvaluationContext | undefined, fresh: boolean): Promise<ResolutionDetails<boolean>> {
     const f = this.catalog.feature(feature);
     if (!f) return errorDetails("", false, ErrorCode.FEATURE_NOT_FOUND, `feature "${feature}" is not in the catalog`, feature);
     const gate = this.catalog.privilege(gateKey(f))!;
-    const d = await this.#evaluate(gate.key, ctx, { feature, fallback: gate.default });
+    const d = await this.#evaluate(gate.key, ctx, { feature, fallback: gate.default, fresh });
     const v = d.value;
     const enabled = gate.valueType === "boolean" ? v === true : isUnlimited(v) || (isInt(v) && v > 0);
     const out: ResolutionDetails<boolean> = { ...d, value: enabled };
@@ -206,8 +213,9 @@ export class EntitlementClient {
     return (await this.isEnabledDetails(feature, ctx)).value;
   }
 
+  /** A check-and-act gate: never served from a provider-side decision cache. */
   async requireEnabled(feature: string, ctx?: EvaluationContext): Promise<ResolutionDetails<boolean>> {
-    const d = await this.isEnabledDetails(feature, ctx);
+    const d = await this.#isEnabledDetails(feature, ctx, true);
     if (!d.value) {
       const f = this.catalog.feature(feature);
       throw new FeatureNotEntitled({ feature, privilege: f ? gateKey(f) : d.privilege, details: d, requiredPlan: d.requiredPlan });
@@ -225,13 +233,16 @@ export class EntitlementClient {
     return (await this.getLimitDetails(privilege, ctx)).value;
   }
 
-  /** Check-only: NOT atomic with whatever you do next. Use `guard` for that (Requirement 5.1.1). */
+  /**
+   * Check-only: NOT atomic with whatever you do next. Use `guard` for that (Requirement 5.1.1).
+   * Like `guard`, never served from a provider-side decision cache.
+   */
   async requireWithin(privilege: string, current: Usage, requested: number, ctx?: EvaluationContext): Promise<ResolutionDetails<Limit>> {
     if (!isInt(requested)) throw new InvalidArgument(`requested must be an integer, got ${String(requested)}`);
     normalizeUsage(current); // validates (Requirement 3.3.2)
     const priv = this.catalog.privilege(privilege);
     if (priv && priv.valueType !== "integer") throw new TypeMismatch(`requireWithin needs an integer privilege; ${privilege} is ${priv.valueType}`);
-    const d = await this.getLimitDetails(privilege, ctx);
+    const d = await this.#evaluate(privilege, ctx, { expect: "integer", fallback: 0, fresh: true }) as ResolutionDetails<Limit>;
     return this.#checkResolvedLimit(privilege, d, current, requested, ctx);
   }
 
@@ -281,11 +292,13 @@ export class EntitlementClient {
     ctx: EvaluationContext | undefined,
     fns: { count: (tx: Tx) => Usage | Promise<Usage>; act: (tx: Tx) => R | Promise<R> },
   ): Promise<GuardResult<R>> {
+    const explicitTime = mergeContext(this.context, ctx).now !== undefined;
     const merged = this.#merge(ctx);
     const problem = contextProblem(merged);
     if (problem) throw new InvalidArgument(problem);
     return this.lock.run(lockKey(merged.organizationId!, privilege), async (tx: Tx) => {
-      const resolved = await this.getLimitDetails(privilege, merged);
+      // Check-and-act: always the provider's current limit, never a cached one.
+      const resolved = await this.#evaluate(privilege, merged, { expect: "integer", fallback: 0, fresh: true, explicitTime }) as ResolutionDetails<Limit>;
       const current = await fns.count(tx);
       const details = await this.#checkResolvedLimit(privilege, resolved, current, requested, merged);
       const result = await fns.act(tx);

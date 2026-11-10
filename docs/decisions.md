@@ -4,7 +4,7 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 
 | Record | Status and scope |
 |---|---|
-| [ADR-0001](../ADR-0001.md) | Accepted: protocol, generic SDKs and own reference server; application-owned usage |
+| [ADR-0001](../ADR-0001.md) | Accepted: protocol, generic SDKs and own reference server; application-owned usage; opt-in `RemoteProvider` decision cache (never for check-and-act) |
 | [ADR-0002](../ADR-0002.md) | Historical accepted design, partially superseded by ADR-0003/0004; AWS-first, Tenant UI terminology and implicit Stripe-free access are not current requirements |
 | [ADR-0003](../ADR-0003.md) | Accepted: Workspace control plane, Privilege Catalog, Group/Tag cardinality and compatibility boundaries |
 | [ADR-0004](../ADR-0004.md) | Accepted: boolean-only restrictive environment prerequisites, separate visibility, usage/billing boundaries |
