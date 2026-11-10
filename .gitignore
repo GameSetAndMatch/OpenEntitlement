@@ -35,3 +35,4 @@ deploy/.env
 
 # Generated from docs/guides/acme-workspace.md
 website/src/content/docs/docs/acme-workspace.md
+website/public/revision.json

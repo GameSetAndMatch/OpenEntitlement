@@ -30,13 +30,15 @@ jobs:
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
+      # Written into public/ so it survives every build, including the one
+      # `wrangler deploy` runs itself from the `build` command in wrangler.jsonc.
       - name: Stamp the deployment revision
         run: |
           node --input-type=module - <<'JS'
           import { writeFileSync } from 'node:fs';
-          writeFileSync('website/dist/revision.json', JSON.stringify({ revision: process.env.GITHUB_SHA }) + '\n');
+          writeFileSync('website/public/revision.json', JSON.stringify({ revision: process.env.GITHUB_SHA }) + '\n');
           JS
+      - run: npm run build
       - name: Deploy to Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
