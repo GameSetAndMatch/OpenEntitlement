@@ -7,6 +7,7 @@ from openentitlement.privileges import (
     Group,
     IntegerPrivilege,
     Privilege,
+    PrivilegeCatalog,
     StringEnumPrivilege,
     Tag,
     Visibility,
@@ -67,3 +68,29 @@ def test_catalog_checks_references_cycles_and_multiple_tags():
         PrivilegeCatalog(privileges=catalog.privileges, groups=catalog.groups)
     with pytest.raises(ValueError, match="cycle"):
         PrivilegeCatalog(privileges=(), groups=(Group(id="one", title="One", parent_id="two"), Group(id="two", title="Two", parent_id="one")))
+
+
+@pytest.mark.parametrize("default", [{}, {"unlimited": 1}, {"unlimited": False}, {"unlimited": None}, {"unlimited": True, "extra": 0}])
+def test_unlimited_requires_explicit_true(default):
+    with pytest.raises(ValueError):
+        IntegerPrivilege(key="seats", title="Seats", unlimited=True, default=default)
+
+
+@pytest.mark.parametrize("field", ["groupId", "maximum", "default"])
+def test_explicit_null_is_rejected(field):
+    with pytest.raises(ValueError):
+        IntegerPrivilege.model_validate({"key": "seats", "title": "Seats", field: None})
+
+
+def test_nested_normal_serialization_omits_absent_fields():
+    from pydantic import BaseModel
+
+    class Response(BaseModel):
+        catalog: PrivilegeCatalog
+
+    catalog = PrivilegeCatalog(privileges=(BooleanPrivilege(key="enabled", title="Enabled"),))
+    raw = json.loads(Response(catalog=catalog).model_dump_json())["catalog"]
+    assert "groupId" not in raw["privileges"][0]
+    assert "default" not in raw["privileges"][0]
+    assert "envOverride" not in raw["privileges"][0]
+    assert PrivilegeCatalog.model_validate(raw) == catalog

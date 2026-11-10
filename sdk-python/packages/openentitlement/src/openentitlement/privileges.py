@@ -20,6 +20,7 @@ from pydantic import (
     StringConstraints,
     TypeAdapter,
     model_validator,
+    model_serializer,
 )
 
 from .model import OpenEntitlementModel
@@ -43,6 +44,17 @@ class CatalogModel(OpenEntitlementModel):
     """The shared model configuration (immutable, no unknown fields, camelCase JSON), plus validated defaults."""
 
     model_config = ConfigDict(validate_default=True, use_enum_values=False)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_explicit_nulls(cls, value: Any) -> Any:
+        if isinstance(value, dict) and any(v is None for v in value.values()):
+            raise ValueError("Omit absent Catalog fields rather than supplying null")
+        return value
+
+    @model_serializer(mode="wrap")
+    def _omit_absent(self, handler: Any) -> dict[str, Any]:
+        return {key: value for key, value in handler(self).items() if value is not None}
 
     def to_dict(self) -> dict[str, Any]:
         """The Catalog JSON shape, with camelCase keys."""
@@ -119,7 +131,14 @@ class BooleanPrivilege(Privilege):
 class Unlimited(CatalogModel):
     """The explicit absence of a cap. JSON: ``{"unlimited": true}``."""
 
-    unlimited: Literal[True] = True
+    unlimited: Literal[True]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _explicit_true(cls, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("unlimited") is not True:
+            raise ValueError("Unlimited requires explicit boolean true")
+        return value
 
 
 class IntegerPrivilege(Privilege):

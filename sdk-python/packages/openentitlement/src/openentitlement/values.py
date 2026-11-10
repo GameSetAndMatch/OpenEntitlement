@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Union
 
+from pydantic import StrictBool, StrictInt, StrictStr
+
 
 class Unlimited:
     """The distinct "no limit" value (Requirement 1.2.1).
@@ -70,10 +72,10 @@ class Unlimited:
 
 UNLIMITED = Unlimited()
 
-Limit = Union[int, Unlimited]
+Limit = Union[StrictInt, Unlimited]
 """An integer privilege value: a non-negative int or UNLIMITED."""
 
-Value = Union[bool, int, str, Unlimited]
+Value = Union[StrictBool, StrictInt, StrictStr, Unlimited]
 """Any privilege value."""
 
 

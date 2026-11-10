@@ -6,11 +6,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Generic, Mapping, Optional, TypeVar, Union
 
-from pydantic import Field, SkipValidation, StrictInt
+from pydantic import Field, SkipValidation, StrictInt, model_validator
 
 from .errors import InvalidArgument
 from .model import OpenEntitlementModel, WireModel
-from .values import encode_value, is_int
+from .values import decode_value, encode_value, is_int
 
 T = TypeVar("T")
 
@@ -115,6 +115,17 @@ class ResolutionDetails(WireModel, Generic[T]):
     error_code: Optional[ErrorCode] = None
     error_message: Optional[str] = None
     lock_domain: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _preserve_plan_presence(cls, value: Any) -> Any:
+        if isinstance(value, dict) and ("planValue" in value or "plan_value" in value):
+            value = dict(value)
+            if "has_plan_value" not in value and "hasPlanValue" not in value:
+                value["has_plan_value"] = True
+            key = "planValue" if "planValue" in value else "plan_value"
+            value[key] = decode_value(value[key])
+        return value
 
     def with_(self, **changes: Any) -> "ResolutionDetails[Any]":
         """A copy with ``changes`` applied, like ``dataclasses.replace`` (not re-validated)."""

@@ -147,3 +147,33 @@ def test_malformed_admin_arguments_raise_sdk_errors() -> None:
         c.admin.create_grant(None, "seat_max", 1, actor="ops", reason="pack")  # type: ignore[arg-type]
     with pytest.raises(InvalidArgument):
         c.admin.assign_plan("acme", "free", actor=None, reason="x")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("value", [True, "12", 1.5, {}, {"unlimited": 1}, {"unlimited": False}, {"unlimited": None}, {"unlimited": True, "extra": 1}])
+def test_typed_limit_rejects_coercion(value: object) -> None:
+    with pytest.raises(ValidationError):
+        ResolutionDetails[Limit](privilege="seat_max", value=value, reason=Reason.PLAN)
+
+
+@pytest.mark.parametrize("value", [0, False, None, {"unlimited": True}])
+def test_plan_value_presence_roundtrips(value: object) -> None:
+    raw = {"privilege": "seat_max", "value": 1, "reason": "PLAN", "planValue": value}
+    details = ResolutionDetails[Limit].model_validate(raw)
+    for _ in range(2):
+        dumped = details.model_dump_json()
+        assert "hasPlanValue" not in dumped and "has_plan_value" not in dumped
+        assert json.loads(dumped)["planValue"] == value
+        details = ResolutionDetails[Limit].model_validate_json(dumped)
+    absent = ResolutionDetails[Limit](privilege="seat_max", value=1, reason=Reason.PLAN)
+    assert "planValue" not in absent.model_dump()
+
+
+def test_value_union_preserves_types_and_rejects_coercion() -> None:
+    from openentitlement.values import Value
+
+    adapter = TypeAdapter(Value)
+    for value in (True, 0, "12", UNLIMITED):
+        assert type(adapter.validate_python(value)) is type(value)
+    for value in (1.5, None, {}, {"unlimited": 1}):
+        with pytest.raises(ValidationError):
+            adapter.validate_python(value)
