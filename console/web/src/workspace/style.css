@@ -49,3 +49,18 @@
 
 .workspace-card { min-width: 0; }
 .workspace-card code { overflow-wrap: anywhere; }
+
+/* Labels belong to a Privilege; Group management stays independent. */
+.privilege-tags { margin:20px 0; }
+.tag-field-title { display:block; font-weight:600; margin-bottom:8px; }
+.selected-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.tag-chip { border:1px solid #b9dcd6; border-radius:20px; background:#e2f3ef; color:#145b51; padding:5px 10px; font:inherit; font-size:13px; cursor:pointer; }
+.tag-picker { position:relative; max-width:360px; }
+.tag-picker summary { cursor:pointer; display:list-item; color:var(--accent-dark); font-size:14px; padding:8px 0; }
+.tag-popover { border:1px solid var(--line); padding:14px; border-radius:8px; background:white; box-shadow:0 6px 20px #182f4014; }
+.tag-popover label { display:block; }
+.tag-popover input:not([type=checkbox]) { width:100%; margin-top:8px; }
+.tag-options { max-height:220px; overflow:auto; margin:10px 0; }
+.tag-options label { display:flex; align-items:center; gap:8px; padding:8px 0; }
+.tag-options input { width:16px; height:16px; }
+.tag-picker :focus-visible,.tag-chip:focus-visible { outline:2px solid var(--accent-dark); outline-offset:3px; }
