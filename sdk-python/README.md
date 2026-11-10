@@ -2,16 +2,16 @@ Connect to our [entitlement service](../console/README.md) using the generic `Re
 
 # OpenEntitlement, Python SDK
 
-Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Python ≥ 3.10, synchronous API.
+Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Python ≥ 3.11, synchronous API.
 
 | Package | Depends on | Contents |
 |---|---|---|
-| `openentitlement-sdk` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
+| `openentitlement-sdk` | `pydantic>=2.12,<3` | Pydantic models, API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
 | `openentitlement-sdk[postgres]` → `openentitlement.postgres` | `psycopg>=3.1` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, [`schema.sql`](packages/openentitlement/src/openentitlement/postgres/schema.sql) |
 
 ## Python-first authoring and business walkthrough
 
-See [ACME: a Workspace and its entitlements](../docs/guides/acme-workspace.md) for Groups, Tags, Catalog defaults, Tiers and variants, Organization terms and user exceptions. Optional strict Pydantic authoring lives in `openentitlement.authoring` (`openentitlement-sdk[authoring]`); the runtime SDK stays dependency-free.
+See [ACME: a Workspace and its entitlements](../docs/guides/acme-workspace.md) for Groups, Tags, Catalog defaults, Tiers and variants, Organization terms and user exceptions. The Privilege Catalog models (`PrivilegeCatalog`, `BooleanPrivilege`, `Group`, `Tag` …) are strict Pydantic models exported from `openentitlement`. Every SDK model is a frozen Pydantic model with snake_case attributes and camelCase JSON ([ADR-0006](../ADR-0006.md)). See [`examples/fastapi_app.py`](examples/fastapi_app.py) for FastAPI use.
 
 ## Quick start
 

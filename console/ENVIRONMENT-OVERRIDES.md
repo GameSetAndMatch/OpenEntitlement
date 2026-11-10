@@ -68,4 +68,4 @@ The standalone OEREP service uses its existing `FIXED` reason plus optional diag
 
 Keep MCP as a normal boolean entitlement: Basic denies it and Business includes it. If the MCP component is absent, `MCP_INSTALLED=false` vetoes both. When installed, `true` preserves each customer's entitlement: Basic stays denied and Business can use MCP. Behavior settings such as timeouts or model names remain deployment configuration, not entitlement environment bindings.
 
-The new workspace Privilege Catalog uses `env_override` and `visibility` in place of legacy `envVariable`, `hidden` and `frozen` fields. See [Privilege Catalog](PRIVILEGE-CATALOG.md). The boolean AND behavior is unchanged; older standalone Catalogs remain supported.
+The new workspace Privilege Catalog uses `envOverride` (`env_override` on the Python model) and `visibility` in place of legacy `envVariable`, `hidden` and `frozen` fields. See [Privilege Catalog](PRIVILEGE-CATALOG.md). The boolean AND behavior is unchanged; older standalone Catalogs remain supported.

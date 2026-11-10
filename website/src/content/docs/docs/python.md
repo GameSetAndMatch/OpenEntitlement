@@ -3,21 +3,21 @@ title: Python SDK
 description: Evaluate entitlements from Python using the synchronous reference SDK.
 ---
 
-The Python SDK is synchronous and uses `urllib` from the standard library for remote evaluation.
+The Python SDK is synchronous and uses `urllib` from the standard library for remote evaluation. Its models are [Pydantic](https://docs.pydantic.dev/) models; Pydantic is the only required dependency.
 
 ## Install
 
 ```sh
 pip install openentitlement-sdk
-# Optional validated Catalog authoring:
-pip install 'openentitlement-sdk[authoring]>=0.2.0'
+# PostgreSQL provider (adds psycopg):
+pip install 'openentitlement-sdk[postgres]'
 ```
 
-The distribution name is `openentitlement-sdk`; Python imports remain `openentitlement`. The authoring extra provides Pydantic models from `openentitlement.authoring`; the runtime alone needs no third-party dependencies. Follow the [ACME Workspace walkthrough](/docs/acme-workspace/) for typed Privileges, Groups, Tags, Tiers, Organizations and user exceptions. New authoring APIs described here require the corresponding released SDK version; use the source checkout until it is published.
+The distribution name is `openentitlement-sdk`; Python imports remain `openentitlement`. It requires Python 3.11 or later and installs Pydantic 2. The Privilege Catalog models (`PrivilegeCatalog`, `BooleanPrivilege`, `Group`, `Tag` …) are exported from `openentitlement`; the former `[authoring]` extra is no longer needed. Follow the [ACME Workspace walkthrough](/docs/acme-workspace/) for typed Privileges, Groups, Tags, Tiers, Organizations and user exceptions. New authoring APIs described here require the corresponding released SDK version; use the source checkout until it is published.
 
 ## Use the source workspace
 
-Requires Python ≥3.10 and [uv](https://docs.astral.sh/uv/). From the repository root:
+Requires Python ≥3.11 and [uv](https://docs.astral.sh/uv/). From the repository root:
 
 ```sh
 cd sdk-python
@@ -51,7 +51,7 @@ print(client.get_details('seat_max', context).to_dict())
 
 ## Use idiomatic names
 
-Python uses snake_case: `get_limit`, `is_enabled`, `get_enum`, `get_details`, `require_within`, and `required_plan`. Wire JSON retains the specification's camelCase names.
+Python uses snake_case: `get_limit`, `is_enabled`, `get_enum`, `get_details`, `require_within`, and `required_plan`. Model attributes are snake_case too (`details.plan_id`, `privilege.group_id`). JSON keeps camelCase names (`planId`, `groupId`): `to_dict()`, `model_dump_json()` and JSON Schema all use them, and validation accepts either spelling.
 
 ```python
 client.require_within('project_max', 4, 1, {'organization_id': 'globex'})
@@ -62,3 +62,24 @@ For a shared pool with a subject allowance, usage is `{'pool': 4, 'subject': 0}`
 A remote failure resolves to the privilege's local default with reason `ERROR`. Use timezone-aware datetimes when providing `now` directly to the remote provider. The client normalizes naive datetimes as UTC.
 
 For atomic check-and-act, see [Guards & usage](/docs/guards/). [Full Python SDK source](https://github.com/open-entitlement/OpenEntitlement/tree/main/sdk-python).
+
+## Use with FastAPI
+
+Because the models are Pydantic models, FastAPI can use `ResolutionDetails` and `PrivilegeCatalog` directly as request bodies and response types. It validates the input, serializes camelCase JSON and documents both in OpenAPI. FastAPI is not an SDK dependency; install it in your application.
+
+```python
+from fastapi import FastAPI
+from openentitlement import Limit, PrivilegeCatalog, ResolutionDetails
+
+app = FastAPI()
+
+@app.get('/organizations/{organization_id}/limits/{privilege}')
+def get_limit(organization_id: str, privilege: str) -> ResolutionDetails[Limit]:
+    return client.get_limit_details(privilege, {'organization_id': organization_id})
+
+@app.post('/privilege-catalog')
+def check_catalog(catalog: PrivilegeCatalog) -> PrivilegeCatalog:
+    return catalog  # invalid Catalogs are rejected with 422
+```
+
+A response looks like `{"privilege": "seat_max", "value": 3, "reason": "PLAN", "grants": [], "staleOverrides": [], "planId": "free", "planValue": 3}`. This is the same OEREP v1 details shape that `to_dict()` returns: absent members are omitted and UNLIMITED is `{"unlimited": true}`. The OpenAPI schema lists camelCase property names. The runnable [FastAPI example](https://github.com/open-entitlement/OpenEntitlement/blob/main/sdk-python/examples/fastapi_app.py) is covered by the SDK test suite.

@@ -7,15 +7,15 @@
 
 ## Contract
 
-A Privilege has a flat stable `key`, `type`, `title`, `description`, `visibility`, an optional single `group_id`, zero or more unique Tag IDs in `tags`, and an optional typed `default`.
+A Privilege has a flat stable `key`, `type`, `title`, `description`, `visibility`, an optional single `groupId`, zero or more unique Tag IDs in `tags`, and an optional typed `default`.
 
 | Subtype | Type value | Additional fields |
 |---|---|---|
-| Boolean | `boolean` | Boolean default; optional `env_override` variable name |
+| Boolean | `boolean` | Boolean default; optional `envOverride` variable name |
 | Integer | `integer` | Integer default or explicit allowed unlimited value; optional minimum/maximum/unlimited capability |
 | String enum | `enum` | Non-empty unique `enum` choices and an optional matching string default |
 
-`env_override` must not exist on integer or enum subtypes. It is a boolean AND prerequisite, not an exact-value replacement. Unknown keys, wrong types, out-of-range defaults, duplicate Tags and invalid references are errors. A Privilege belongs to at most one Group; Group parent relationships must exist and be acyclic. Tags are labels independent of that hierarchy.
+`envOverride` must not exist on integer or enum subtypes. It is a boolean AND prerequisite, not an exact-value replacement. Unknown keys, wrong types, out-of-range defaults, duplicate Tags and invalid references are errors. A Privilege belongs to at most one Group; Group parent relationships must exist and be acyclic. Tags are labels independent of that hierarchy.
 
 Visibility is `editable`, `read_only` or `hidden`. Read-only values use the Catalog default; hidden values are omitted from normal controls but still evaluate. Environment-linked boolean controls are locked and display the prerequisite's source. Hidden, read-only and environment-linked values need defaults; otherwise an editable value without a default must be supplied in every tier variant.
 
@@ -35,16 +35,16 @@ privileges:
     description: Permit MCP use when the component is installed.
     visibility: editable
     default: false
-    group_id: integrations
+    groupId: integrations
     tags: [enterprise, mcp]
-    env_override: MCP_INSTALLED
+    envOverride: MCP_INSTALLED
 ```
 
 ## Workflow and boundaries
 
 Author Privileges and metadata in the Catalog, create Tiers/variants from their defaults, then assign Organizations and negotiated terms. Standard, trial and grace variants remain separate from commercial Tier level. A customer's contract and privileges do not become a role, release flag or billing provider.
 
-The reference implementation exposes a typed authoring API and serializable Python dataclasses. JSON/YAML representation is intentionally simple, without requiring OpenAPI document structure or arbitrary schema vocabularies.
+The reference implementation exposes a typed authoring API and serializable Python Pydantic models. JSON and YAML keys are camelCase, while Python attributes stay snake_case ([ADR-0006](../../ADR-0006.md)). JSON/YAML representation is intentionally simple, without requiring OpenAPI document structure or arbitrary schema vocabularies.
 
 ## Compatibility and status
 

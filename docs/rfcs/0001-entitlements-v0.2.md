@@ -62,7 +62,7 @@ Each privilege is defined with a small subset of [JSON Schema 2020-12](https://j
 - `enum`: strings only;
 - two extensions: `x-unlimited: true`, which allows the value `unlimited` on an integer, and `x-subjects`.
 
-Nothing else: no `oneOf`, `$ref`, objects or arrays. Plain models with one validator are enough to check it, and a JSON Schema for editors is derived from them. Core SDKs keep no dependencies (ADR-0001), so the validator is hand-written in each language and shared conformance fixtures keep them aligned. Integer quantities must be safe across the supported languages; booleans and numeric strings must not pass as integers. The `x-unlimited` annotation must be translated to an ordinary allowed-value alternative in a generated editor schema; it does not make the string `unlimited` satisfy a standard `type: integer` schema by itself.
+Nothing else: no `oneOf`, `$ref`, objects or arrays. Plain models with one validator are enough to check it, and a JSON Schema for editors is derived from them. Core SDKs keep no dependencies (ADR-0001), so the validator is hand-written in each language and shared conformance fixtures keep them aligned. *(ADR-0006 later allowed Pydantic and Zod in the core SDKs; shared fixtures still keep the languages aligned.)* Integer quantities must be safe across the supported languages; booleans and numeric strings must not pass as integers. The `x-unlimited` annotation must be translated to an ordinary allowed-value alternative in a generated editor schema; it does not make the string `unlimited` satisfy a standard `type: integer` schema by itself.
 
 ```json
 {

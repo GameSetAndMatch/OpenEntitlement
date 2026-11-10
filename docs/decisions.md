@@ -8,7 +8,8 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 | [ADR-0002](../ADR-0002.md) | Historical accepted design, partially superseded by ADR-0003/0004; AWS-first, Tenant UI terminology and implicit Stripe-free access are not current requirements |
 | [ADR-0003](../ADR-0003.md) | Accepted: Workspace control plane, Privilege Catalog, Group/Tag cardinality and compatibility boundaries |
 | [ADR-0004](../ADR-0004.md) | Accepted: boolean-only restrictive environment prerequisites, separate visibility, usage/billing boundaries |
-| [ADR-0005](../ADR-0005.md) | Accepted: user-scoped inheritance, Cloud capability packaging and optional typed authoring |
+| [ADR-0005](../ADR-0005.md) | Accepted: user-scoped inheritance and Cloud capability packaging; its optional typed authoring is superseded by ADR-0006 |
+| [ADR-0006](../ADR-0006.md) | Accepted: core SDK dependency rule (only Pydantic/Zod), Pydantic models everywhere in Python, camelCase JSON with language-idiomatic attributes, Python ≥ 3.11; supersedes parts of ADR-0001/0003/0005 |
 | [RFC-0001](rfcs/0001-entitlements-v0.2.md) | Proposed historical contract refinement; retain unresolved parts explicitly, not as implemented requirements |
 | [RFC-0002](rfcs/0002-privilege-catalog.md) | Accepted reference authoring contract; not a normative OEREP version bump |
 | [RFC-0003](rfcs/0003-consumption-dashboard.md) | Proposed read-only consumption view; blocked on a real application/metering usage source |
@@ -20,7 +21,7 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 
 - [#22](https://github.com/open-entitlement/OpenEntitlement/pull/22): shared workspace preview, verified sign-in, membership, isolation, audit and commercial facts.
 - [#23](https://github.com/open-entitlement/OpenEntitlement/pull/23): boolean environment prerequisites and visibility controls.
-- [#24](https://github.com/open-entitlement/OpenEntitlement/pull/24): typed Privilege authoring, one Group/multiple Tags, dataclasses and terminology consolidation.
+- [#24](https://github.com/open-entitlement/OpenEntitlement/pull/24): typed Privilege authoring, one Group/multiple Tags and terminology consolidation (its dataclasses were replaced by Pydantic models under ADR-0006).
 
 These references identify review scope, not a permanent release-status dashboard. Check the actual merged code/release before claiming availability. The legacy standalone service remains a separate compatibility entry point. Production workspace identity provisioning, complete SDK integration of that slice, advanced metering and enterprise assurance are not implied by these previews.
 
