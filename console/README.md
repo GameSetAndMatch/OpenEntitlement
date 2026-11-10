@@ -62,7 +62,7 @@ const client = createClient({ catalog, provider: new RemoteProvider({ baseUrl: "
 const seats = await client.getLimit("seat_max", { organizationId: "acme" });
 ```
 
-Both clients use the application's catalog and validate remote values against it. They do not cache decisions. See the [protocol](../spec/sections/10-remote-evaluation.md) and [OpenAPI](../spec/oerep.openapi.json) for bulk resolution and suggestions.
+Both clients use the application's catalog and validate remote values against it. They do not cache decisions unless an opt-in TTL is configured, and never for check-and-act paths. See the [protocol](../spec/sections/10-remote-evaluation.md) and [OpenAPI](../spec/oerep.openapi.json) for bulk resolution and suggestions.
 
 ## Administration and credentials
 

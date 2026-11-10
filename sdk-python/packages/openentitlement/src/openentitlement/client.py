@@ -152,7 +152,13 @@ class EntitlementClient:
         expect: Optional[ValueType] = None,
         fallback: Any = None,
         feature: Optional[str] = None,
+        fresh: bool = False,
+        explicit_time: Optional[bool] = None,
     ) -> ResolutionDetails[Any]:
+        """``fresh``: a check-and-act path that must not be served from a provider-side decision cache."""
+        # A caller-supplied ``now`` is a time-travel query: caching providers must not serve or store it.
+        if explicit_time is None:
+            explicit_time = self.context.merged_with(to_context(ctx)).now is not None
         merged = self._merge(ctx)
         priv = self.catalog.privilege(key)
         # Every field is already typed here; skip re-validation on the evaluation hot path.
@@ -177,7 +183,9 @@ class EntitlementClient:
             self._run_finally_hooks(hctx, details)
             return details.with_(feature=feature)
 
-        details = self._resolve(key, priv, merged, expect=expect, fallback=fallback).with_(feature=feature)
+        details = self._resolve(
+            key, priv, merged, expect=expect, fallback=fallback, fresh=fresh, explicit_time=explicit_time
+        ).with_(feature=feature)
         if details.reason is Reason.ERROR:
             self._run_error_hooks(hctx, EvaluationError(details))
         else:
@@ -197,6 +205,8 @@ class EntitlementClient:
         *,
         expect: Optional[ValueType],
         fallback: Any,
+        fresh: bool = False,
+        explicit_time: bool = False,
     ) -> ResolutionDetails[Any]:
         if priv is None:
             return error_details(key, fallback, ErrorCode.PRIVILEGE_NOT_FOUND, f"{key!r} is not in the catalog")
@@ -211,7 +221,10 @@ class EntitlementClient:
         if init_error is not None:
             return error_details(key, priv.default, ErrorCode.PROVIDER_NOT_READY, f"initialize failed: {init_error}")
         try:
-            details = self.provider.resolve(priv, ctx)
+            if getattr(self.provider, "supports_fresh", False):
+                details = self.provider.resolve(priv, ctx, fresh=fresh, explicit_time=explicit_time)  # type: ignore[call-arg]
+            else:
+                details = self.provider.resolve(priv, ctx)
         except ProviderNotReady as e:
             return error_details(key, priv.default, ErrorCode.PROVIDER_NOT_READY, str(e))
         except Exception as e:  # noqa: BLE001 - Requirement 6.1.5
@@ -263,12 +276,15 @@ class EntitlementClient:
     # -- features (Requirements 4.2.1, 4.2.2, 3.2.x) ---------------------------------------------
 
     def is_enabled_details(self, feature: str, ctx: ContextArg = None) -> ResolutionDetails[bool]:
+        return self._is_enabled_details(feature, ctx)
+
+    def _is_enabled_details(self, feature: str, ctx: ContextArg, fresh: bool = False) -> ResolutionDetails[bool]:
         f = self.catalog.feature(feature)
         if f is None:
             return error_details("", False, ErrorCode.FEATURE_NOT_FOUND, f"feature {feature!r} is not in the catalog", feature)
         gate = self.catalog.privilege(f.gate_key)
         assert gate is not None
-        d = self._evaluate(gate.key, ctx, feature=feature, fallback=gate.default)
+        d = self._evaluate(gate.key, ctx, feature=feature, fallback=gate.default, fresh=fresh)
         v = d.value
         enabled = (v is True) if gate.value_type is ValueType.BOOLEAN else (is_unlimited(v) or (is_int(v) and v > 0))
         out = d.with_(value=enabled)
@@ -283,7 +299,8 @@ class EntitlementClient:
         return bool(self.is_enabled_details(feature, ctx).value)
 
     def require_enabled(self, feature: str, ctx: ContextArg = None) -> ResolutionDetails[bool]:
-        d = self.is_enabled_details(feature, ctx)
+        """A check-and-act gate: never served from a provider-side decision cache."""
+        d = self._is_enabled_details(feature, ctx, fresh=True)
         if not d.value:
             f = self.catalog.feature(feature)
             raise FeatureNotEntitled(
@@ -305,14 +322,16 @@ class EntitlementClient:
     def require_within(
         self, privilege: str, current: Usage, requested: int, ctx: ContextArg = None
     ) -> ResolutionDetails[Limit]:
-        """Check-only: NOT atomic with whatever you do next. Use :meth:`guard` for that (Requirement 5.1.1)."""
+        """Check-only: NOT atomic with whatever you do next. Use :meth:`guard` for that (Requirement 5.1.1).
+
+        Like ``guard``, never served from a provider-side decision cache."""
         if not is_int(requested):
             raise InvalidArgument(f"requested must be an integer, got {requested!r}")
         normalize_usage(current)  # validates (Requirement 3.3.2)
         priv = self.catalog.privilege(privilege)
         if priv is not None and priv.value_type is not ValueType.INTEGER:
             raise TypeMismatch(f"require_within needs an integer privilege; {privilege} is {priv.value_type.value}")
-        d = self._evaluate(privilege, ctx, expect=ValueType.INTEGER, fallback=0)
+        d = self._evaluate(privilege, ctx, expect=ValueType.INTEGER, fallback=0, fresh=True)
         return self._check_resolved_limit(privilege, d, current, requested, ctx)
 
     def _check_resolved_limit(
@@ -375,6 +394,7 @@ class EntitlementClient:
         act: Callable[[Any], R],
     ) -> GuardResult[R]:
         """Serialized check-then-act (Requirement 5.2.1)."""
+        explicit_time = self.context.merged_with(to_context(ctx)).now is not None
         merged = self._merge(ctx)
         problem = merged.validation_error()
         if problem:
@@ -382,7 +402,8 @@ class EntitlementClient:
         domain = getattr(self.lock, "domain", "unknown")
 
         def run(tx: Any) -> GuardResult[R]:
-            resolved = self.get_limit_details(privilege, merged)
+            # Check-and-act: always the provider's current limit, never a cached one.
+            resolved = self._evaluate(privilege, merged, expect=ValueType.INTEGER, fallback=0, fresh=True, explicit_time=explicit_time)
             current = count(tx)
             details = self._check_resolved_limit(privilege, resolved, current, requested, merged)
             return GuardResult(result=act(tx), details=details.with_(lock_domain=domain))

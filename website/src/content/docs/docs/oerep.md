@@ -46,7 +46,7 @@ The result is `{"requiredPlan":"business"}` or `{"requiredPlan":null}` when no e
 
 `organizationId` is required. `subjectId` and `resourceId` are optional non-empty strings. `now` is an optional RFC 3339 timestamp with timezone.
 
-Ordinary entitlement decisions return 200. Request/transport failures use HTTP 400, 401, 404, 405, 413, 415, or 500 with `{error, message}`. Resolution errors carry reason `ERROR` in the details. Responses use `Cache-Control: no-store`; the generic providers do not cache decisions.
+Ordinary entitlement decisions return 200. Request/transport failures use HTTP 400, 401, 404, 405, 413, 415, or 500 with `{error, message}`. Resolution errors carry reason `ERROR` in the details. Responses use `Cache-Control: no-store`. The generic providers do not cache decisions unless an application opts in with a short TTL; even then, errors, explicit evaluation times, suggestions and check-and-act paths (`guard`, `requireWithin`, `requireEnabled`) are never served from the cache.
 
 The `/api/` administration endpoints are separate and implementation-specific. They are not part of OEREP v1.
 

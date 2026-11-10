@@ -38,7 +38,7 @@ Primary users:
 | Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; strict Limit/Unlimited values and presence-preserving roundtrips; Pydantic is a core dependency | 🚧 | ADR-0006, #38 |
 | Python ≥ 3.11 | 🚧 | ADR-0006, #38 |
 | Zod as a regular TypeScript dependency, replacing the hand-written validators | 🚧 | ADR-0006, #39 (stacked on #38); shared malformed-value/null/full-string fixtures |
-| Opt-in short-lived decision cache in `RemoteProvider` (both SDKs) | 🚧 | #35, stacked on #39 |
+| Opt-in short-lived decision cache in `RemoteProvider` (both SDKs; provenance-safe bypass, failure eviction, fixed transport identity; never used by check-and-act) | 🚧 | [#35](https://github.com/open-entitlement/OpenEntitlement/pull/35); stacked on #39 → #38; #40 shipped on `main` |
 | PyPI and npm publication via Trusted Publishing | ✅ workflows; 👤 first release pending | #7, #9, #28 |
 
 ### Service and console

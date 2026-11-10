@@ -110,6 +110,21 @@ export interface Inspection {
   listAudit(filter?: AuditFilter): Promise<AuditEvent[]>;
 }
 
+/** Per-call resolution options. Providers without a decision cache ignore them. */
+export interface ResolveOptions {
+  /**
+   * The client is on a check-and-act path (`guard`, `requireWithin`, `requireEnabled`): return the current
+   * value, never a cached one. A caching provider bypasses and refreshes its cache.
+   */
+  fresh?: boolean;
+  /**
+   * The caller supplied the evaluation time (`now`) rather than letting the client use its clock: a
+   * time-travel query. A caching provider neither serves nor stores the result. When omitted,
+   * RemoteProvider treats a supplied `now` as explicit; `false` identifies SDK-generated time.
+   */
+  explicitTime?: boolean;
+}
+
 export interface Provider {
   readonly metadata: ProviderMetadata;
   readonly capabilities: Capabilities;
@@ -117,7 +132,7 @@ export interface Provider {
   readonly inspection?: Inspection;
   initialize?(): Promise<void>;
   shutdown?(): Promise<void>;
-  resolve(privilege: PrivilegeDefinition, ctx: ResolvedContext): Promise<ResolutionDetails>;
+  resolve(privilege: PrivilegeDefinition, ctx: ResolvedContext, options?: ResolveOptions): Promise<ResolutionDetails>;
   suggestPlan?(privilege: PrivilegeDefinition, need: Need, ctx: ResolvedContext): Promise<string | undefined>;
 }
 

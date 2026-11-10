@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any, Optional
+import threading
+import time
+from collections import OrderedDict
+from typing import Any, Iterable, Optional
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -61,18 +64,85 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
 
 
 class RemoteProvider(AbstractProvider):
-    """Connect to an OEREP server; decisions are never cached. Timeout is in seconds."""
+    """Connect to an OEREP server. Timeout and ``cache_ttl`` are in seconds.
+
+    Decisions are not cached unless ``cache_ttl`` is set. With a TTL, successful validated resolutions
+    are kept per privilege and context (organization, subject, resource) for at most ``cache_ttl``
+    seconds, bounded to ``cache_max_entries`` with least-recently-used eviction. Cached values can be
+    up to ``cache_ttl`` stale: administrative changes take up to that long to be visible. Errors and
+    requests with an explicit evaluation time are never cached; upgrade suggestions are never cached.
+    Check-and-act paths (``guard``, ``require_within``, ``require_enabled``) always fetch the current
+    value with ``fresh=True``, which bypasses and refreshes the cache.
+    """
     metadata = ProviderMetadata(name="oerep")
+    #: The client passes ``fresh=True`` to ``resolve`` on check-and-act paths.
+    supports_fresh = True
     capabilities = Capabilities(overrides=True, grants=True, plan_catalog=True)
 
-    def __init__(self, base_url: str, *, token: Optional[str] = None, timeout: float = 5.0):
+    def __init__(self, base_url: str, *, token: Optional[str] = None, timeout: float = 5.0,
+                 cache_ttl: Optional[float] = None, cache_max_entries: int = 10_000):
         url = urlsplit(base_url)
         if url.scheme not in ("http", "https") or not url.netloc or url.query or url.fragment or url.username or url.password:
             raise ValueError("base_url must be an HTTP(S) URL without credentials, query or fragment")
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("timeout must be positive")
-        self.base_url, self.token, self.timeout = base_url.rstrip("/"), token, timeout
+        if cache_ttl is not None and (isinstance(cache_ttl, bool) or not isinstance(cache_ttl, (int, float))
+                                      or not math.isfinite(cache_ttl) or cache_ttl <= 0):
+            raise ValueError("cache_ttl must be a positive finite number of seconds or None")
+        if isinstance(cache_max_entries, bool) or not isinstance(cache_max_entries, int) or cache_max_entries <= 0:
+            raise ValueError("cache_max_entries must be a positive integer")
+        self._base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
+        self.cache_ttl, self.cache_max_entries = cache_ttl, cache_max_entries
         self._opener = build_opener(_NoRedirect())
+        self._cache: OrderedDict[tuple[Optional[str], ...], tuple[float, ResolutionDetails[Any]]] = OrderedDict()
+        self._cache_lock = threading.Lock()
+        self._monotonic = time.monotonic
+
+    @property
+    def base_url(self) -> str:
+        """Transport authority is fixed for this provider's lifetime."""
+        return self._base_url
+
+    @property
+    def token(self) -> Optional[str]:
+        return self._token
+
+    def clear_cache(self) -> None:
+        """Drop every cached resolution."""
+        with self._cache_lock:
+            self._cache.clear()
+
+    def shutdown(self) -> None:
+        self.clear_cache()
+
+    def _cache_key(self, key: str, ctx: EvaluationContext) -> Optional[tuple[Optional[str], ...]]:
+        """The entry key, or None when this request must bypass the cache."""
+        if self.cache_ttl is None:
+            return None
+        return (key, ctx.organization_id, ctx.subject_id, ctx.resource_id)
+
+    def _cache_get(self, ck: tuple[Optional[str], ...]) -> Optional[ResolutionDetails[Any]]:
+        with self._cache_lock:
+            entry = self._cache.get(ck)
+            if entry is None:
+                return None
+            if self._monotonic() >= entry[0]:
+                del self._cache[ck]
+                return None
+            self._cache.move_to_end(ck)
+            return entry[1]
+
+    def _cache_put(self, items: list[tuple[tuple[Optional[str], ...], ResolutionDetails[Any]]]) -> None:
+        assert self.cache_ttl is not None
+        expires = self._monotonic() + self.cache_ttl
+        with self._cache_lock:
+            for ck, d in items:
+                if d.reason is Reason.ERROR:
+                    continue
+                self._cache[ck] = (expires, d)
+                self._cache.move_to_end(ck)
+            while len(self._cache) > self.cache_max_entries:
+                self._cache.popitem(last=False)
 
     def _post(self, path: str, ctx: EvaluationContext, **extra: Any) -> Any:
         context: dict[str, Any] = {"organizationId": ctx.organization_id}
@@ -92,10 +162,60 @@ class RemoteProvider(AbstractProvider):
         with self._opener.open(req, timeout=self.timeout) as response:
             return json.load(response)
 
-    def resolve(self, privilege: PrivilegeDefinition, ctx: EvaluationContext) -> ResolutionDetails[Any]:
-        return decode_remote_details(self._post(f"resolve/{quote(privilege.key, safe='')}", ctx), privilege, ctx)
+    def resolve(
+        self, privilege: PrivilegeDefinition, ctx: EvaluationContext, *, fresh: bool = False, explicit_time: Optional[bool] = None
+    ) -> ResolutionDetails[Any]:
+        """``fresh=True`` skips a cached entry and refreshes it with the server's current value.
+        A supplied ``now`` bypasses the cache unless ``explicit_time=False`` identifies SDK-generated time."""
+        if explicit_time is None:
+            explicit_time = ctx.now is not None
+        ck = None if explicit_time else self._cache_key(privilege.key, ctx)
+        if ck is not None and not fresh and (hit := self._cache_get(ck)) is not None:
+            return hit
+        if ck is not None:
+            with self._cache_lock:
+                self._cache.pop(ck, None)
+        d = decode_remote_details(self._post(f"resolve/{quote(privilege.key, safe='')}", ctx), privilege, ctx)
+        if ck is not None:
+            self._cache_put([(ck, d)])
+        return d
+
+    def resolve_all(self, privileges: Iterable[PrivilegeDefinition], ctx: EvaluationContext) -> dict[str, ResolutionDetails[Any]]:
+        """Resolve every listed privilege with one bulk request (``POST /oerep/v1/resolve``).
+
+        Pass ``catalog.privileges``. Results for privileges the server knows but the local catalog does
+        not are ignored. Any invalid entry fails the whole call. With a cache, results fill the
+        per-privilege entries that later single resolutions read.
+        """
+        wanted = {p.key: p for p in privileges}
+        # Evict all requested current-time entries before fetching: failed bulk validation is atomic.
+        if ctx.now is None:
+            with self._cache_lock:
+                for key in wanted:
+                    self._cache.pop((key, ctx.organization_id, ctx.subject_id, ctx.resource_id), None)
+        data = self._post("resolve", ctx)
+        if not isinstance(data, dict) or not isinstance(data.get("privileges"), list):
+            raise ValueError("invalid OEREP bulk response")
+        out: dict[str, ResolutionDetails[Any]] = {}
+        for raw in data["privileges"]:
+            key = raw.get("privilege") if isinstance(raw, dict) else None
+            if not isinstance(key, str):
+                raise ValueError("invalid OEREP details")
+            if key not in wanted:
+                continue
+            if key in out:
+                raise ValueError("duplicate OEREP bulk result")
+            out[key] = decode_remote_details(raw, wanted[key], ctx)
+        if len(out) != len(wanted):
+            raise ValueError("OEREP bulk response is missing privileges")
+        # A bulk call with an explicit ``now`` is a time-travel query: never stored.
+        if self.cache_ttl is not None and ctx.now is None:
+            items = [(ck, d) for k, d in out.items() if (ck := self._cache_key(k, ctx)) is not None]
+            self._cache_put(items)
+        return out
 
     def suggest_plan(self, privilege: PrivilegeDefinition, need: Need, ctx: EvaluationContext) -> Optional[str]:
+        """Upgrade suggestions are never cached."""
         data = self._post(f"suggest/{quote(privilege.key, safe='')}", ctx, need=need)
         if not isinstance(data, dict) or "requiredPlan" not in data:
             raise ValueError("invalid OEREP suggestion")
