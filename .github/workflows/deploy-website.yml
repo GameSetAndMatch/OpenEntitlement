@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     timeout-minutes: 20
     runs-on: ubuntu-latest
     environment:
@@ -30,22 +31,32 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
+      - name: Stamp the deployment revision
+        run: |
+          node --input-type=module - <<'JS'
+          import { writeFileSync } from 'node:fs';
+          writeFileSync('website/dist/revision.json', JSON.stringify({ revision: process.env.GITHUB_SHA }) + '\n');
+          JS
       - name: Deploy to Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN secret or CLOUDFLARE_ACCOUNT_ID variable is not set; skipping deployment."
-            echo "skipped=true" >> "$GITHUB_ENV"
-            exit 0
+            echo "::error::Production deployment requires the website environment token and account configuration."
+            exit 1
           fi
           npx wrangler deploy --message "main ${GITHUB_SHA::7}"
       - name: Smoke-test the live site
-        if: env.skipped != 'true'
         run: |
           for path in / /docs/ /docs/quickstart/; do
             status=$(curl -s -o /dev/null -w "%{http_code}" "https://openentitlement.dev${path}?deploy=${GITHUB_SHA}")
             echo "${path} -> ${status}"
             test "$status" = 200
           done
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "https://openentitlement.dev/revision.json?deploy=${GITHUB_SHA}" -o /tmp/oe-deployed-revision.json
+          node --input-type=module - <<'JS'
+          import { readFileSync } from 'node:fs';
+          const deployed = JSON.parse(readFileSync('/tmp/oe-deployed-revision.json', 'utf8'));
+          if (deployed.revision !== process.env.GITHUB_SHA) throw new Error('Production revision does not match this deployment');
+          JS

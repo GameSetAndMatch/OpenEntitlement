@@ -82,7 +82,7 @@ Primary users:
 | Landing product scenes using the console Catalog, value editor and resolver, with concise copy and no playground controls | ✅ | #43; replaces the #42 playground; `website/src/components/ProductScenes.tsx` |
 | Privilege-local Tag picker with search, selection, removable labels and inline creation; Group management remains separate | ✅ | #44; `console/web/src/workspace/tag-picker.tsx` |
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
-| Automatic website deployment to Cloudflare on every merge to `main` | ✅ workflow delivered; 🚧 trust hardening | #36; follow-up: main-only environment and revision verification; 👤 move production token into the environment |
+| Automatic website deployment to Cloudflare on every merge to `main` | ✅ | #36, #41: runs only from `main` in the protected `website` environment (token scoped there), fails without credentials, verifies the live revision |
 | Landing page rebuilt on the docs' theme and components, showing the current model | ✅ | #33 |
 | PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
 | PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |
