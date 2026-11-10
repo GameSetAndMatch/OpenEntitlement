@@ -3,8 +3,7 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/core",
-    "packages/postgres"
+    "packages/core"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

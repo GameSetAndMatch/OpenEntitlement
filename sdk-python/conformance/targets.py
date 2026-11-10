@@ -72,7 +72,7 @@ class PostgresTarget(Target):
     name = "postgres"
 
     def __init__(self, dsn: str):
-        import openentitlement_postgres as oep
+        import openentitlement.postgres as oep
 
         self._oep = oep
         self.dsn = dsn

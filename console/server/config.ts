@@ -100,7 +100,7 @@ export async function buildRuntime(cfg: ConsoleConfig): Promise<Runtime> {
     case "postgres": {
       if (!cfg.databaseUrl) throw new Error("OE_PROVIDER=postgres needs DATABASE_URL or PGHOST connection fields");
       const { default: pg } = await import("pg");
-      const { PostgresProvider, PostgresAdvisoryLock } = await import("@openentitlement/postgres");
+      const { PostgresProvider, PostgresAdvisoryLock } = await import("@openentitlement/core/postgres");
       const pool = new pg.Pool({ connectionString: cfg.databaseUrl });
       pool.on("error",(error:Error & {code?:string})=>console.error("Service database connection lost",error.code??"UNKNOWN"));
       contracts = new ContractStore(pool);

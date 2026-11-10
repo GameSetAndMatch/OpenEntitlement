@@ -1,4 +1,7 @@
-/** Postgres provider and advisory lock for OpenEntitlement (node-postgres). Same schema as the Python provider. */
+/**
+ * Postgres provider and advisory lock (node-postgres). Same schema as the Python provider.
+ * Import from "@openentitlement/core/postgres"; requires the optional peer dependency `pg`.
+ */
 
 import { readFile } from "node:fs/promises";
 import type { Pool, PoolClient } from "pg";
@@ -42,7 +45,7 @@ import {
   resolveFromFacts,
   suggestPlanFromFacts,
   type Need,
-} from "@openentitlement/core";
+} from "./index.ts";
 
 export async function schemaSql(): Promise<string> {
   return readFile(new URL("../schema.sql", import.meta.url), "utf8");

@@ -1,5 +1,5 @@
 -- OpenEntitlement reference Postgres schema, v0.1.0.
--- Shared by the Python (openentitlement-postgres) and TypeScript (@openentitlement/postgres) providers.
+-- Shared by the Python (openentitlement.postgres) and TypeScript (@openentitlement/core/postgres) providers.
 -- Values are jsonb: true/false, integers, enum strings, and {"unlimited": true} (spec Requirement 1.2.3).
 -- Idempotent: safe to run on every start.
 

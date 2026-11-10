@@ -7,7 +7,7 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). No
 | Package | Depends on | Contents |
 |---|---|---|
 | `@openentitlement/core` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolveFromFacts` |
-| `@openentitlement/postgres` | peer `pg` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, `schema.sql` (same schema as Python) |
+| `@openentitlement/core/postgres` | optional peer `pg` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, `schema.sql` (same schema as Python) |
 
 ## Typed authoring
 
@@ -18,7 +18,7 @@ Use the optional `@openentitlement/core/authoring` subpath with Zod for `Privile
 ```ts
 import pg from "pg";
 import { Catalog, createClient, feature, boolean, integer, enumeration, EntitlementDenied, toHttpProblem, UNLIMITED } from "@openentitlement/core";
-import { PostgresProvider, PostgresAdvisoryLock } from "@openentitlement/postgres";
+import { PostgresProvider, PostgresAdvisoryLock } from "@openentitlement/core/postgres";
 
 const catalog = new Catalog([
   feature("seats", "Seats", [integer("seat_max", { default: 1, unlimitedAllowed: true })]),

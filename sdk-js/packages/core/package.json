@@ -1,7 +1,7 @@
 {
   "name": "@openentitlement/core",
   "version": "0.2.0",
-  "description": "Vendor-neutral entitlements API: features, limits, plans, overrides, grants. Reference SDK for the OpenEntitlement spec.",
+  "description": "Vendor-neutral entitlements API: features, limits, plans, overrides, grants. Reference SDK for the OpenEntitlement spec. Optional Postgres provider and lock.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -14,11 +14,18 @@
       "source": "./src/authoring.ts",
       "types": "./dist/authoring.d.ts",
       "default": "./dist/authoring.js"
-    }
+    },
+    "./postgres": {
+      "source": "./src/postgres.ts",
+      "types": "./dist/postgres.d.ts",
+      "default": "./dist/postgres.js"
+    },
+    "./schema.sql": "./schema.sql"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "schema.sql"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json"
@@ -45,10 +52,14 @@
   },
   "homepage": "https://openentitlement.dev/docs/",
   "peerDependencies": {
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "pg": "^8.11.0"
   },
   "peerDependenciesMeta": {
     "zod": {
+      "optional": true
+    },
+    "pg": {
       "optional": true
     }
   }

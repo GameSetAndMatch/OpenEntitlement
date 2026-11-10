@@ -3,7 +3,6 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY sdk-js/tsconfig.base.json ./sdk-js/tsconfig.base.json
 COPY sdk-js/packages/core/ ./sdk-js/packages/core/
-COPY sdk-js/packages/postgres/ ./sdk-js/packages/postgres/
 COPY console/package*.json ./console/
 WORKDIR /app/console
 RUN npm ci
@@ -22,7 +21,6 @@ COPY --from=build /app/console/package.json ./package.json
 COPY --from=build /app/console/server ./server
 COPY --from=build /app/console/web/dist ./web/dist
 COPY --from=build /app/sdk-js/packages/core /app/sdk-js/packages/core
-COPY --from=build /app/sdk-js/packages/postgres /app/sdk-js/packages/postgres
 RUN ln -s ../console/node_modules /app/sdk-js/node_modules
 COPY spec/assets/catalog.json spec/assets/plans.json /app/spec/assets/
 COPY LICENSE /app/LICENSE

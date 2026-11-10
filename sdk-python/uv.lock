@@ -9,7 +9,6 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "openentitlement-postgres",
     "openentitlement-sdk",
     "openentitlement-workspace",
 ]
@@ -796,21 +795,6 @@ wheels = [
 ]
 
 [[package]]
-name = "openentitlement-postgres"
-version = "0.2.0"
-source = { editable = "packages/openentitlement-postgres" }
-dependencies = [
-    { name = "openentitlement-sdk" },
-    { name = "psycopg" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "openentitlement-sdk", editable = "packages/openentitlement" },
-    { name = "psycopg", specifier = ">=3.1" },
-]
-
-[[package]]
 name = "openentitlement-sdk"
 version = "0.2.0"
 source = { editable = "packages/openentitlement" }
@@ -819,17 +803,22 @@ source = { editable = "packages/openentitlement" }
 authoring = [
     { name = "pydantic" },
 ]
+postgres = [
+    { name = "psycopg" },
+]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", marker = "extra == 'authoring'", specifier = ">=2.12,<3" }]
-provides-extras = ["authoring"]
+requires-dist = [
+    { name = "psycopg", marker = "extra == 'postgres'", specifier = ">=3.1" },
+    { name = "pydantic", marker = "extra == 'authoring'", specifier = ">=2.12,<3" },
+]
+provides-extras = ["authoring", "postgres"]
 
 [[package]]
 name = "openentitlement-workspace"
 version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "openentitlement-postgres" },
     { name = "openentitlement-sdk" },
 ]
 
@@ -847,10 +836,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "openentitlement-postgres", editable = "packages/openentitlement-postgres" },
-    { name = "openentitlement-sdk", editable = "packages/openentitlement" },
-]
+requires-dist = [{ name = "openentitlement-sdk", editable = "packages/openentitlement" }]
 
 [package.metadata.requires-dev]
 dev = [

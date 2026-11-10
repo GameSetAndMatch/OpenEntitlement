@@ -1,4 +1,8 @@
-"""Postgres provider and advisory lock for OpenEntitlement (psycopg 3)."""
+"""Postgres provider and advisory lock (psycopg 3).
+
+Install with ``pip install "openentitlement-sdk[postgres]"``. Importing ``openentitlement``
+never loads this module, so the core stays dependency-free.
+"""
 
 from __future__ import annotations
 

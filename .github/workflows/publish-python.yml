@@ -43,7 +43,7 @@ jobs:
           PY
       - name: Build wheels and source distributions
         run: |
-          for package in openentitlement-sdk openentitlement-postgres; do
+          for package in openentitlement-sdk; do
             uv build --project sdk-python --package "$package" --out-dir "dist/$package"
           done
       - name: Check package metadata and descriptions
@@ -51,19 +51,28 @@ jobs:
       - name: Install and smoke-test the built wheels on Python 3.10
         run: |
           uv venv --python 3.10 /tmp/oe-wheel-check
-          uv pip install --python /tmp/oe-wheel-check/bin/python dist/*/*.whl "psycopg[binary]>=3.1"
+          uv pip install --python /tmp/oe-wheel-check/bin/python dist/*/*.whl
           cd /tmp
+          # The core installs with no dependencies; the [postgres] extra adds only psycopg.
+          /tmp/oe-wheel-check/bin/python - <<'PY'
+          from importlib.metadata import requires
+          import sys
+          import openentitlement
+          assert "psycopg" not in sys.modules, "importing the core must not load psycopg"
+          assert not [r for r in requires("openentitlement-sdk") if "extra ==" not in r], "core must have no required dependencies"
+          PY
+          uv pip install --python /tmp/oe-wheel-check/bin/python "$(ls dist/openentitlement-sdk/*.whl)[postgres]" "psycopg[binary]>=3.1"
           /tmp/oe-wheel-check/bin/python - <<'PY'
           from importlib.metadata import version
           from importlib.resources import files
           from openentitlement import Catalog, FixedProvider, create_client, feature, integer
-          from openentitlement_postgres import PostgresProvider
+          from openentitlement.postgres import PostgresAdvisoryLock, PostgresProvider
           catalog = Catalog([feature("projects", "Projects", [integer("project_max")])])
           client = create_client(FixedProvider(catalog, {"project_max": 5}), catalog)
           assert client.get_limit("project_max", {"organizationId": "demo"}) == 5
           assert files("openentitlement").joinpath("py.typed").is_file()
-          assert files("openentitlement_postgres").joinpath("schema.sql").is_file()
-          for package in ("openentitlement-sdk", "openentitlement-postgres"):
+          assert files("openentitlement.postgres").joinpath("schema.sql").is_file()
+          for package in ("openentitlement-sdk",):
               print(f"{package}=={version(package)}")
           PY
       - uses: actions/upload-artifact@v4
@@ -88,8 +97,6 @@ jobs:
         include:
           - package: openentitlement-sdk
             environment: pypi
-          - package: openentitlement-postgres
-            environment: pypi-postgres
     steps:
       - uses: actions/download-artifact@v4
         with:
