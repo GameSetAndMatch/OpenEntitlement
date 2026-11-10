@@ -1,0 +1,26 @@
+{
+  "description": "Groups may nest through parentId",
+  "catalog": {
+    "groups": [
+      {
+        "id": "product",
+        "title": "Product",
+        "description": "Product areas"
+      },
+      {
+        "id": "exports",
+        "title": "Exports",
+        "parentId": "product"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "groupId": "exports",
+        "default": 3
+      }
+    ]
+  }
+}

@@ -29,4 +29,8 @@ privileges:
 
 The workspace console supports Group and Tag management, Tag filtering and typed privilege authoring. In Python, `pip install openentitlement-sdk` includes Pydantic. Import the strict `BooleanPrivilege`, `IntegerPrivilege`, `StringEnumPrivilege`, `Group`, `Tag` and `PrivilegeCatalog` models from `openentitlement`; they also work directly as [FastAPI](/docs/python/#use-with-fastapi) request and response types. TypeScript uses the `@openentitlement/core/authoring` Zod schemas. See the [Python-first ACME walkthrough](/docs/acme-workspace/) for the whole Workspace model.
 
+## Shared JSON Schema
+
+[`spec/schemas/privilege-catalog.schema.json`](https://github.com/open-entitlement/OpenEntitlement/blob/main/spec/schemas/privilege-catalog.schema.json) is the cross-language contract, a JSON Schema 2020-12 document generated from the Pydantic models. Point an editor or another language's validator at it. It checks structure, types, identifiers, lengths and integer ranges. The SDK models also enforce rules a JSON Schema cannot express: trimmed titles, unique Tags and enum choices, minimum ≤ maximum, defaults within bounds, required defaults, known Group and Tag references and an acyclic Group hierarchy. Shared [fixtures](https://github.com/open-entitlement/OpenEntitlement/tree/main/spec/assets/catalog-fixtures) keep Pydantic, Zod and the schema in agreement.
+
 See the [authoring guide](https://github.com/open-entitlement/OpenEntitlement/blob/main/console/PRIVILEGE-CATALOG.md) for a complete Catalog example, API routes, migration behavior and standalone compatibility limits. The existing OEREP v1 transport and evaluation SDKs remain compatible.

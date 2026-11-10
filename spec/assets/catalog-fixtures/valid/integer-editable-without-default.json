@@ -1,0 +1,12 @@
+{
+  "description": "An editable Privilege may omit its default; every Tier variant then supplies it",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer"
+      }
+    ]
+  }
+}

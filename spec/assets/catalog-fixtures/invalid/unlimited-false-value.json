@@ -1,0 +1,16 @@
+{
+  "description": "The unlimited value is exactly {\"unlimited\": true}",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "unlimited": true,
+        "default": {
+          "unlimited": false
+        }
+      }
+    ]
+  }
+}

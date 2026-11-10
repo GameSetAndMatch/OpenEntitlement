@@ -1,0 +1,13 @@
+{
+  "description": "Tags have no hierarchy",
+  "catalog": {
+    "tags": [
+      {
+        "id": "a",
+        "title": "A",
+        "parentId": "b"
+      }
+    ],
+    "privileges": []
+  }
+}

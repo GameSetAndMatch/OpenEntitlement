@@ -1,0 +1,16 @@
+{
+  "description": "The unlimited default requires unlimited: true",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "unlimited": true,
+        "default": {
+          "unlimited": true
+        }
+      }
+    ]
+  }
+}

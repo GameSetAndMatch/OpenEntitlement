@@ -1,0 +1,12 @@
+{
+  "description": "Only key, title and type are required",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean"
+      }
+    ]
+  }
+}

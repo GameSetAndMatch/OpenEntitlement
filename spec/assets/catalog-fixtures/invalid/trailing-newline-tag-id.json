@@ -1,0 +1,12 @@
+{
+  "description": "trailing newline tag id",
+  "catalog": {
+    "privileges": [],
+    "tags": [
+      {
+        "id": "root\n",
+        "title": "Root"
+      }
+    ]
+  }
+}

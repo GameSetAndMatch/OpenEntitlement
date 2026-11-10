@@ -1,0 +1,13 @@
+{
+  "description": "An enum has 1 to 100 choices",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "retention",
+        "title": "Retention",
+        "type": "enum",
+        "enum": []
+      }
+    ]
+  }
+}

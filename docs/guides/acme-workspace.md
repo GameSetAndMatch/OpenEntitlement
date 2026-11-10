@@ -2,7 +2,7 @@
 
 ACME builds a document-assistant SaaS. It sells Business and Enterprise offers to other companies. Its sales team negotiates some Organization limits; a few customers need personal allowances. The same product can be self-hosted without a billing provider.
 
-This guide describes the Workspace preview. Python authoring and the optional TypeScript/Zod interface in this change are available from the source checkout until the corresponding SDK versions are released. Package documentation is not evidence that an unpublished version can already be installed from PyPI/npm.
+This guide describes the Workspace preview. Python authoring and the TypeScript/Zod interface in this change are available from the source checkout until the corresponding SDK versions are released. Package documentation is not evidence that an unpublished version can already be installed from PyPI/npm.
 
 ## 1. Create the Workspace
 
@@ -119,10 +119,10 @@ Entitlements answer what was purchased or granted. ACME's authorization still de
 
 ## TypeScript equivalent
 
-Install Zod alongside the core SDK when using its optional authoring subpath:
+Zod ships with the core SDK; its authoring subpath needs no extra install:
 
 ```sh
-npm install @openentitlement/core zod
+npm install @openentitlement/core
 ```
 
 ```ts

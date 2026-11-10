@@ -1,0 +1,14 @@
+{
+  "description": "A Group's parent exists in the Catalog",
+  "needsModelValidation": true,
+  "catalog": {
+    "groups": [
+      {
+        "id": "exports",
+        "title": "Exports",
+        "parentId": "product"
+      }
+    ],
+    "privileges": []
+  }
+}

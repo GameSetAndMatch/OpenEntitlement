@@ -1,0 +1,7 @@
+{
+  "description": "Unknown top-level fields are rejected",
+  "catalog": {
+    "privileges": [],
+    "features": []
+  }
+}

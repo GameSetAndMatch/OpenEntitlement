@@ -2,10 +2,10 @@ name: npm distributions
 
 on:
   pull_request:
-    paths: ["sdk-js/**", "console/**", ".github/workflows/publish-npm.yml"]
+    paths: ["sdk-js/**", "console/**", "spec/schemas/**", "spec/assets/catalog-fixtures/**", ".github/workflows/publish-npm.yml"]
   push:
     branches: [main]
-    paths: ["sdk-js/**", "console/**", ".github/workflows/publish-npm.yml"]
+    paths: ["sdk-js/**", "console/**", "spec/schemas/**", "spec/assets/catalog-fixtures/**", ".github/workflows/publish-npm.yml"]
   release:
     types: [published]
 
@@ -57,10 +57,12 @@ jobs:
           node --input-type=module - <<'JS'
           import { Catalog, FixedProvider, createClient, feature, integer } from '@openentitlement/core';
           import { PostgresAdvisoryLock, PostgresProvider } from '@openentitlement/core/postgres';
+          import { parseCatalog } from '@openentitlement/core/authoring';
           const catalog = new Catalog([feature('projects', 'Projects', [integer('project_max')])]);
           const client = createClient({ catalog, provider: new FixedProvider(catalog, {'project_max': 5}) });
           if (await client.getLimit('project_max', {organizationId: 'demo'}) !== 5) throw Error('Incorrect limit');
           if (!PostgresProvider || !PostgresAdvisoryLock) throw Error('Postgres export missing');
+          if (parseCatalog({privileges: [{key: 'project_max', title: 'Projects', type: 'integer'}]}).privileges[0].minimum !== 0) throw Error('Authoring export broken');
           JS
       - uses: actions/upload-artifact@v4
         with:

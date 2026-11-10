@@ -1,0 +1,14 @@
+{
+  "description": "Environment-linked booleans need a default",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "envOverride": "MCP_INSTALLED"
+      }
+    ]
+  }
+}

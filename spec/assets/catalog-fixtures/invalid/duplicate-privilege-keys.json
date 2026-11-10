@@ -1,0 +1,19 @@
+{
+  "description": "Privilege keys are unique within a Catalog",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer"
+      },
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "default": 1
+      }
+    ]
+  }
+}

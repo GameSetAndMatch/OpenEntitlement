@@ -1,0 +1,13 @@
+{
+  "description": "Integer quantities have no fractional part",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "default": 2.5
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Enum choices have at most 200 characters",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "retention",
+        "title": "Retention",
+        "type": "enum",
+        "enum": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      }
+    ]
+  }
+}

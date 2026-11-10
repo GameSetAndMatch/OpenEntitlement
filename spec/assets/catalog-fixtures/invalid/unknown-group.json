@@ -1,0 +1,14 @@
+{
+  "description": "A Privilege's Group exists in the Catalog",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "groupId": "integrations"
+      }
+    ]
+  }
+}

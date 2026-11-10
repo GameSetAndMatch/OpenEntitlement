@@ -1,0 +1,12 @@
+{
+  "description": "Identifiers have at most 80 characters",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "title": "Seats",
+        "type": "integer"
+      }
+    ]
+  }
+}

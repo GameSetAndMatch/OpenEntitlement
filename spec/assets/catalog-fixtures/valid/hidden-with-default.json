@@ -1,0 +1,14 @@
+{
+  "description": "Hidden values still evaluate and need a default",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "visibility": "hidden",
+        "default": true
+      }
+    ]
+  }
+}

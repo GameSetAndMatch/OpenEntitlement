@@ -1,0 +1,14 @@
+{
+  "description": "type discriminates the Privilege and is required",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "retention",
+        "title": "Retention",
+        "enum": [
+          "30d"
+        ]
+      }
+    ]
+  }
+}

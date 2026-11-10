@@ -26,7 +26,7 @@ Primary users:
 | Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | ✅ | #40, merged on `main` |
 | Privilege Catalog authoring contract: Groups, Tags, visibility | ✅ accepted (RFC-0002) | #24 |
 | Read-only consumption dashboard | 📋 proposed (RFC-0003), blocked on a real usage source | `docs/rfcs/0003-consumption-dashboard.md` |
-| Generated JSON Schema as the shared cross-language contract | 🚧 | ADR-0006, #39 |
+| Generated JSON Schema as the shared cross-language contract | 🚧 | ADR-0006, #39; regenerated from #38 models, shared parity and serialization fixtures |
 
 ### SDKs
 
@@ -37,7 +37,7 @@ Primary users:
 | Stripe Entitlements adapter | ✅ removed before release (billing is not an entitlement source) | #30 |
 | Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; strict Limit/Unlimited values and presence-preserving roundtrips; Pydantic is a core dependency | 🚧 | ADR-0006, #38 |
 | Python ≥ 3.11 | 🚧 | ADR-0006, #38 |
-| Zod as a regular TypeScript dependency, replacing the hand-written validators | 🚧 | ADR-0006, #39 |
+| Zod as a regular TypeScript dependency, replacing the hand-written validators | 🚧 | ADR-0006, #39 (stacked on #38); shared malformed-value/null/full-string fixtures |
 | Opt-in short-lived decision cache in `RemoteProvider` (both SDKs) | 🚧 | #35, stacked on #39 |
 | PyPI and npm publication via Trusted Publishing | ✅ workflows; 👤 first release pending | #7, #9, #28 |
 

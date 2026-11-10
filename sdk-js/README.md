@@ -6,12 +6,12 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). No
 
 | Package | Depends on | Contents |
 |---|---|---|
-| `@openentitlement/core` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolveFromFacts` |
+| `@openentitlement/core` | `zod` | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolveFromFacts` |
 | `@openentitlement/core/postgres` | optional peer `pg` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, `schema.sql` (same schema as Python) |
 
 ## Typed authoring
 
-Use the optional `@openentitlement/core/authoring` subpath with Zod for `PrivilegeSchema` and `PrivilegeCatalogSchema`. Runtime imports do not load Zod. See the [Python-first ACME case study](../docs/guides/acme-workspace.md) for equivalent JSON, Groups/Tags and the complete Workspace model.
+`@openentitlement/core/authoring` exports the Zod schemas `PrivilegeSchema` and `PrivilegeCatalogSchema`, plus `parsePrivilege` and `parseCatalog`. Zod is a regular dependency of `@openentitlement/core`, so no separate `npm install zod` is needed. Catalog JSON keys are camelCase (`groupId`, `parentId`, `envOverride`). The rules match the Python Pydantic models and the generated [JSON Schema contract](../spec/schemas/privilege-catalog.schema.json), checked by the [shared fixtures](../spec/assets/catalog-fixtures/README.md). See the [Python-first ACME case study](../docs/guides/acme-workspace.md) for equivalent JSON, Groups/Tags and the complete Workspace model.
 
 ## Quick start
 

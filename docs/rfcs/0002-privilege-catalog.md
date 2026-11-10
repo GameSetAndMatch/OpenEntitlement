@@ -44,7 +44,9 @@ privileges:
 
 Author Privileges and metadata in the Catalog, create Tiers/variants from their defaults, then assign Organizations and negotiated terms. Standard, trial and grace variants remain separate from commercial Tier level. A customer's contract and privileges do not become a role, release flag or billing provider.
 
-The reference implementation exposes a typed authoring API and serializable Python Pydantic models. JSON and YAML keys are camelCase, while Python attributes stay snake_case ([ADR-0006](../../ADR-0006.md)). JSON/YAML representation is intentionally simple, without requiring OpenAPI document structure or arbitrary schema vocabularies.
+Catalog JSON and YAML keys are camelCase (`groupId`, `parentId`, `envOverride`). Python attributes stay snake_case (`group_id`) and serialize to the camelCase aliases.
+
+The reference implementation exposes typed models in each language: Pydantic models in `openentitlement.privileges` (Python) and Zod schemas in `@openentitlement/core/authoring` (TypeScript). The Pydantic models are canonical: [`spec/schemas/privilege-catalog.schema.json`](../../spec/schemas/privilege-catalog.schema.json) is generated from them by `sdk-python/scripts/export_schemas.py` and is the shared contract that editors and other languages can use. CI checks that the committed file is up to date, that Zod's own `z.toJSONSchema` output agrees with it structurally, and that the [shared fixtures](../../spec/assets/catalog-fixtures/README.md) are accepted or rejected identically by Pydantic, Zod and the JSON Schema. Rules JSON Schema cannot express (trimmed titles, unique Tags and choices, minimum ≤ maximum, defaults within bounds, required defaults, references and cycles) are enforced by the models. JSON/YAML representation stays intentionally simple, without requiring OpenAPI document structure or arbitrary schema vocabularies.
 
 ## Compatibility and status
 

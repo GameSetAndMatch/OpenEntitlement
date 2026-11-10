@@ -1,0 +1,13 @@
+{
+  "description": "Integers above 2^53-1 are not portable",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "maximum": 9007199254740992
+      }
+    ]
+  }
+}

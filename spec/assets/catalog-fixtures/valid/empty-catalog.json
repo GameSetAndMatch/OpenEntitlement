@@ -1,0 +1,6 @@
+{
+  "description": "A Catalog may have no Privileges; groups and tags default to empty",
+  "catalog": {
+    "privileges": []
+  }
+}

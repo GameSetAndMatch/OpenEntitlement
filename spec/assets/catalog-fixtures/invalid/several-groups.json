@@ -1,0 +1,21 @@
+{
+  "description": "A Privilege has at most one Group",
+  "catalog": {
+    "groups": [
+      {
+        "id": "integrations",
+        "title": "Integrations"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "groupIds": [
+          "integrations"
+        ]
+      }
+    ]
+  }
+}

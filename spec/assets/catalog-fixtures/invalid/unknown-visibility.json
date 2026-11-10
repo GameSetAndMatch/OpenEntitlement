@@ -1,0 +1,14 @@
+{
+  "description": "Visibility is hidden, read_only or editable",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "visibility": "frozen",
+        "default": 1
+      }
+    ]
+  }
+}

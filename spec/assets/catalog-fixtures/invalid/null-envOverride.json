@@ -1,0 +1,13 @@
+{
+  "description": "null envOverride",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "enabled",
+        "title": "Enabled",
+        "type": "boolean",
+        "envOverride": null
+      }
+    ]
+  }
+}

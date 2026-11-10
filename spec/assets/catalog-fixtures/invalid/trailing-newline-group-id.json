@@ -1,0 +1,12 @@
+{
+  "description": "trailing newline group id",
+  "catalog": {
+    "privileges": [],
+    "groups": [
+      {
+        "id": "root\n",
+        "title": "Root"
+      }
+    ]
+  }
+}

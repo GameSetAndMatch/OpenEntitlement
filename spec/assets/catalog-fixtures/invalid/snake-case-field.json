@@ -1,0 +1,20 @@
+{
+  "description": "Catalog JSON uses camelCase: group_id is an unknown field",
+  "catalog": {
+    "groups": [
+      {
+        "id": "integrations",
+        "title": "Integrations"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "group_id": "integrations"
+      }
+    ]
+  },
+  "pythonConvenience": true
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Group identifiers are unique",
+  "needsModelValidation": true,
+  "catalog": {
+    "groups": [
+      {
+        "id": "integrations",
+        "title": "Integrations"
+      },
+      {
+        "id": "integrations",
+        "title": "Integrations"
+      }
+    ],
+    "privileges": []
+  }
+}

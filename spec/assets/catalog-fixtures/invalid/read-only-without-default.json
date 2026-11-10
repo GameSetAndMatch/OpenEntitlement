@@ -1,0 +1,18 @@
+{
+  "description": "Read-only Privileges need a default",
+  "needsModelValidation": true,
+  "catalog": {
+    "privileges": [
+      {
+        "key": "retention",
+        "title": "Retention",
+        "type": "enum",
+        "enum": [
+          "30d",
+          "365d"
+        ],
+        "visibility": "read_only"
+      }
+    ]
+  }
+}

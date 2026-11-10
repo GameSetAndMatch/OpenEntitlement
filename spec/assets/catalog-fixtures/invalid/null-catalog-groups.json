@@ -1,0 +1,7 @@
+{
+  "description": "null catalog groups",
+  "catalog": {
+    "privileges": [],
+    "groups": null
+  }
+}

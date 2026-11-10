@@ -1,0 +1,27 @@
+{
+  "description": "A Privilege's Tags are unique",
+  "needsModelValidation": true,
+  "catalog": {
+    "tags": [
+      {
+        "id": "enterprise",
+        "title": "Enterprise"
+      },
+      {
+        "id": "mcp",
+        "title": "MCP"
+      }
+    ],
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "tags": [
+          "mcp",
+          "mcp"
+        ]
+      }
+    ]
+  }
+}

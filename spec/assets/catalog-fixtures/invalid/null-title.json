@@ -1,0 +1,13 @@
+{
+  "description": "null title",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seats",
+        "title": null,
+        "type": "integer",
+        "unlimited": true
+      }
+    ]
+  }
+}

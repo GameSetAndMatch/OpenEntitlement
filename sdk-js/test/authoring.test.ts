@@ -6,7 +6,7 @@ import {
   PrivilegeSchema,
 } from "../packages/core/src/authoring.ts";
 import { Catalog, feature, integer } from "../packages/core/src/index.ts";
-test("optional Zod authoring has strict types, flat keys, metadata and normalized constraints", () => {
+test("Zod authoring has strict types, flat keys, metadata and normalized constraints", () => {
   const catalog = PrivilegeCatalogSchema.parse({
     groups: [{ id: "collaboration", title: "Collaboration" }],
     tags: [{ id: "licensed", title: "Licensed" }],

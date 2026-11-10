@@ -1,0 +1,13 @@
+{
+  "description": "Boolean defaults are booleans",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "mcp_enabled",
+        "title": "MCP access",
+        "type": "boolean",
+        "default": "true"
+      }
+    ]
+  }
+}

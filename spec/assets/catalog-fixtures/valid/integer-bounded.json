@@ -1,0 +1,15 @@
+{
+  "description": "Integer with bounds and an in-range default",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "seat_max",
+        "title": "Seats",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 5
+      }
+    ]
+  }
+}
