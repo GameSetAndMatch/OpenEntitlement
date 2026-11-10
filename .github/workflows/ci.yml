@@ -108,4 +108,5 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npm run test:diagrams --workspace website
+      - run: npm run test:demo --workspace website
       - run: npx wrangler deploy --dry-run
