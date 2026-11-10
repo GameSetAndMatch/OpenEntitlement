@@ -4,7 +4,7 @@ Use this file with any coding model. Current user instructions take precedence o
 
 ## Context and language
 
-For product/model changes, read [VISION.md](VISION.md), [GLOSSARY.md](GLOSSARY.md) and the relevant entries in [docs/decisions.md](docs/decisions.md). Read only the ADR/RFC needed for the task. Distinguish accepted direction, a proposal, implemented preview behavior and released normative contracts. Do not resolve a conflict by silently changing scope or protocol semantics.
+For product/model changes, read [VISION.md](VISION.md), [GLOSSARY.md](GLOSSARY.md) and the relevant entries in [docs/decisions.md](docs/decisions.md). Track features and their delivery status in [PRD.md](PRD.md); update it in the PR that changes a status. Read only the ADR/RFC needed for the task. Distinguish accepted direction, a proposal, implemented preview behavior and released normative contracts. Do not resolve a conflict by silently changing scope or protocol semantics.
 
 Keep the application-facing SDK/protocol portable across providers. Preferred authoring terms are Privilege Catalog, Privilege, Group, Tag, Tier, Tier variant, Organization and Workspace. Preserve documented OEREP v1 compatibility names behind explicit adapters rather than gratuitously renaming wire fields.
 
