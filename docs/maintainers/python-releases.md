@@ -23,7 +23,7 @@ Official references: [creating a project through Trusted Publishing](https://doc
 3. Review the workflow's built artifacts and approve the `pypi` environment deployment if required. The workflow rejects a version/tag mismatch and release commits outside main's history.
 4. Confirm the project and version on PyPI. Test installation into a clean environment, for example `pip install openentitlement-sdk==0.1.1`.
 
-The workflow builds wheels and source distributions, checks metadata with Twine, then imports installed wheels outside the source checkout on Python 3.10. It checks a real limit evaluation, the typing marker and bundled PostgreSQL schema. The existing CI remains responsible for the full SDK and conformance suite; release only a commit that has passed it.
+The workflow builds wheels and source distributions, checks metadata with Twine, then imports installed wheels outside the source checkout on Python 3.11. It checks a real limit evaluation, the typing marker and bundled PostgreSQL schema. The existing CI remains responsible for the full SDK and conformance suite; release only a commit that has passed it.
 
 If the publish job fails, fix the publisher configuration and rerun **failed jobs only**; do not rebuild and overwrite an existing version. PyPI files are immutable. For a defective published artifact, bump the version and release again. Do not delete and reuse a version.
 

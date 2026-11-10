@@ -48,10 +48,10 @@ jobs:
           done
       - name: Check package metadata and descriptions
         run: uvx --from twine==7.0.0 twine check --strict dist/*/*
-      - name: Install and smoke-test the built wheels on Python 3.10
+      - name: Install and smoke-test the built wheels on Python 3.11
         run: |
           wheel=$(ls "$GITHUB_WORKSPACE"/dist/openentitlement-sdk/*.whl)
-          uv venv --python 3.10 /tmp/oe-wheel-check
+          uv venv --python 3.11 /tmp/oe-wheel-check
           uv pip install --python /tmp/oe-wheel-check/bin/python "$wheel"
           cd /tmp
           # The core requires only Pydantic (ADR-0006); the [postgres] extra adds only psycopg.
