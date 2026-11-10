@@ -35,8 +35,8 @@ Primary users:
 | Python SDK (`openentitlement-sdk`) and TypeScript SDK (`@openentitlement/core`) with in-memory, fixed and remote providers, hooks and `guard` | ✅ | `sdk-python/`, `sdk-js/` |
 | Postgres provider and advisory lock inside the core packages (`[postgres]` extra, `/postgres` entry point) | ✅ | #31 |
 | Stripe Entitlements adapter | ✅ removed before release (billing is not an entitlement source) | #30 |
-| Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; Pydantic is a core dependency | 🚧 | ADR-0006, branch `feat/camelcase-authoring-json` |
-| Python ≥ 3.11 | 🚧 | with ADR-0006 |
+| Pydantic models everywhere in Python: camelCase JSON, snake_case attributes, FastAPI-ready; Pydantic is a core dependency | 🚧 | ADR-0006, #38 |
+| Python ≥ 3.11 | 🚧 | ADR-0006, #38 |
 | Zod as a regular TypeScript dependency, replacing the hand-written validators | 📋 next | ADR-0006 |
 | Opt-in short-lived decision cache in `RemoteProvider` (both SDKs) | 📋 next | — |
 | PyPI and npm publication via Trusted Publishing | ✅ workflows; 👤 first release pending | #7, #9, #28 |
