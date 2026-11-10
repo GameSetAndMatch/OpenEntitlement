@@ -12,6 +12,7 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 | [RFC-0001](rfcs/0001-entitlements-v0.2.md) | Proposed historical contract refinement; retain unresolved parts explicitly, not as implemented requirements |
 | [RFC-0002](rfcs/0002-privilege-catalog.md) | Accepted reference authoring contract; not a normative OEREP version bump |
 | [RFC-0003](rfcs/0003-consumption-dashboard.md) | Proposed read-only consumption view; blocked on a real application/metering usage source |
+| [RFC-0004](rfcs/0004-mcp-server.md) | Draft: MCP server for the Workspace control plane; authentication and write scope still open |
 | [Normative specification](../spec/README.md) | Released/draft version stated by the spec itself governs compatible SDK/wire behavior |
 | [Revenera spike](research/revenera-connector-spike.md) | Research: read-only connector feasibility, API beta caveat and runtime allocation boundaries |
 | [Prior-art matrix](research/vendor-data-model-matrix.md) | Research evidence/inference, not product requirements or certified compatibility |
