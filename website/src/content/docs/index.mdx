@@ -1,0 +1,182 @@
+---
+title: OpenEntitlement
+description: An open-source entitlement model, protocol and service. Resolve what an Organization and its users may do, and how much of it.
+template: splash
+editUrl: false
+lastUpdated: false
+hero:
+  title: Entitlements you can explain
+  tagline: An open-source model, protocol and self-hostable service for deciding what an Organization and its application users may do, and how much of it. Every resolved value carries the reason it was chosen.
+  actions:
+    - text: Get started
+      link: /docs/quickstart/
+      icon: right-arrow
+    - text: Read the specification
+      link: /docs/specification/
+      variant: secondary
+    - text: GitHub
+      link: https://github.com/open-entitlement/OpenEntitlement
+      icon: external
+      variant: minimal
+---
+
+import { Aside, Badge, Card, CardGrid, LinkCard, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Experimental">
+The specification is v0.1.0 and OEREP v1 is a draft. The Workspace console described here is a preview. Interfaces may change before a stable release.
+</Aside>
+
+## How a value is resolved
+
+A Workspace holds one product's **Privilege Catalog**: typed Privileges such as `seat_max` (integer), `ai_tokens` (integer), `mcp_enabled` (boolean) and `retention` (string choice), organized by one Group each and any number of Tags. Each layer below can replace the value from the layer above it, except the last, which can only restrict.
+
+<Steps>
+
+1. **Privilege Catalog default.** The fallback value every Organization starts from.
+
+2. **Tier variant.** A reusable Tier such as Business or Enterprise sets values in its standard, trial and grace variants. A trial is a variant of a Tier, not a separate Tier.
+
+3. **Organization terms.** A contract negotiated with one Organization replaces specific values without cloning a Tier.
+
+4. **Application user terms and grants.** Optional personal terms replace the Organization value for one user; a grant adds to an integer allowance. Users without an exception inherit.
+
+5. **Environment prerequisites.** An install condition such as `MCP_INSTALLED=false` can veto a boolean Privilege. It can never grant access that was not purchased, and it never sets integers or strings.
+
+</Steps>
+
+## A worked example
+
+<Aside type="note" title="Illustrative values">
+These figures follow the [ACME Workspace walkthrough](/docs/acme-workspace/). ACME sells a document assistant through Business and Enterprise Tiers; Globex is one of its Organizations. Reasons are the codes returned by the Workspace preview's evaluation endpoint.
+</Aside>
+
+<Tabs>
+<TabItem label="Organization">
+
+Globex is assigned **Business standard**, and its contract negotiates 40 seats. Other Privileges inherit from the Tier.
+
+| Layer | `seat_max` | `ai_tokens` |
+| --- | --- | --- |
+| Catalog default | 5 | 1,000 |
+| Business standard | 25 | 10,000 |
+| Globex Organization terms | **40** | inherits |
+| **Resolved for Globex** | **40** <Badge text="CONTRACT" variant="tip" /> | **10,000** <Badge text="VARIANT" variant="note" /> |
+
+</TabItem>
+<TabItem label="Users">
+
+Alice has personal terms and an additional grant at Globex. Bob has no exception and inherits the Organization value.
+
+| Application user at Globex | Personal terms | Grant | Resolved `ai_tokens` |
+| --- | --- | --- | --- |
+| `idp\|alice` | 15,000 | +2,000 | **17,000** <Badge text="SUBJECT_GRANT" variant="tip" /> |
+| `idp\|bob` | — | — | **10,000** <Badge text="VARIANT" variant="note" /> |
+
+Alice's exceptions are scoped to `(Workspace, globex, idp|alice)`. The same subject ID in another Organization does not inherit them.
+
+</TabItem>
+<TabItem label="Environment">
+
+An Enterprise Organization includes `mcp_enabled`, but this self-hosted install sets `MCP_INSTALLED=false`.
+
+| Layer | `mcp_enabled` |
+| --- | --- |
+| Catalog default | Disabled |
+| Enterprise standard | Enabled |
+| Environment prerequisite | `MCP_INSTALLED=false` |
+| **Resolved** | **Disabled** <Badge text="ENVIRONMENT" variant="caution" /> |
+
+Setting `MCP_INSTALLED=true` on a Business install would still resolve to disabled: an environment prerequisite can only restrict.
+
+</TabItem>
+</Tabs>
+
+Other reasons are `DEFAULT` (Catalog default), `SUBJECT` (personal terms without a grant), `GRACE` (grace variant during a qualifying status change) and `FROZEN` (a read-only Privilege, which always uses its Catalog default).
+
+## Evaluate from your application
+
+The reference SDKs call an [OEREP](/docs/oerep/) server with the Organization and, optionally, the application user. Python accepts snake_case context keys; the wire format stays camelCase.
+
+<Tabs syncKey="lang">
+<TabItem label="Python">
+
+```python
+import os
+from openentitlement import RemoteProvider, create_client
+
+client = create_client(
+    catalog=catalog,  # your application's Catalog
+    provider=RemoteProvider(
+        'https://entitlements.example.com',
+        token=os.environ['OE_EVAL_TOKEN'],
+    ),
+)
+
+context = {'organization_id': 'globex', 'subject_id': 'idp|alice'}
+client.get_limit('ai_tokens', context)
+client.get_details('ai_tokens', context).reason
+```
+
+</TabItem>
+<TabItem label="TypeScript">
+
+```ts
+import { createClient, RemoteProvider } from '@openentitlement/core';
+
+const client = createClient({
+  catalog, // your application's Catalog
+  provider: new RemoteProvider({
+    baseUrl: 'https://entitlements.example.com',
+    token: process.env.OE_EVAL_TOKEN,
+  }),
+});
+
+const context = { organizationId: 'globex', subjectId: 'idp|alice' };
+await client.getLimit('ai_tokens', context);
+(await client.getDetails('ai_tokens', context)).reason;
+```
+
+</TabItem>
+<TabItem label="HTTP">
+
+```http
+POST /oerep/v1/resolve/ai_tokens HTTP/1.1
+Host: entitlements.example.com
+Content-Type: application/json
+Authorization: Bearer <evaluation-token>
+
+{"context": {"organizationId": "globex", "subjectId": "idp|alice"}}
+```
+
+</TabItem>
+</Tabs>
+
+<Aside type="note">
+The Workspace preview exposes its own `/api/evaluate` endpoint, which is not OEREP. The [ACME walkthrough](/docs/acme-workspace/#6-evaluate-from-python) shows how to call it. Evaluation tokens are backend credentials; never ship them to a browser.
+</Aside>
+
+## Where entitlements stop
+
+<CardGrid>
+<Card title="Not billing" icon="document">
+Invoices, payments and subscriptions stay in your billing system. Entitlements record what was agreed, and evaluation never charges anything.
+</Card>
+<Card title="Not feature flags" icon="setting">
+Flags manage rollout and experiments. Entitlements describe commercial rights that hold until terms change.
+</Card>
+<Card title="Not roles or permissions" icon="approve-check">
+Your authorization still decides whether Alice may open a document. Check both; one does not replace the other.
+</Card>
+<Card title="Usage stays in your application" icon="information">
+Your application or metering integration counts consumption and owns time windows. Missing usage is unknown, not zero.
+</Card>
+</CardGrid>
+
+## Next steps
+
+<CardGrid>
+<LinkCard title="Quickstart" href="/docs/quickstart/" description="Run the reference service and evaluate your first entitlement." />
+<LinkCard title="ACME Workspace walkthrough" href="/docs/acme-workspace/" description="From a Workspace to a personal entitlement, step by step." />
+<LinkCard title="Self-host the service" href="/docs/self-hosting/" description="Run the service with Postgres and separate credentials." />
+<LinkCard title="OEREP HTTP API" href="/docs/oerep/" description="Endpoints, request context and resolution details." />
+</CardGrid>
