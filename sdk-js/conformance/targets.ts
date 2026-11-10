@@ -1,7 +1,6 @@
 /** Conformance targets: one per provider. */
 
-import { capabilityTags, InMemoryProvider, UNLIMITED, type Catalog, type Plan } from "@openentitlement/core";
-import { StripeEntitlementsProvider } from "@openentitlement/stripe";
+import { capabilityTags, InMemoryProvider } from "@openentitlement/core";
 import type { Counter, Seeder, Target, World } from "./steps.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -39,71 +38,6 @@ export const fixedTarget: Target = {
   tags: new Set(["fixed"]),
   async setup() {
     throw new Error("fixed targets do not seed plans");
-  },
-  async counter() {
-    return new MemoryCounter();
-  },
-};
-
-// ------------------------------------------------------------------ Stripe (fake account)
-
-class FakeStripe {
-  plans = new Map<string, Plan>();
-  values = new Map<string, Map<string, unknown>>();
-  customers = new Map<string, string>(); // org -> plan
-  readonly catalog: Catalog;
-  constructor(catalog: Catalog) {
-    this.catalog = catalog;
-  }
-  lookupKeys(planId: string): string[] {
-    const keys: string[] = [];
-    for (const [k, v] of this.values.get(planId) ?? []) {
-      const p = this.catalog.privilege(k)!;
-      if (p.valueType === "boolean") {
-        if (v === true) keys.push(k);
-      } else keys.push(v === UNLIMITED ? `${k}:unlimited` : `${k}:${String(v)}`);
-    }
-    return keys;
-  }
-  transport = async (url: string) => {
-    const org = new URL(url).searchParams.get("customer")!.replace(/^cus_/, "");
-    const plan = this.customers.get(org);
-    const data = (plan ? this.lookupKeys(plan) : []).map((k, i) => ({ id: `ent_${i}`, object: "entitlements.active_entitlement", lookup_key: k }));
-    return { status: 200, body: JSON.stringify({ object: "list", data, has_more: false }) };
-  };
-}
-
-export const stripeTarget: Target = {
-  name: "stripe",
-  tags: new Set(),
-  async setup(w: World) {
-    const fake = new FakeStripe(w.catalog);
-    w.makeClient(
-      new StripeEntitlementsProvider({
-        apiKey: "sk_test_conformance",
-        customerFor: (org) => (fake.customers.has(org) ? `cus_${org}` : undefined),
-        transport: fake.transport,
-        cacheTtl: 0,
-      }),
-    );
-    const unsupported = async () => {
-      throw new Error("Stripe has no overrides/grants; scenario should have been skipped");
-    };
-    w.seeder = {
-      async upsertPlan(plan: Plan) {
-        fake.plans.set(plan.id, plan);
-      },
-      async setPlanValue(planId: string, privilege: string, value: unknown) {
-        if (!fake.values.has(planId)) fake.values.set(planId, new Map());
-        fake.values.get(planId)!.set(privilege, value);
-      },
-      async assignPlan(org: string, planId: string | null) {
-        if (planId === null) fake.customers.delete(org);
-        else fake.customers.set(org, planId);
-      },
-      createOverride: unsupported,
-      createGrant: unsupported,
-    };
   },
   async counter() {
     return new MemoryCounter();

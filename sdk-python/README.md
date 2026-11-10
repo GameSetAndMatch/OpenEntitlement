@@ -8,7 +8,6 @@ Reference implementation of [OpenEntitlement spec v0.1.0](../spec/README.md). Py
 |---|---|---|
 | `openentitlement-sdk` | nothing | API, provider interface, `InMemoryProvider`, `FixedProvider`, `InProcessLock`, hooks, `resolve_from_facts` |
 | `openentitlement-postgres` | `psycopg>=3.1` | `PostgresProvider`, `PostgresAdvisoryLock`, `migrate()`, [`schema.sql`](packages/openentitlement-postgres/src/openentitlement_postgres/schema.sql) |
-| `openentitlement-stripe` | nothing (stdlib HTTPS) | `StripeEntitlementsProvider`, `verify_webhook` |
 
 ## Python-first authoring and business walkthrough
 
@@ -69,30 +68,11 @@ client = create_client(FixedProvider(catalog, {"project_max": 10_000, "sso_conne
 
 Evaluation hooks subclass `Hook` (`before`, `after`, `error`, `finally_after`). Mutation hooks subclass `MutationHook`, receive an `AuditEvent` in `after`, and can veto a change by raising in `before`. Python has no method named `finally` (it is a keyword), so the `finally` stage is `finally_after`.
 
-## Stripe adapter
-
-```python
-from openentitlement_stripe import StripeEntitlementsProvider, verify_webhook
-
-stripe = StripeEntitlementsProvider(
-    os.environ["STRIPE_SECRET_KEY"],
-    customer_for=lambda org_id: db.stripe_customer_id(org_id),
-    mapping={"legacy-bundle": {"seat_max": 25}},   # optional, for lookup keys you can't rename
-)
-# webhook endpoint:
-event = verify_webhook(request.body, request.headers["Stripe-Signature"], os.environ["STRIPE_WEBHOOK_SECRET"])
-stripe.handle_event(event)  # refreshes the cache on entitlements.active_entitlement_summary.updated
-```
-
-Stripe features are boolean `lookup_key`s attached to products. The adapter reads values from a naming convention: `sso_enabled`, `seat_max:50`, `seat_max:unlimited`, `report_retention:365d`. Several matches resolve to the most generous value. Capabilities: none of `overrides`, `grants`, `mutations`, `planCatalog` (Stripe has no such concepts), so there is no `required_plan` either. A boolean missing from a customer that has other active entitlements resolves to `False` with reason `PLAN`. To combine Stripe limits with your own overrides, write a provider that composes this one with a facts source, and pass a `PostgresAdvisoryLock` for `guard`.
-
-For seats bought in Stripe's billing portal (spec Req 1.8.3), set the portal's quantity maximum from `get_limit("seat_max")`, and check observed quantities in your `customer.subscription.updated` webhook with `require_within`.
-
 ## Development
 
 ```bash
 uv sync
-uv run pytest                                   # unit tests + conformance (in-memory, fixed, Stripe fake)
+uv run pytest                                   # unit tests + conformance (in-memory, fixed)
 OE_PG_DSN=postgresql://... uv run pytest        # + Postgres conformance
 uv run ruff check packages
 ```

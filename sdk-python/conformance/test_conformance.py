@@ -1,6 +1,6 @@
 """Run spec/assets/gherkin against every available target.
 
-    uv run pytest conformance                         # in-memory, fixed, Stripe (fake account)
+    uv run pytest conformance                         # in-memory, fixed
     OE_PG_DSN=postgresql://... uv run pytest conformance   # + Postgres
 """
 

@@ -4,8 +4,7 @@
   "type": "module",
   "workspaces": [
     "packages/core",
-    "packages/postgres",
-    "packages/stripe"
+    "packages/postgres"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

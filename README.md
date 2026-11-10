@@ -28,8 +28,8 @@ Run the [service and local demo](console/README.md), backed by memory or Postgre
 | [`console/`](console/README.md) | Our entitlement server, OEREP API, and administrative web console |
 | [`spec/`](spec/README.md) | Semantic specification and OEREP v1 [OpenAPI](spec/oerep.openapi.json) |
 | [`spec/assets/gherkin/`](spec/assets/gherkin/README.md) | Conformance suite: 11 feature files, tagged by requirement and provider capability |
-| [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk` (runtime core, zero deps; optional Pydantic authoring), `openentitlement-postgres`, `openentitlement-stripe` |
-| [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core` (zero deps), `@openentitlement/postgres`, `@openentitlement/stripe` |
+| [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk` (runtime core, zero deps; optional Pydantic authoring), `openentitlement-postgres` |
+| [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core` (zero deps), `@openentitlement/postgres` |
 | [`PRIOR_ART.md`](PRIOR_ART.md) | What exists, the vendor mapping table, where billing leaks, link check |
 | [`ADR-0001.md`](ADR-0001.md) | Why an open protocol plus our own entitlement server |
 
@@ -56,10 +56,7 @@ New authoring uses flat keys, a Privilege Catalog, one Group and multiple Tags, 
 |---|---|---|
 | in-memory | ✅ 110/110 | ✅ 110/110 |
 | Postgres (16) | ✅ 110/110 | ✅ 110/110 |
-| Stripe adapter (fake account) | ✅ 41/41 | ✅ 41/41 |
 | fixed provider | ✅ 6/6 | ✅ 6/6 |
-
-The Stripe adapter is tested against a fake account built from the response shapes in Stripe's docs, not against live Stripe.
 
 OEREP v1 is implemented in both SDKs and the reference service, with real cross-language HTTP integration tests. Roadmap: add-ons and change events. See [spec/README.md](spec/README.md#roadmap).
 

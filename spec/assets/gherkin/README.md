@@ -28,7 +28,7 @@ Fixtures: [`../catalog.json`](../catalog.json) (the catalog the application "dec
 
 ## Seeding
 
-`Given` steps that create plans, values, assignments, overrides, or grants are *seeding* steps. A harness MAY implement them through the SDK's admin interface (for providers with `mutations`), or through any provider-specific back door (a fake Stripe account, SQL fixtures). Errors in `Given` steps fail the scenario. Errors in `When` steps are captured and MUST be asserted by a later `Then the operation fails with "<CODE>"`. An unasserted captured error fails the scenario.
+`Given` steps that create plans, values, assignments, overrides, or grants are *seeding* steps. A harness MAY implement them through the SDK's admin interface (for providers with `mutations`), or through any provider-specific back door (SQL fixtures, a fake vendor account). Errors in `Given` steps fail the scenario. Errors in `When` steps are captured and MUST be asserted by a later `Then the operation fails with "<CODE>"`. An unasserted captured error fails the scenario.
 
 `When` mutation steps clear the recorded audit log before the first mutation of the scenario's `When` phase, so `Then an audit event records …` sees only what the scenario did.
 

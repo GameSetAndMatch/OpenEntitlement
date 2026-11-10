@@ -9,7 +9,7 @@ The spec therefore separates two things:
 - **`requireWithin`**: a pure check, with no atomicity guarantee.
 - **`guard`**: check-then-act, serialized per `(organizationId, privilege)` through a pluggable **lock**, with the count and the act running inside the lock.
 
-Serialization depends on *where the usage lives* (usually the application's database), not on where the limits come from. So the lock is a client option and not a provider capability. A Stripe adapter can supply the limits while a Postgres advisory lock serializes the inserts.
+Serialization depends on *where the usage lives* (usually the application's database), not on where the limits come from. So the lock is a client option and not a provider capability. A remote service can supply the limits while a Postgres advisory lock in the application serializes the inserts.
 
 ### 5.1. requireWithin is not atomic
 

@@ -6,7 +6,7 @@ A vendor-neutral API for product entitlements: feature access, numeric limits, p
 pip install openentitlement-sdk
 ```
 
-Read the [quickstart](https://openentitlement.dev/docs/quickstart/), [Python SDK guide](https://github.com/open-entitlement/OpenEntitlement/blob/main/sdk-python/README.md), and [specification](https://openentitlement.dev/docs/specification/). PostgreSQL and Stripe providers are available as separate packages.
+Read the [quickstart](https://openentitlement.dev/docs/quickstart/), [Python SDK guide](https://github.com/open-entitlement/OpenEntitlement/blob/main/sdk-python/README.md), and [specification](https://openentitlement.dev/docs/specification/). The PostgreSQL provider and lock are available as a separate package, `openentitlement-postgres`.
 
 
 The PyPI distribution is **openentitlement-sdk**; Python imports remain `openentitlement`.
