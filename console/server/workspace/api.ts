@@ -49,7 +49,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     if (!match) throw new WorkspaceError("Endpoint not found",404);
     const [,id,section,target]=match;
     if (!section && method === "GET") { const workspace=await store.read(account,id!);send(res,200,view(workspace));return true; }
-    if(section==="catalog"&&method==="GET"){const workspace=await store.read(account,id!);send(res,200,{privileges:workspace.data.privileges.map(p=>catalogDefinition(p,workspace.data)),groups:workspace.data.groups.map(g=>({id:g.id,title:g.name,description:g.description,...(g.parentId?{parent_id:g.parentId}:{})})),tags:workspace.data.tags.map(t=>({id:t.id,title:t.name,description:t.description}))});return true;}
+    if(section==="catalog"&&method==="GET"){const workspace=await store.read(account,id!);send(res,200,{privileges:workspace.data.privileges.map(p=>catalogDefinition(p,workspace.data)),groups:workspace.data.groups.map(g=>({id:g.id,title:g.name,description:g.description,...(g.parentId?{parentId:g.parentId}:{})})),tags:workspace.data.tags.map(t=>({id:t.id,title:t.name,description:t.description}))});return true;}
     if (section === "audit" && method === "GET") { send(res,200,await store.history(account,id!));return true; }
     if (section === "invitations" && method === "POST") {
       if (!["Owner","Manager","User"].includes(body.role))throw new WorkspaceError("Invalid role");
@@ -91,7 +91,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
         if(index<0)data.subjects.push(row);else data.subjects[index]=row;
         }
       }
-      if((section==="groups"||section==="tags")&&entry&&typeof entry==="object"&&"title" in entry){const {title,parent_id,...rest}=entry as Record<string,unknown>;entry={...rest,name:title,...(parent_id?{parentId:parent_id}:{})};}
+      if((section==="groups"||section==="tags")&&entry&&typeof entry==="object"&&"title" in entry){const {title,parentId,...rest}=entry as Record<string,unknown>;entry={...rest,name:title,...(parentId?{parentId:parentId}:{})};}
       if(section==="catalog"){try{entry=storedDefinition(parsePrivilege(entry));}catch(e){throw new WorkspaceError((e as Error).message,422);}}
       const upsert=<T>(list: T[],value: T,key: (v: T) => string) => { const index=list.findIndex(v => key(v) === key(value));if(index<0)list.push(value);else list[index]=value; };
       if (section === "groups") upsert(data.groups,group(data,entry),v => v.id);

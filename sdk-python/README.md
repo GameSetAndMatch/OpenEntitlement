@@ -41,7 +41,7 @@ client.admin.create_override("acme", "project_max", 12, actor="sales", reason="M
 client.admin.create_grant("acme", "project_max", 3, actor="support", reason="goodwill", subject_id="u_7")
 
 # 3. Gate (spec §4)
-ctx = {"organizationId": "acme", "subjectId": "u_7"}
+ctx = {"organization_id": "acme", "subject_id": "u_7"}
 client.is_enabled("sso", ctx)                    # False, details carry required_plan when a plan unlocks it
 client.get_limit("project_max", ctx)            # 15 (override 12 + personal grant 3)
 

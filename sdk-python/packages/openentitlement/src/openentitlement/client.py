@@ -71,7 +71,7 @@ ContextArg = Union[EvaluationContext, Mapping[str, Any], None]
 
 
 def to_context(ctx: ContextArg) -> Optional[EvaluationContext]:
-    """Accept an EvaluationContext or a dict with spec (camelCase) or Python (snake_case) names."""
+    """Accept an EvaluationContext or a dict. Prefer snake_case keys (organization_id); spec camelCase keys also work."""
     if ctx is None or isinstance(ctx, EvaluationContext):
         return ctx
     get = lambda *names: next((ctx[n] for n in names if n in ctx), None)  # noqa: E731
