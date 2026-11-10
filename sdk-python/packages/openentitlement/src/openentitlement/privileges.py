@@ -7,6 +7,25 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Literal
 
+# Catalog JSON uses camelCase keys; Python attributes use snake_case.
+_JSON_KEYS = {"group_id": "groupId", "parent_id": "parentId", "env_override": "envOverride"}
+_PYTHON_KEYS = {camel: snake for snake, camel in _JSON_KEYS.items()}
+
+
+def _to_json_keys(data: dict[str, Any]) -> dict[str, Any]:
+    return {_JSON_KEYS.get(key, key): value for key, value in data.items()}
+
+
+def _to_python_keys(data: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in data.items():
+        name = _PYTHON_KEYS.get(key, key)
+        if name in result:
+            raise ValueError(f"{key} is given twice, as camelCase and snake_case")
+        result[name] = value
+    return result
+
+
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -87,14 +106,14 @@ class Privilege:
         result["tags"] = list(self.tags)
         if "enum" in result:
             result["enum"] = list(result["enum"])
-        return result
+        return _to_json_keys(result)
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Privilege:
-        raw = dict(data)
+        raw = _to_python_keys(data)
         kind = raw.pop("type", None)
         model = {"boolean": BooleanPrivilege, "integer": IntegerPrivilege, "enum": StringEnumPrivilege}.get(kind)
         if model is None:
@@ -206,7 +225,7 @@ class PrivilegeCatalog:
     def to_dict(self) -> dict[str, Any]:
         return {
             "privileges": [p.to_dict() for p in self.privileges],
-            "groups": [{k: v for k, v in asdict(g).items() if v is not None} for g in self.groups],
+            "groups": [_to_json_keys({k: v for k, v in asdict(g).items() if v is not None}) for g in self.groups],
             "tags": [asdict(t) for t in self.tags],
         }
 
@@ -219,6 +238,6 @@ class PrivilegeCatalog:
             raise ValueError("Privilege Catalog contains unknown fields or no privileges list")
         return cls(
             privileges=tuple(Privilege.from_dict(p) for p in data["privileges"]),
-            groups=tuple(Group(**g) for g in data.get("groups", [])),
+            groups=tuple(Group(**_to_python_keys(g)) for g in data.get("groups", [])),
             tags=tuple(Tag(**t) for t in data.get("tags", [])),
         )

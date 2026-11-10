@@ -16,7 +16,7 @@ from openentitlement import Catalog, FixedProvider, create_client, feature, inte
 
 catalog = Catalog([feature("seats", "Seats", [integer("seat_max")])])
 client = create_client(FixedProvider(catalog, {"seat_max": 25}), catalog)
-assert client.get_limit("seat_max", {"organizationId": "acme"}) == 25
+assert client.get_limit("seat_max", {"organization_id": "acme"}) == 25
 ```
 
 Privilege keys are flat (`seat_max`). Groups and Tags are separate Catalog metadata, rather than segments encoded into a dotted key. See the [Privilege Catalog guide](https://github.com/open-entitlement/OpenEntitlement/blob/main/console/PRIVILEGE-CATALOG.md) for typed definitions. Existing dotted identifiers remain supported by the v1 SDK for compatibility; no automatic key renaming occurs.

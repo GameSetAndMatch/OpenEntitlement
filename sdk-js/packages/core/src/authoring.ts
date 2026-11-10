@@ -6,13 +6,13 @@ export interface PrivilegeBase {
   title: string;
   description: string;
   visibility: Visibility;
-  group_id?: string;
+  groupId?: string;
   tags: string[];
 }
 export interface BooleanPrivilege extends PrivilegeBase {
   type: "boolean";
   default?: boolean;
-  env_override?: string;
+  envOverride?: string;
 }
 export interface IntegerPrivilege extends PrivilegeBase {
   type: "integer";
@@ -41,14 +41,14 @@ function validatePrivilege(input: unknown): Privilege {
     "title",
     "description",
     "visibility",
-    "group_id",
+    "groupId",
     "tags",
     "type",
     "default",
   ];
   const extra =
     b.type === "boolean"
-      ? ["env_override"]
+      ? ["envOverride"]
       : b.type === "integer"
         ? ["minimum", "maximum", "unlimited"]
         : b.type === "enum"
@@ -75,12 +75,12 @@ function validatePrivilege(input: unknown): Privilege {
   )
     throw new Error("Invalid Privilege visibility");
   if (
-    b.group_id !== undefined &&
-    (typeof b.group_id !== "string" ||
-      b.group_id.length > 80 ||
-      !keyPattern.test(b.group_id))
+    b.groupId !== undefined &&
+    (typeof b.groupId !== "string" ||
+      b.groupId.length > 80 ||
+      !keyPattern.test(b.groupId))
   )
-    throw new Error("Privilege group_id must be one Group identifier");
+    throw new Error("Privilege groupId must be one Group identifier");
   if (
     b.tags !== undefined &&
     (!Array.isArray(b.tags) ||
@@ -100,11 +100,11 @@ function validatePrivilege(input: unknown): Privilege {
   } as unknown as Privilege;
   if (result.type === "boolean") {
     if (
-      result.env_override !== undefined &&
-      !/^[A-Z][A-Z0-9_]*$/.test(result.env_override)
+      result.envOverride !== undefined &&
+      !/^[A-Z][A-Z0-9_]*$/.test(result.envOverride)
     )
       throw new Error(
-        "env_override must be an uppercase environment variable name",
+        "envOverride must be an uppercase environment variable name",
       );
     if (Object.hasOwn(result, "default") && typeof result.default !== "boolean")
       throw new Error("Boolean Privilege default must be a boolean");
@@ -153,7 +153,7 @@ function validatePrivilege(input: unknown): Privilege {
   }
   if (
     (result.visibility !== "editable" ||
-      (result.type === "boolean" && result.env_override)) &&
+      (result.type === "boolean" && result.envOverride)) &&
     !Object.hasOwn(result, "default")
   )
     throw new Error(
@@ -166,7 +166,7 @@ export interface GroupDefinition {
   id: string;
   title: string;
   description: string;
-  parent_id?: string;
+  parentId?: string;
 }
 export interface TagDefinition {
   id: string;
@@ -201,7 +201,7 @@ function validateCatalog(input: unknown): PrivilegeCatalog {
         (k) =>
           !(
             group
-              ? ["id", "title", "description", "parent_id"]
+              ? ["id", "title", "description", "parentId"]
               : ["id", "title", "description"]
           ).includes(k),
       )
@@ -219,17 +219,17 @@ function validateCatalog(input: unknown): PrivilegeCatalog {
     )
       throw new Error("Invalid Group or Tag metadata");
     if (
-      row.parent_id !== undefined &&
+      row.parentId !== undefined &&
       (!group ||
-        typeof row.parent_id !== "string" ||
-        !keyPattern.test(row.parent_id))
+        typeof row.parentId !== "string" ||
+        !keyPattern.test(row.parentId))
     )
       throw new Error("Invalid parent Group");
     return {
       id: row.id,
       title: row.title.trim(),
       description: (row.description ?? "") as string,
-      ...(row.parent_id ? { parent_id: row.parent_id as string } : {}),
+      ...(row.parentId ? { parentId: row.parentId as string } : {}),
     };
   }
   if (
@@ -251,17 +251,17 @@ function validateCatalog(input: unknown): PrivilegeCatalog {
       throw new Error(`Duplicate ${label} identifier`);
   for (const group of groups) {
     const seen = new Set([group.id]);
-    let parent = group.parent_id;
+    let parent = group.parentId;
     while (parent) {
       if (seen.has(parent)) throw new Error("Group hierarchy contains a cycle");
       seen.add(parent);
       const next = groups.find((g) => g.id === parent);
       if (!next) throw new Error("Unknown parent Group");
-      parent = next.parent_id;
+      parent = next.parentId;
     }
   }
   for (const privilege of privileges) {
-    if (privilege.group_id && !groups.some((g) => g.id === privilege.group_id))
+    if (privilege.groupId && !groups.some((g) => g.id === privilege.groupId))
       throw new Error("Privilege references an unknown Group");
     if (privilege.tags.some((id) => !tags.some((t) => t.id === id)))
       throw new Error("Privilege references an unknown Tag");
@@ -301,14 +301,14 @@ export function standaloneCatalog(input: unknown): unknown {
             key: p.key,
             valueType: p.type,
             default: p.default,
-            ...(p.type === "boolean" && p.env_override
-              ? { envVariable: p.env_override }
+            ...(p.type === "boolean" && p.envOverride
+              ? { envVariable: p.envOverride }
               : {}),
             ...(p.type === "integer"
               ? { unlimitedAllowed: p.unlimited ?? false }
               : {}),
             ...(p.type === "enum" ? { options: p.enum } : {}),
-            group_id: p.group_id,
+            groupId: p.groupId,
             tags: p.tags,
           },
         ],
@@ -328,7 +328,7 @@ const commonSchema = {
   title: titleSchema,
   description: z.string().max(2000).optional(),
   visibility: z.enum(["hidden", "read_only", "editable"]).optional(),
-  group_id: identifierSchema.optional(),
+  groupId: identifierSchema.optional(),
   tags: z.array(identifierSchema).max(50).optional(),
 };
 const rawPrivilegeSchema = z.discriminatedUnion("type", [
@@ -336,7 +336,7 @@ const rawPrivilegeSchema = z.discriminatedUnion("type", [
     ...commonSchema,
     type: z.literal("boolean"),
     default: z.boolean().optional(),
-    env_override: z
+    envOverride: z
       .string()
       .regex(/^[A-Z][A-Z0-9_]*$/)
       .optional(),
@@ -370,7 +370,7 @@ const groupSchema = z.strictObject({
   id: identifierSchema,
   title: titleSchema,
   description: z.string().max(2000).optional(),
-  parent_id: identifierSchema.optional(),
+  parentId: identifierSchema.optional(),
 });
 const tagSchema = z.strictObject({
   id: identifierSchema,

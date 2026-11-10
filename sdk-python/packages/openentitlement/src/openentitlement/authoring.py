@@ -2,6 +2,9 @@
 
 The core SDK remains dependency-free. Existing dataclasses remain compatible;
 these models reuse their domain checks and emit the same Catalog JSON.
+
+Python attributes are snake_case (``group_id``); JSON, JSON Schema and FastAPI
+responses use camelCase aliases (``groupId``). Validation accepts either form.
 """
 
 from __future__ import annotations
@@ -9,6 +12,7 @@ from __future__ import annotations
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic.alias_generators import to_camel
 
 from . import privileges as domain
 
@@ -19,10 +23,22 @@ SafeInteger = Annotated[int, Field(ge=0, le=2**53 - 1)]
 
 
 class AuthoringModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True, validate_default=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        validate_default=True,
+        alias_generator=to_camel,
+        validate_by_name=True,
+        validate_by_alias=True,
+        serialize_by_alias=True,
+    )
 
     def to_dict(self) -> dict[str, Any]:
+        """Catalog JSON shape, with camelCase keys."""
         return self.model_dump(mode="json", exclude_none=True)
+
+    def _python_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json", exclude_none=True, by_alias=False)
 
     def to_json(self) -> str:
         return self.model_dump_json(exclude_none=True)
@@ -36,7 +52,7 @@ class Group(AuthoringModel):
 
     @model_validator(mode="after")
     def validate_group(self) -> Group:
-        domain.Group(**self.to_dict())
+        domain.Group(**self._python_dict())
         return self
 
 
@@ -47,7 +63,7 @@ class Tag(AuthoringModel):
 
     @model_validator(mode="after")
     def validate_tag(self) -> Tag:
-        domain.Tag(**self.to_dict())
+        domain.Tag(**self._python_dict())
         return self
 
 

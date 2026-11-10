@@ -24,7 +24,9 @@ def test_privilege_dataclasses_round_trip_with_one_group_and_many_tags():
     dumped = json.loads(privilege.to_json())
     assert dumped["type"] == "boolean"
     assert dumped["visibility"] == "read_only"
-    assert dumped["group_id"] == "mcp"
+    assert dumped["groupId"] == "mcp"
+    assert dumped["envOverride"] == "MCP_INSTALLED"
+    assert "group_id" not in dumped
     assert dumped["tags"] == ["enterprise", "integration"]
     assert Privilege.from_dict(dumped) == privilege
 
