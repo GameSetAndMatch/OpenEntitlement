@@ -60,7 +60,7 @@ function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
   const lastFinite = useRef(typeof value === "number" ? value : 0);
   useEffect(() => { if (typeof value === "number") lastFinite.current = value; }, [value]);
   return <div className="int-input">
-    <input ref={input} aria-invalid={Boolean(problem)} aria-describedby={problem ? errorId : undefined} className="input" type={unlimited ? "text" : "number"} aria-label={def.key} min={0} step={1}
+    <input ref={input} aria-invalid={Boolean(problem)} aria-describedby={problem ? errorId : undefined} className="input" type={unlimited ? "text" : "number"} aria-label={def.key} step={1}
       disabled={disabled || unlimited} value={unlimited ? "∞" : value ?? ""}
       onChange={e => onChange(e.target.value === "" ? undefined : Number(e.target.value))}/>
     {problem && <small id={errorId} role="alert" className="field-error">{problem}</small>}

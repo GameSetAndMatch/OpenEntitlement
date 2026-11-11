@@ -151,7 +151,7 @@ A contract negotiated on `enterprise` shouldn't silently follow the customer dow
 
 #### Requirement 1.5.6
 
-> A provider MUST validate values written as plan values or overrides: `boolean` values MUST be booleans, `integer` values MUST be integers ≥ 0 or `UNLIMITED` (subject to [Requirement 1.2.5](#requirement-125)), and `enum` values MUST be one of the declared options. Invalid writes MUST fail with `INVALID_VALUE`.
+> A provider MUST validate values written as plan values or overrides: `boolean` values MUST be booleans, `integer` values MUST be integers between −(2^53−1) and 2^53−1 inclusive (negative values are allowed) or `UNLIMITED` (subject to [Requirement 1.2.5](#requirement-125)), and `enum` values MUST be one of the declared options. Invalid writes MUST fail with `INVALID_VALUE`.
 
 #### Requirement 1.5.7
 

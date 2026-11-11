@@ -39,9 +39,9 @@ class PrivilegeDefinition(OpenEntitlementModel):
         if self.value_type is ValueType.INTEGER:
             if is_unlimited(value):
                 return None if self.unlimited_allowed else f"{self.key} does not allow UNLIMITED"
-            if is_int(value) and value >= 0:
+            if is_int(value):
                 return None
-            return f"{self.key} expects a non-negative integer or UNLIMITED"
+            return f"{self.key} expects an integer or UNLIMITED"
         if isinstance(value, str) and value in self.options:
             return None
         return f"{self.key} expects one of {list(self.options)}"

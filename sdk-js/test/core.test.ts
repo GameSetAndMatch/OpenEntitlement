@@ -64,7 +64,7 @@ describe("catalog validation is eager", () => {
     [feature("a", "A", [boolean("a_x"), boolean("a_y")])],
     [feature("a", "A", [enumeration("a_tier", ["x"])])],
     [feature("a", "A", [boolean("a_x")]), feature("b", "B", [boolean("a_x")])],
-    [feature("a", "A", [integer("a_max", { default: -1 })])],
+    [feature("a", "A", [integer("a_max", { default: 1.5 })])], // not an integer
     [feature("a", "A", [integer("a_max", { default: UNLIMITED })])],
     [feature("a", "A", [])],
     [feature("a", "A", [boolean("a_x")], { gate: "b_y" })],

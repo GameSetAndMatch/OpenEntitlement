@@ -1,0 +1,15 @@
+{
+  "description": "Integer bounds and defaults may be negative",
+  "catalog": {
+    "privileges": [
+      {
+        "key": "temperature_offset",
+        "title": "Temperature offset",
+        "type": "integer",
+        "minimum": -10,
+        "maximum": 10,
+        "default": -5
+      }
+    ]
+  }
+}

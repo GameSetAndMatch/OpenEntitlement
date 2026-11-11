@@ -33,7 +33,7 @@ def test_pydantic_catalog_roundtrip_and_schema():
     payload = catalog.model_dump_json(exclude_none=True)
     assert PrivilegeCatalog.model_validate_json(payload) == catalog
     assert json.loads(payload)["privileges"][0]["key"] == "seat_max"
-    assert IntegerPrivilege.model_json_schema()["properties"]["minimum"]["minimum"] == 0
+    assert IntegerPrivilege.model_json_schema()["properties"]["minimum"]["minimum"] == -(2**53 - 1)
     assert IntegerPrivilege.model_json_schema()["properties"]["minimum"]["maximum"] == 2**53 - 1
     assert (
         Privilege.from_dict({"type": "boolean", "key": "export_enabled", "title": "Exports", "default": False}).default

@@ -30,7 +30,8 @@ MAX_SAFE_INTEGER = 2**53 - 1
 Identifier = Annotated[StrictStr, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$", max_length=80)]
 Title = Annotated[StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Description = Annotated[StrictStr, StringConstraints(max_length=2000)]
-SafeInteger = Annotated[StrictInt, Field(ge=0, le=MAX_SAFE_INTEGER)]
+SafeInteger = Annotated[StrictInt, Field(ge=-MAX_SAFE_INTEGER, le=MAX_SAFE_INTEGER)]
+"""An integer that is exact in every supported language. Negative values are allowed."""
 EnvironmentVariable = Annotated[StrictStr, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]*$")]
 
 

@@ -51,7 +51,8 @@ export function createOerep(rt: Runtime, token?: string) {
       if (match[1] === "suggest") {
         const p = rt.catalog.privilege(key!);
         if (!p) throw new ProtocolError(404, "unknown privilege");
-        if (validateValue(p, body.need) || (p.valueType === "boolean" && body.need !== true)) throw new ProtocolError(400, "invalid need");
+        // `need` is a requested quantity, so it stays non-negative even though integer values may be negative.
+        if (validateValue(p, body.need) || (p.valueType === "boolean" && body.need !== true) || (typeof body.need === "number" && body.need < 0)) throw new ProtocolError(400, "invalid need");
         // requiredPlan first resolves, suppressing upsells when evaluation fails.
         const details = await rt.client.getDetails(key!, ctx);
         const requiredPlan = details.reason === "ERROR" ? undefined : await rt.client.provider.suggestPlan?.(p, body.need, ctx as import("@openentitlement/core").ResolvedContext);
