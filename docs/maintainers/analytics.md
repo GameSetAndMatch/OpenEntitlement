@@ -28,7 +28,7 @@ The `phc_` project key is public by design: it can only send events. It lives in
 | `$pageview` | Every page load (automatic) | `$pathname` |
 | `docs_code_copied` | The copy button of any code block is clicked | `path`, `language`, `first_line` |
 | `outbound_link_clicked` | A link to another site is clicked | `path`, `destination` (`github`, `docker`, `pypi`, `npm`, `other`), `href` |
-| `cta_clicked` | An element with `data-ph-cta="<name>"` is clicked | `path`, `cta` |
+| `cta_clicked` | A call to action is clicked: an element with `data-ph-cta="<name>"`, or a homepage hero action (named `hero_<label>`, e.g. `hero_get_started`). Homepage names: `hero_get_started`, `hero_read_the_specification`, `scene_catalog`, `scene_tiers`, `scene_exception`, `close_get_started`, `close_github` | `path`, `cta` |
 
 ### Console activation
 
@@ -49,7 +49,7 @@ These are sent by the server after a successful, audited change, so ad blockers 
 
 `tools/posthog/dashboards.mjs` creates or updates two dashboards, matched by name so it is safe to rerun:
 
-- **Website acquisition:** the funnel homepage → docs → quickstart → copied a code block → GitHub, Docker, PyPI or npm; daily visitors; top pages; copied code by page; outbound clicks; paths from the homepage; website errors.
+- **Website acquisition:** the funnel homepage → docs → quickstart → copied a code block → GitHub, Docker, PyPI or npm; homepage conversion (homepage → call to action → quickstart); calls to action by name; dead clicks by page; daily visitors; top pages; copied code by page; outbound clicks; paths from the homepage; website errors.
 - **Console activation:** the funnel signed in → created a Workspace → defined a Privilege → created a Tier or variant → added an Organization → created an API key → first evaluation; weekly active Accounts; changes by section; invitations; Workspace retention; errors by service.
 
 ```sh

@@ -23,6 +23,9 @@ try {
   // One primary action in the hero and one at the close; no collapsed explanations or link cards.
   assert.equal(await page.locator('.hero .sl-link-button.primary').count(),1);
   assert.equal(await page.locator('main details, main .sl-link-card').count(),0);
+  // Each product screen is the one way into its docs page, and every homepage action is named for analytics.
+  assert.deepEqual(await page.locator('.scene-link').evaluateAll(a=>a.map(l=>[l.getAttribute('href'),l.dataset.phCta])),[['/docs/privilege-catalog/','scene_catalog'],['/docs/acme-workspace/','scene_tiers'],['/docs/acme-workspace/','scene_exception']]);
+  assert.equal(await page.locator('.landing-close-actions a[data-ph-cta]').count(),2);
   const tier=page.locator('.product-scene').nth(1);
   assert.equal(await tier.locator('input[aria-label="seat_max"]').inputValue(),'∞');
   assert.equal(await tier.locator('[role=switch][aria-label="export_enabled"]').getAttribute('aria-checked'),'true');

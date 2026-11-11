@@ -52,6 +52,25 @@ const dashboards = [
         ]),
       },
       {
+        name: "Homepage conversion: homepage → call to action → quickstart",
+        description: "Does the landing page move people to the quickstart? 1-day window.",
+        query: funnel([
+          event("$pageview", [prop("$pathname", "/")], { custom_name: "Homepage" }),
+          event("cta_clicked", [prop("path", "/")], { custom_name: "Clicked a call to action or scene" }),
+          event("$pageview", [prop("$pathname", "/docs/quickstart/")], { custom_name: "Quickstart" }),
+        ], 1),
+      },
+      {
+        name: "Calls to action by name",
+        description: "Hero, scene and closing actions on the homepage (cta_clicked.cta).",
+        query: trend([event("cta_clicked")], { breakdown: "cta", display: "ActionsBarValue" }),
+      },
+      {
+        name: "Dead clicks by page",
+        description: "Clicks that did nothing: places where visitors expect a link or control.",
+        query: trend([event("$dead_click")], { breakdown: "$pathname", display: "ActionsBarValue" }),
+      },
+      {
         name: "Daily visitors",
         query: trend([event("$pageview", [], { math: "dau", custom_name: "Unique visitors" })]),
       },
