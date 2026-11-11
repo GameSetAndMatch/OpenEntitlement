@@ -38,6 +38,7 @@ function trackJourney(): void {
       posthog.capture('docs_code_copied', { path, language, first_line: firstLine });
       return;
     }
+    // Names are stable identifiers set in markup (Starlight hero actions use frontmatter attrs), never labels.
     const cta = target.closest<HTMLElement>('[data-ph-cta]');
     if (cta) posthog.capture('cta_clicked', { path, cta: cta.dataset.phCta });
     const link = target.closest<HTMLAnchorElement>('a[href]');

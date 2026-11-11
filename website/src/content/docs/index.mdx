@@ -5,34 +5,46 @@ template: splash
 editUrl: false
 lastUpdated: false
 hero:
-  title: Entitlements you can explain
-  tagline: Define privileges. Set limits. Make exceptions.
+  title: Entitlements you can explain.
+  tagline: Define what your product allows, package it into Tiers, and make room for every customer deal. Each value says where it came from.
   actions:
     - text: Get started
       link: /docs/quickstart/
-      icon: right-arrow
+      attrs:
+        data-ph-cta: hero_get_started
     - text: Read the specification
       link: /docs/specification/
-      variant: secondary
+      variant: minimal
+      attrs:
+        data-ph-cta: hero_specification
 ---
 
 import ProductScenes from '../../components/ProductScenes';
-import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 <ProductScenes />
 
-<details>
-<summary>How it works</summary>
+<section class="landing-code" aria-labelledby="ask">
 
-Catalog defaults → Tier variant → Organization overrides. Boolean environment prerequisites can only restrict access. The examples above use the console's Catalog, value editor and resolver.
+<h2 id="ask">One question from your application.</h2>
 
-OpenEntitlement is an open-source model, protocol and self-hostable service. Keep billing, roles and usage in your existing tools. The console is a preview and OEREP v1 is a draft.
+<p>Ask for a value, and why. The same contract in Python and TypeScript.</p>
 
-[Follow the ACME walkthrough](/docs/acme-workspace/) or [read the specification](/docs/specification/).
+```python
+client = create_client(RemoteProvider("http://localhost:8787"), catalog)
+client.get_limit("seat_max", {"organization_id": "acme"})           # 250
+client.get_details("seat_max", {"organization_id": "acme"}).reason  # OVERRIDE
+```
 
-</details>
+<p class="landing-code-more"><a href="/docs/python/">See the complete setup</a></p>
 
-<CardGrid>
-<LinkCard title="Build with Python" href="/docs/python/" description="Evaluate entitlements in your application." />
-<LinkCard title="Run it yourself" href="/docs/self-hosting/" description="Start the service with Docker." />
-</CardGrid>
+</section>
+
+<section class="landing-close" aria-labelledby="own">
+
+<h2 id="own">Open source. Yours to run.</h2>
+
+<p>Apache-2.0. Self-host the service with Docker, or start with the SDK.</p>
+
+<p class="landing-close-actions"><a class="landing-primary" href="/docs/quickstart/" data-ph-cta="close_get_started">Get started</a> <a href="https://github.com/open-entitlement/OpenEntitlement" data-ph-cta="close_github">View on GitHub</a></p>
+
+</section>

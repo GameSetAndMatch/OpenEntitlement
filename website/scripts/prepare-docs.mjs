@@ -40,7 +40,10 @@ for (const file of files) {
       if (result.status === 'rejected') throw new Error(`Invalid diagram in ${file.source}`, { cause: result.reason });
       const name = `${file.target.replaceAll('/', '-').replace('.md', '')}-${index + 1}.svg`;
       await writeFile(resolve(diagrams, name), result.value.svg);
-      content = content.replace(blocks[index][0], `![${heading} diagram](/diagrams/${name})`);
+      // Width and height from the viewBox let the browser reserve the space, so the page does not shift (CLS).
+      const [, , w, h] = (result.value.svg.match(/viewBox="([^"]+)"/)?.[1] ?? '0 0 0 0').split(/\s+/).map(Number);
+      const size = w && h ? ` width="${Math.round(w)}" height="${Math.round(h)}"` : '';
+      content = content.replace(blocks[index][0], `<img src="/diagrams/${name}" alt="${heading.replaceAll('"', "&quot;")} diagram"${size} decoding="async">`);
     }
   }
   const frontmatter = `---\ntitle: ${JSON.stringify(heading)}\neditUrl: ${JSON.stringify('https://github.com/open-entitlement/OpenEntitlement/edit/main/' + file.source)}\n---\n\n`;
