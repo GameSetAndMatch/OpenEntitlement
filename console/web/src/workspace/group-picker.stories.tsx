@@ -64,6 +64,10 @@ export const LongNameCollisions:Story={play:async({canvasElement})=>{
  await expect(ids.length).toBe(2);
  await expect(ids[1]).not.toBe(ids[0]);
  await expect(ids.every((id:string)=>id.length<=80&&/^[a-z][a-z0-9_]*$/.test(id))).toBe(true);
+ // A long name stays on one line in the tree and is truncated with an ellipsis.
+ await userEvent.click(summary);
+ for(const option of canvasElement.querySelectorAll<HTMLElement>('.group-tree .group-option'))await expect(option.getBoundingClientRect().height).toBeLessThanOrEqual(40);
+ await userEvent.keyboard('{Escape}');
  done(canvasElement);
 }};
 

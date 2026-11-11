@@ -14,9 +14,12 @@
   --fill: #f0f0ed;
   --ink: #16181b;
   --muted: #62666d;
-  --faint: #8d9198;
+  --faint: #6b6f76;
   --line: rgb(22 24 27 / 8%);
   --line-strong: rgb(22 24 27 / 16%);
+  /* Boundaries of controls people operate: at least 3:1 against surface and fill (WCAG 1.4.11). */
+  --control-line: rgb(22 24 27 / 52%);
+  --control-off: #62666d;
   --accent: #0f766e;
   --accent-ink: #0b5f58;
   --accent-hover: #0b5f58;
@@ -49,9 +52,11 @@
     --fill: #202124;
     --ink: #f1f1ef;
     --muted: #a3a6ab;
-    --faint: #75797f;
+    --faint: #8f9399;
     --line: rgb(255 255 255 / 8%);
     --line-strong: rgb(255 255 255 / 16%);
+    --control-line: rgb(255 255 255 / 38%);
+    --control-off: #6b6f76;
     --accent: #3cbfae;
     --accent-ink: #6fd6c8;
     --accent-hover: #5ccdbf;
@@ -89,7 +94,7 @@ html .workspace-shell .workspace-picker { margin: 28px 2px 8px; font-weight: 500
 html .workspace-shell nav { margin-top: 16px; }
 html .nav { padding: 8px 12px; margin: 2px 0; border-radius: var(--radius-s); color: var(--muted); font-size: 14px; transition: background var(--speed) var(--ease), color var(--speed) var(--ease); }
 html .nav:hover { background: var(--fill); color: var(--ink); }
-html .nav.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color); }
+html .nav.active { background: var(--surface); color: var(--accent-ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color); }
 html .sidebar-footer { color: var(--faint); }
 html main { padding: 56px 48px 48px; max-width: 1180px; }
 html .page-heading { margin: 0 0 32px; }
@@ -119,7 +124,7 @@ html .btn.primary { background: var(--accent); border-color: transparent; color:
 html .btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
 html .btn:disabled { background: var(--fill); color: var(--faint); border-color: transparent; }
 html .btn.primary:disabled { background: var(--accent-disabled); color: var(--on-accent); }
-html input:where(:not([type=checkbox]):not([type=radio])), html select, html textarea, html .input { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 9px 12px; transition: border-color var(--speed) var(--ease), box-shadow var(--speed) var(--ease); }
+html input:where(:not([type=checkbox]):not([type=radio])), html select, html textarea, html .input { background: var(--surface); color: var(--ink); border: 1px solid var(--control-line); border-radius: var(--radius); padding: 9px 12px; transition: border-color var(--speed) var(--ease), box-shadow var(--speed) var(--ease); }
 html input:where(:not([type=checkbox]):not([type=radio])):hover, html select:hover, html textarea:hover { border-color: var(--faint); }
 html input:where(:not([type=checkbox]):not([type=radio])):focus, html select:focus, html textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 html input:disabled, html select:disabled, html textarea:disabled { background: var(--fill); color: var(--faint); }
@@ -143,7 +148,7 @@ html .modal-backdrop { background: var(--surface); color: var(--ink); border-rad
 html .modal { background: var(--surface); }
 html .badge, html .chip { background: var(--fill); color: var(--muted); border: 0; border-radius: 999px; }
 html .tag-chip { background: var(--accent-soft); color: var(--accent-ink); border: 0; }
-html .toggle-track { background: var(--line-strong); border-color: transparent; }
+html .toggle-track { background: var(--control-off); border-color: transparent; }
 html .toggle.on .toggle-track { background: var(--accent); }
 
 @media (max-width: 760px) {

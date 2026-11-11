@@ -26,8 +26,10 @@ The console defines them in `console/web/src/design.css`. The website maps the s
 | `--fill` | `#f0f0ed` | `#202124` | Hover, disabled, quiet chips |
 | `--ink` | `#16181b` | `#f1f1ef` | Text |
 | `--muted` | `#62666d` | `#a3a6ab` | Secondary text |
-| `--faint` | `#8d9198` | `#75797f` | Captions, table headers |
-| `--line` | ink 8% | white 8% | Hairlines |
+| `--faint` | `#6b6f76` | `#8f9399` | Captions, table headers (still at least 4.5:1) |
+| `--line` | ink 8% | white 8% | Decorative hairlines between content |
+| `--control-line` | ink 52% | white 38% | Borders of fields people operate (at least 3:1) |
+| `--control-off` | `#62666d` | `#6b6f76` | An off switch's track |
 | `--accent` | `#0f766e` | `#3cbfae` | The one accent |
 | `--danger` | `#b42318` | `#f97066` | Errors only |
 
@@ -38,6 +40,8 @@ The console defines them in `console/web/src/design.css`. The website maps the s
 **Depth.** One shadow: a 1px contact shadow plus a long, faint ambient shadow. No other shadows.
 
 ## Applying it
+
+- Text tokens reach 4.5:1 and control boundaries 3:1 in both themes; `console/test/design-tokens.test.ts` enforces it.
 
 - A page has one title, one sentence of purpose, and one primary action.
 - Remove a container if alignment alone shows the grouping.
