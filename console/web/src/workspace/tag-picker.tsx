@@ -1,3 +1,4 @@
+import {identifierFromTitle} from './identifier.ts';
 import {useRef,useState} from 'react';
 import type {Tag} from '../../../server/workspace/model.ts';
 
@@ -13,8 +14,7 @@ export function TagPicker({tags,selected,onChange,onCreate,disabled=false}:{tags
   if(unavailable||pending.current||!text)return;
   if(exact){if(!selected.includes(exact.id))onChange([...selected,exact.id]);setQuery('');return;}
   pending.current=true;setCreating(true);setError('');
-  const stem=(text.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tag').slice(0,60);
-  const base=/^[a-z]/.test(stem)?stem:`tag_${stem}`;let id=base,suffix=1;
+  const base=identifierFromTitle(text,'tag',60)||'tag';let id=base,suffix=1;
   while(tags.some(t=>t.id===id))id=`${base}_${suffix++}`;
   try{if(await onCreate({id,name:text,description:''})){onChange([...selected,id]);setQuery('');}}
   catch(e){setError(e instanceof Error?e.message:'Could not add the tag');}

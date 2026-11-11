@@ -112,7 +112,7 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
             <h3 id="reason-title">{state.title}</h3>
             {state.detail && <div className="modal-detail">{state.detail}</div>}
             <label htmlFor="change-reason" className="label">Reason (recorded in change history)</label>
-            <textarea id="change-reason" name="reason" ref={ref} className="input" rows={3} value={text} placeholder="e.g. MSA #42, signed 2026-11-01" onChange={(e) => setText(e.target.value)} />
+            <textarea id="change-reason" name="reason" ref={ref} className="input" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
             <div className="row end">
               <button type="button" className="btn ghost" onClick={() => close(null)}>
                 Cancel

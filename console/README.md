@@ -90,4 +90,4 @@ HTTP integration tests exercise the actual service through the TypeScript SDK. P
 
 ## YAML configuration view
 
-Open **Configuration** to inspect the current catalog and tier defaults as YAML. Copy or download `openentitlement.snapshot.yaml`, including before completing setup. Refresh reloads changes from the service. This read-only snapshot uses the current `plans` model and is not the proposed declarative format or a backup: assignments, overrides, grants, contracts, and usage are excluded. YAML import is not supported. Providers without inspection expose only their catalog.
+Open **Configuration** to inspect the current catalog and tier defaults as YAML. Download `openentitlement.snapshot.yaml`, including before completing setup. The console reloads changes from the service when you return to its window. This read-only snapshot uses the current `plans` model and is not the proposed declarative format or a backup: assignments, overrides, grants, contracts, and usage are excluded. YAML import is not supported. Providers without inspection expose only their catalog.
