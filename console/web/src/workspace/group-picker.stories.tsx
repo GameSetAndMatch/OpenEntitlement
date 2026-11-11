@@ -57,6 +57,16 @@ export const FoldersAndNewGroups:Story={play:async({canvasElement})=>{
  done(canvasElement);
 }};
 
+export const LongNameCollisions:Story={play:async({canvasElement})=>{
+ const c=within(canvasElement),summary=canvasElement.querySelector('summary')!,long='Very long group name '.repeat(6);
+ for(let i=0;i<2;i++){await userEvent.click(summary);await userEvent.click(c.getByRole('button',{name:'+ New group'}));await userEvent.keyboard(long+'{Enter}');}
+ const ids=JSON.parse(c.getByTestId('created').textContent!).map((g:{id:string})=>g.id);
+ await expect(ids.length).toBe(2);
+ await expect(ids[1]).not.toBe(ids[0]);
+ await expect(ids.every((id:string)=>id.length<=80&&/^[a-z][a-z0-9_]*$/.test(id))).toBe(true);
+ done(canvasElement);
+}};
+
 export const SaveFailure:Story={args:{failure:true},play:async({canvasElement})=>{
  const c=within(canvasElement),summary=canvasElement.querySelector('summary')!;
  await userEvent.click(summary);

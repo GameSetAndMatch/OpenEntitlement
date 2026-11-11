@@ -24,6 +24,11 @@ export function WorkspaceApp(){
   async function loadWorkspace(id:string){setWorkspace(undefined);const next=await request<Workspace>(`/api/workspaces/${id}`);if(selectedRef.current===id)setWorkspace(next);}
   async function refreshAccess(){await loadList();if(!selected)return;try{await loadWorkspace(selected);}catch(e){if((e as {status?:number}).status===404){setSelected("");setWorkspace(undefined);}else throw e;}}
   useEffect(()=>{let active=true;request("/api/session").then(async value=>{if(!active)return;setCsrf(value.csrf);setSession(value);identify(value.account.id);await loadList();}).catch(e=>{if(e.status!==401)setError(e.message);}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
+  useEffect(()=>{if(!selected)return;let active=true;
+    // Stay current when the person returns to this window. An open form keeps its draft and revision.
+    const onFocus=()=>{if(document.visibilityState!=="visible"||document.querySelector("main form.form"))return;request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active&&selectedRef.current===selected)setWorkspace(value);}).catch(()=>{});};
+    window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
+    return()=>{active=false;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};},[selected]);
   useEffect(()=>{if(!selected)return;let active=true;setWorkspace(undefined);request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active)setWorkspace(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[selected]);
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main")setPage(currentPage());};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);

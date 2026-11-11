@@ -27,12 +27,14 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
  assert.equal(await page.locator('#error-stack').isVisible(),false);
  for(const width of [1280,390,360]){
   await page.setViewportSize({width,height:900});
-  for(const story of ['key-from-title','negative-integer','enum-choices','boolean-for-administrator']){
+  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator']){
    await page.goto(`${origin}/iframe.html?id=privilege-catalog-privilege-form--${story}&viewMode=story`);
    await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-form--${story} did not finish its play function at ${width}px`);});
    await assertFormLayout(page);
   }
-  for(const story of ['folders-and-new-groups','save-failure']){
+  await page.goto(`${origin}/iframe.html?id=privilege-catalog--one-form-at-a-time&viewMode=story`);
+  await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-catalog--one-form-at-a-time did not finish at ${width}px`);});
+  for(const story of ['folders-and-new-groups','long-name-collisions','save-failure']){
    await page.goto(`${origin}/iframe.html?id=catalog-group-picker--${story}&viewMode=story`);
    await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story group-picker--${story} did not finish its play function at ${width}px`);});
    await assertFormLayout(page);

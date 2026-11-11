@@ -44,7 +44,8 @@ export function GroupPicker({label='Group',noneLabel='No group',groups:saved,exc
   const name=draft?.name.trim();
   if(!draft||!name||!onCreate||unavailable||pending.current)return;
   const taken=new Set([...takenIds,...groups.map(g=>g.id)]),base=identifierFromTitle(name,'group')||'group';
-  let groupId=base,suffix=1;while(taken.has(groupId))groupId=`${base}_${suffix++}`;
+  // Identifiers are at most 80 characters, so a collision suffix replaces the end of the base.
+  let groupId=base,suffix=1;while(taken.has(groupId)){const tail=`_${suffix++}`;groupId=base.slice(0,80-tail.length).replace(/_+$/,'')+tail;}
   pending.current=true;setCreating(true);setError('');
   const group:Group={id:groupId,name,description:'',...(draft.parentId?{parentId:draft.parentId}:{})};
   try{if(await onCreate(group)){setCreated(c=>[...c,group]);choose(groupId);}}
@@ -56,7 +57,7 @@ export function GroupPicker({label='Group',noneLabel='No group',groups:saved,exc
   const parent=parentId?byId.get(parentId)?.name:undefined;
   return <li className="group-new">
    <Folder/>
-   <input autoFocus maxLength={200} disabled={unavailable} aria-label={parent?`Name of the new group inside ${parent}`:'Name of the new group'} placeholder="Untitled group" value={draft.name}
+   <input autoFocus maxLength={200} disabled={unavailable} aria-label={parent?`Name of the new group inside ${parent}`:'Name of the new group'} value={draft.name}
     onChange={e=>{setDraft({...draft,name:e.target.value});setError('');}}
     onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void create();}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setDraft(undefined);}}}/>
    <button type="button" className="btn" disabled={unavailable||!draft.name.trim()} onClick={()=>void create()}>{creating?'Creating…':'Create'}</button>

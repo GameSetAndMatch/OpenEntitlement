@@ -75,6 +75,26 @@ export const EnumChoices:Story={args:{initial:plan},play:async({canvasElement,ar
  await userEvent.click(canvas.getByRole('button',{name:'+ Add choice'}));
  await userEvent.click(canvas.getByRole('button',{name:'Save privilege'}));
  await expect(args.onSave).toHaveBeenCalledWith(expect.objectContaining({enum:['premium','enterprise'],default:'premium'}));
+ // A blank first row is fine while another choice exists: blank rows disappear on save.
+ await userEvent.clear(canvas.getByRole('textbox',{name:'Choice 1'}));
+ await expect(canvas.getByRole('textbox',{name:'Choice 1'})).toBeValid();
+ await expect(canvas.queryByRole('alert')).not.toBeInTheDocument();
+ // Pasting more lines than fit adds what fits, keeps existing choices, and says so.
+ await userEvent.click(canvas.getByRole('textbox',{name:'Choice 1'}));
+ await userEvent.paste(Array.from({length:120},(_,i)=>`c${i}`).join('\n'));
+ await expect(canvas.getByRole('textbox',{name:'Choice 100'})).toBeInTheDocument();
+ await expect(canvas.queryByRole('textbox',{name:'Choice 101'})).not.toBeInTheDocument();
+ await expect(canvas.getAllByRole('textbox').some(t=>(t as HTMLInputElement).value==='enterprise')).toBe(true);
+ await expect(canvas.getByText(/pasted lines were not added/)).toBeVisible();
+ done(canvasElement);
+}};
+
+export const OverlongPastedChoice:Story={args:{initial:{...plan,enum:['standard','']}},play:async({canvasElement})=>{
+ const canvas=within(canvasElement);
+ await userEvent.click(canvas.getByRole('textbox',{name:'Choice 2'}));
+ await userEvent.paste(`premium\n${'x'.repeat(201)}`);
+ await expect(canvas.getByRole('alert')).toHaveTextContent('200 characters or fewer');
+ await expect(canvas.getByRole('textbox',{name:'Choice 3'})).toBeInvalid();
  done(canvasElement);
 }};
 

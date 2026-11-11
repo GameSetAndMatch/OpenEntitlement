@@ -83,6 +83,12 @@ try{
  await page.getByRole('button',{name:'Edit user entitlements',exact:true}).click();await page.getByLabel('Override max_exports',{exact:true}).check();await page.getByLabel('max_exports',{exact:true}).fill('40');await save('Save user entitlements');assert.match(await personal.innerText(),/45/);
  await page.getByRole('link',{name:'Configuration',exact:true}).click();assert.match(await page.locator('main').innerText(),/idp\|alice/);assert.equal((await page.locator('main').innerText()).includes('internal_enabled'),false);
  await page.getByRole('link',{name:'Organizations',exact:true}).click();await page.locator('.workspace-card').filter({hasText:'Acme'}).click();await page.locator('.workspace-card').filter({hasText:'Alice'}).click();await page.getByRole('button',{name:'Remove user exceptions',exact:true}).click();await confirm();await page.getByText('No personal exceptions. Every user inherits the Organization’s values.').waitFor();
+ // A change made elsewhere appears when the person returns to the window, without a refresh button.
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();
+ const current=await (await page.request.get(running.url+`/api/workspaces/${workspaceId}`)).json();const csrf=(await (await page.request.get(running.url+'/api/session')).json()).csrf;
+ assert.equal((await page.request.put(running.url+`/api/workspaces/${workspaceId}/catalog`,{headers:{origin:running.url,'x-oe-csrf':csrf},data:{entry:{key:'external_flag',title:'External flag',type:'boolean',default:false},revision:current.revision,reason:'Changed in another window'}})).status(),200);
+ assert.equal(await page.getByText('External flag',{exact:true}).count(),0);
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('External flag',{exact:true}).waitFor();
  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page must not overflow horizontally');
  assert.deepEqual(pageErrors,[]);console.log('Workspace browser regression passed: verified login, catalog, validation, inheritance, Organization terms, YAML and account isolation');
 }finally{

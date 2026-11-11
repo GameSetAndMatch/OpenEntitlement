@@ -13,11 +13,15 @@ export function WorkspaceSettings({workspace:w,save,account,busy,refreshAccess}:
   const ask=useReason(),toast=useToast();
   const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||w.role==="Manager";
   const base=`/api/workspaces/${w.id}`;
-  async function reload(){if(manager)setMembers(await request(base+"/members"));if(owner)setKeys(await request(base+"/keys"));}
-  useEffect(()=>{let active=true;const load=async()=>{try{const m=manager?await request(base+"/members"):[];const k=owner?await request(base+"/keys"):[];if(active){setMembers(m);setKeys(k);}}catch(e){if(active)setError((e as Error).message);}};void load();
+  // Every load takes a generation number; only the newest one may update the lists.
+  const generation=useRef(0);
+  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=owner?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
+  async function reload(){await load();}
+  useEffect(()=>{let active=true;const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
     // Stay current without a refresh button: reload when the person comes back to this window.
-    const onFocus=()=>{if(document.visibilityState==="visible")void load();};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
-    return()=>{active=false;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};},[base,manager,owner]);
+    const onFocus=()=>{if(document.visibilityState==="visible")void refresh();};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
+    return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
+  },[base,manager,owner]); // load reads exactly base, manager and owner
   async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);try{const reason=await ask(label);if(!reason)return;setError("");const result=await action(reason);if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
   return <>{error&&<p role="alert" className="notice error">{error}</p>}<section className="panel workspace-form"><h2>Members</h2><p>{account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}</p>
       {manager&&<><table><thead><tr><th>Member</th><th>Role</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{members.map(m=><tr key={m.id}><td>{m.email}</td><td>{owner?<select disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>:m.role}</td><td>{(owner||m.role!=="Owner")&&<button className="btn" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate("Remove workspace member",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}})}>Remove</button>}</td></tr>)}</tbody></table>
