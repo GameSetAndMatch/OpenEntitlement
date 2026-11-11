@@ -65,8 +65,8 @@ Your application asks through OEREP, an open remote evaluation protocol modeled 
 
 | Target | Python | TypeScript |
 |---|---|---|
-| in-memory | ✅ 110/110 | ✅ 110/110 |
-| Postgres (16) | ✅ 110/110 | ✅ 110/110 |
+| in-memory | ✅ 112/112 | ✅ 112/112 |
+| Postgres 17 | ✅ 112/112 | ✅ 112/112 |
 | fixed provider | ✅ 6/6 | ✅ 6/6 |
 
 Next on the [roadmap](spec/README.md#roadmap): add-ons and change events.
