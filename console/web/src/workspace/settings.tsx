@@ -28,14 +28,14 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
   return <div className="settings-page">{error&&<p role="alert" className="notice error">{error}</p>}
     {section==="Members"&&<><Group description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}>
-      {manager&&members.map(m=><Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span>{m.email}</span>} description={m.id===account.id?"You":undefined}>
+      {manager&&members.map(m=><Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span><span className="member-email">{m.email}</span>{m.id===account.id&&<span className="member-you">You</span>}</span>}>
         {owner?roleSelect(m):<span className="settings-value">{m.role}</span>}
         {(owner||m.role!=="Owner")&&<button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate("Remove workspace member",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}})}>Remove</button>}
       </Item>)}
     </Group>
-    {manager&&<Group title="Invite a member">
+    {manager&&<Group title="Invite a member" description="They get a link that expires in 7 days.">
       <form aria-label="Invite a member" onSubmit={e=>{e.preventDefault();void mutate("Invite workspace member",async reason=>{const result=await request(base+"/invitations","POST",{email,role,reason});setLink(location.origin+"/app/#invite="+result.token);setEmail("");});}}>
-        <Row label="Email address" description="Invite someone. They get a link that expires in 7 days.">{[<input key="email" type="email" required value={email} onChange={e=>setEmail(e.target.value)}/>,<select key="role" className="fit" aria-label="Role" value={role} onChange={e=>setRole(e.target.value)}>{(owner?["User","Manager","Owner"]:["User","Manager"]).map(r=><option key={r}>{r}</option>)}</select>,<button key="invite" className="btn" disabled={locked}>Create invitation link</button>]}</Row>
+        <div className="settings-row settings-inline"><input type="email" required aria-label="Email address" placeholder="name@company.com" value={email} onChange={e=>setEmail(e.target.value)}/><select className="fit" aria-label="Role" value={role} onChange={e=>setRole(e.target.value)}>{(owner?["User","Manager","Owner"]:["User","Manager"]).map(r=><option key={r}>{r}</option>)}</select><button className="btn" disabled={locked}>Create invitation link</button></div>
       </form>
       {link&&<Field label="Invitation link (expires in 7 days)" hint="Share it with the invited person. They must sign in with that verified email address."><input readOnly value={link} onFocus={e=>e.target.select()}/></Field>}
     </Group>}</>}
