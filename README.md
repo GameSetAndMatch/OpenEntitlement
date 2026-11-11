@@ -73,7 +73,7 @@ Next on the [roadmap](spec/README.md#roadmap): add-ons and change events.
 
 ## Direction
 
-[Vision](VISION.md) · [Glossary](GLOSSARY.md) · [Decisions and RFCs](docs/decisions.md) · [Visual language](docs/design/visual-language.md) · [Prior art](PRIOR_ART.md) · [ADR-0001](ADR-0001.md) · [Contributor workflows](docs/agents/workflows.md)
+[Vision](VISION.md) · [Glossary](GLOSSARY.md) · [Decisions and RFCs](docs/decisions.md) · [Visual language](docs/design/visual-language.md) · [Prior art](PRIOR_ART.md) · [ADR-0001](ADR-0001.md) · [Contributor workflows](docs/agents/workflows.md) · [Changelog](CHANGELOG.md)
 
 ## License
 
