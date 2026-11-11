@@ -1,11 +1,10 @@
 import { useEffect,useRef,useState } from "react";
-import { Field,Group,Row } from "./settings-group.tsx";
+import { Field,Group,Item,Row } from "./settings-group.tsx";
 import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
 import { stringify } from "yaml";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
 import { useReason,useToast } from "../ui.tsx";
-import { FormField } from "../form.tsx";
 export function WorkspaceSettings({workspace:w,save,account,busy,refreshAccess}:{workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
@@ -25,34 +24,33 @@ export function WorkspaceSettings({workspace:w,save,account,busy,refreshAccess}:
   },[base,manager,owner]); // load reads exactly base, manager and owner
   async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);try{const reason=await ask(label);if(!reason)return;setError("");const result=await action(reason);if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
   const tierChanged=hostedTier!==(w.hosting?.tier??"pro");
+  const roleSelect=(m:{id:string;email:string;role:string})=><select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>;
+  const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
   return <div className="settings">{error&&<p role="alert" className="notice error">{error}</p>}
     <Group title="Members" description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}>
-      {manager&&<>{members.map(m=><div className="settings-row" key={m.id}>
-        <span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span><span className="member-email">{m.email}{m.id===account.id&&<small>You</small>}</span></span>
-        <span className="settings-controls">{owner?<select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>:<span className="settings-value">{m.role}</span>}
-        {(owner||m.role!=="Owner")&&<button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate("Remove workspace member",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}})}>Remove</button>}</span>
-      </div>)}
-      <form className="settings-row settings-add" aria-label="Invite a member" onSubmit={e=>{e.preventDefault();void mutate("Invite workspace member",async reason=>{const result=await request(base+"/invitations","POST",{email,role,reason});setLink(location.origin+"/app/#invite="+result.token);setEmail("");});}}>
-        <FormField label="Email address"><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/></FormField>
-        <FormField label="Role"><select className="fit" value={role} onChange={e=>setRole(e.target.value)}>{(owner?["User","Manager","Owner"]:["User","Manager"]).map(r=><option key={r}>{r}</option>)}</select></FormField>
-        <button className="btn" disabled={locked}>Create invitation link</button>
+      {manager&&<>{members.map(m=><Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span>{m.email}</span>} description={m.id===account.id?"You":undefined}>
+        {owner?roleSelect(m):<span className="settings-value">{m.role}</span>}
+        {(owner||m.role!=="Owner")&&<button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate("Remove workspace member",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}})}>Remove</button>}
+      </Item>)}
+      <form aria-label="Invite a member" onSubmit={e=>{e.preventDefault();void mutate("Invite workspace member",async reason=>{const result=await request(base+"/invitations","POST",{email,role,reason});setLink(location.origin+"/app/#invite="+result.token);setEmail("");});}}>
+        <Row label="Email address" description="Invite someone. They get a link that expires in 7 days.">{[<input key="email" type="email" required value={email} onChange={e=>setEmail(e.target.value)}/>,<select key="role" className="fit" aria-label="Role" value={role} onChange={e=>setRole(e.target.value)}>{(owner?["User","Manager","Owner"]:["User","Manager"]).map(r=><option key={r}>{r}</option>)}</select>,<button key="invite" className="btn" disabled={locked}>Create invitation link</button>]}</Row>
       </form>
-      {link&&<div className="settings-row settings-stack"><Field label="Invitation link (expires in 7 days)" hint="Share it with the invited person. They must sign in with that verified email address."><input readOnly value={link} onFocus={e=>e.target.select()}/></Field></div>}</>}
+      {link&&<Field label="Invitation link (expires in 7 days)" hint="Share it with the invited person. They must sign in with that verified email address."><input readOnly value={link} onFocus={e=>e.target.select()}/></Field>}</>}
     </Group>
-    {owner&&<Group title="Application API keys" description="Your application uses these keys to evaluate entitlements in this workspace. A secret is shown only once.">
-      <div className="settings-row"><span className="settings-label">Workspace ID</span><code className="settings-value">{w.id}</code></div>
-      {keys.map(k=><div className="settings-row" key={k.id}><span className="settings-label">{k.name}<small><code>{k.prefix}…</code> · {k.revoked?"Revoked":k.scope}</small></span>{!k.revoked&&<button className="btn-quiet danger" disabled={locked} aria-label={`Revoke ${k.name}`} onClick={()=>void mutate("Revoke API key",async reason=>{await request(base+"/keys/"+k.id,"DELETE",{reason});})}>Revoke</button>}</div>)}
-      <form className="settings-row settings-add" aria-label="Create an evaluation key" onSubmit={e=>{e.preventDefault();void mutate("Create evaluation key",async reason=>{const result=await request(base+"/keys","POST",{name,scope:"evaluate",reason});setSecret(result.secret);setName("");});}}>
-        <FormField label="Key name"><input required value={name} onChange={e=>setName(e.target.value)}/></FormField>
-        <button className="btn" disabled={locked}>Create evaluation key</button>
+    {owner&&<Group title="Application API keys" description="Your application evaluates entitlements in this workspace with these keys.">
+      <Item label="Workspace ID" description="Identifies this workspace in the API and in support requests."><code className="settings-value">{w.id}</code><button className="btn-quiet" onClick={()=>copy(w.id,"Workspace ID copied")}>Copy</button></Item>
+      {keys.map(k=><Item key={k.id} label={k.name} description={<><code>{k.prefix}…</code> · {k.revoked?"Revoked":k.scope}</>}>{!k.revoked&&<button className="btn-quiet danger" disabled={locked} aria-label={`Revoke ${k.name}`} onClick={()=>void mutate("Revoke API key",async reason=>{await request(base+"/keys/"+k.id,"DELETE",{reason});})}>Revoke</button>}</Item>)}
+      <form aria-label="Create an evaluation key" onSubmit={e=>{e.preventDefault();void mutate("Create evaluation key",async reason=>{const result=await request(base+"/keys","POST",{name,scope:"evaluate",reason});setSecret(result.secret);setName("");});}}>
+        <Row label="Key name" description="Create one key per application. Its secret is shown only once.">{[<input key="name" required value={name} onChange={e=>setName(e.target.value)}/>,<button key="create" className="btn" disabled={locked}>Create evaluation key</button>]}</Row>
       </form>
-      {secret&&<div className="settings-row settings-stack"><Field label="Save this secret securely" hint="It will not be shown again."><input readOnly type="password" value={secret} onFocus={e=>e.target.select()}/></Field><button className="btn" onClick={()=>void navigator.clipboard.writeText(secret).then(()=>toast("API key copied")).catch(()=>setError("Copy failed. Select and copy the secret manually."))}>Copy key</button></div>}
+      {secret&&<Field label="Save this secret securely" hint="It will not be shown again."><input readOnly type="password" value={secret} onFocus={e=>e.target.select()}/></Field>}
+      {secret&&<Item label="Copy the secret to your application’s configuration."><button className="btn" onClick={()=>copy(secret,"API key copied")}>Copy key</button></Item>}
     </Group>}
-    <Group title="Plan" description="Your OpenEntitlement plan decides what this workspace can evaluate. It is separate from the tiers you sell to your customers.">
+    <Group title="Plan" description="What OpenEntitlement evaluates for this workspace. It is separate from the tiers you sell to your customers.">
       {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
-        <Row label="Cloud service tier"><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro — Organizations</option><option value="enterprise">Enterprise — Organizations and users</option></select></Row>
+        <Row label="Cloud service tier" description="Enterprise adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
         {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
-      </form>:<div className="settings-row"><span className="settings-label">{w.hosting?.mode==="saas"?`Cloud ${w.hosting.tier==="enterprise"?"Enterprise":"Pro"}`:"Self-hosted"}</span><span className="settings-value">{w.hosting?.subjectEntitlements?"Organizations and their users":"Organizations"}</span></div>}
+      </form>:<Item label={w.hosting?.mode==="saas"?`Cloud ${w.hosting.tier==="enterprise"?"Enterprise":"Pro"}`:"Self-hosted"} description={w.hosting?.subjectEntitlements?"Entitlements for Organizations and their users.":"Entitlements for Organizations."}/>}
     </Group>
   </div>;
 }

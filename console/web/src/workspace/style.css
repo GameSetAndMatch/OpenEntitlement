@@ -100,26 +100,40 @@
 .settings-card > :first-child, .settings-card > form:first-child > :first-child { border-top: 0; }
 .settings-label { min-width: 0; font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
 .settings-label small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--faint); }
+/* Settings: one column of sections. Each row names a setting (and one line of why) on the
+   left, and holds its value and one action on the right. On narrow screens the right side
+   wraps under the text. */
+.settings { display: grid; max-width: 760px; }
+.settings > .notice { margin: 0 0 24px; }
+.settings-group { padding: 32px 0; border-top: 1px solid var(--line); }
+.settings-group:first-of-type { border-top: 0; padding-top: 0; }
+.settings-group > h2 { margin: 0; font-size: 19px; }
+.settings-purpose { margin: 4px 0 0; font-size: 14px; max-width: 60ch; }
+.settings-rows { display: grid; margin-top: 12px; }
+.settings-rows > form { display: contents; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; padding: 14px 0; border-top: 1px solid var(--line); }
+.settings-rows > :first-child, .settings-rows > form:first-child > .settings-row { border-top: 0; }
+.settings-text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+.settings-text label, .settings-name { font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.settings-text small { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.settings-controls { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
+.settings-controls input:not([type=checkbox]) { width: 240px; max-width: 100%; }
 .settings-value { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
-.settings-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.settings select.fit { width: auto; min-width: 0; max-width: 100%; padding-right: 32px; }
-.settings-add { align-items: end; justify-content: flex-start; padding-block: 16px; background: var(--canvas); }
-.settings-add > .field { flex: 1 1 220px; min-width: 0; margin: 0; }
-.settings-add > .field:has(select) { flex: 0 0 auto; }
-.settings-add > .btn { margin-left: auto; }
-.settings-stack { display: grid; justify-content: stretch; gap: 12px; }
-.settings-field { display: grid; gap: 6px; }
-.settings-field small { color: var(--muted); font-size: 12px; }
-.settings-save { justify-content: flex-end; background: var(--canvas); }
-.member { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.member-mark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 13px; font-weight: 600; }
-.member-email { min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
-.member-email small { display: block; font-size: 12px; color: var(--faint); }
+.settings select.fit { width: auto; padding-right: 32px; }
+.settings-reveal { display: grid; justify-content: stretch; gap: 6px; }
+.settings-reveal label { font-size: 14px; font-weight: 500; }
+.settings-reveal small { font-size: 12px; color: var(--muted); }
+.settings-save { justify-content: flex-end; }
+.member { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.member-mark { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; }
+.settings-row:has(.member) .settings-text small { padding-left: 40px; }
 .btn-quiet { padding: 6px 10px; border: 0; border-radius: var(--radius-s); background: transparent; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; transition: background var(--speed) var(--ease), color var(--speed) var(--ease); }
 .btn-quiet:hover:not(:disabled) { background: var(--fill); color: var(--ink); }
 .btn-quiet.danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
 .btn-quiet:disabled { color: var(--faint); cursor: not-allowed; }
-@container (max-width: 480px) {
-  .settings-add > .btn { margin-left: 0; width: 100%; }
+@media (max-width: 560px) {
+  .settings-controls { flex: 1 1 100%; justify-content: flex-start; }
+  .settings-controls input:not([type=checkbox]) { flex: 1 1 100%; width: auto; }
 }
 .tier-policy { margin-top: 40px; }
+.tier-policy .settings-group { padding-top: 0; border-top: 0; }
