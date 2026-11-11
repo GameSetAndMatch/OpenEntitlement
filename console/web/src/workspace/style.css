@@ -85,8 +85,8 @@
 /* Settings: one column of sections. Each row names a setting (and one line of why) on the
    left, and holds its value and one action on the right. On narrow screens the right side
    wraps under the text. */
-.settings { display: grid; max-width: 760px; }
-.settings > .notice { margin: 0 0 24px; }
+.settings-page { display: grid; max-width: 760px; }
+.settings-page > .notice { margin: 0 0 24px; }
 .settings-group { padding: 32px 0; border-top: 1px solid var(--line); }
 .settings-group:first-of-type { border-top: 0; padding-top: 0; }
 .settings-group > h2 { margin: 0; font-size: 19px; }
@@ -96,14 +96,14 @@
 .settings-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; padding: 14px 0; border-top: 1px solid var(--line); }
 .settings-rows > :first-child, .settings-rows > form:first-child > .settings-row { border-top: 0; }
 .settings-text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
-.settings-text label, .settings-name { font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.settings-text label, .settings-name { display: block; margin: 0; font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
 .settings-text small { font-size: 13px; color: var(--muted); line-height: 1.45; }
 .settings-controls { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
 .settings-controls input:not([type=checkbox]) { width: 240px; max-width: 100%; }
 .settings-value { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
-.settings select.fit { width: auto; padding-right: 32px; }
+.settings-page select.fit { width: auto; padding-right: 32px; }
 .settings-reveal { display: grid; justify-content: stretch; gap: 6px; }
-.settings-reveal label { font-size: 14px; font-weight: 500; }
+.settings-reveal label { margin: 0; font-size: 14px; font-weight: 500; }
 .settings-reveal small { font-size: 12px; color: var(--muted); }
 .settings-save { justify-content: flex-end; }
 .member { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }

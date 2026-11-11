@@ -26,7 +26,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const tierChanged=hostedTier!==(w.hosting?.tier??"pro");
   const roleSelect=(m:{id:string;email:string;role:string})=><select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>;
   const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
-  return <div className="settings">{error&&<p role="alert" className="notice error">{error}</p>}
+  return <div className="settings-page">{error&&<p role="alert" className="notice error">{error}</p>}
     {section==="Members"&&<><Group description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}>
       {manager&&members.map(m=><Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span>{m.email}</span>} description={m.id===account.id?"You":undefined}>
         {owner?roleSelect(m):<span className="settings-value">{m.role}</span>}
