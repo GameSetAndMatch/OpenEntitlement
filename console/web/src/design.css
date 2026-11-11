@@ -90,8 +90,7 @@ html aside { background: var(--canvas); border-right: 1px solid var(--line); pad
 html .brand { font-weight: 600; font-size: 15px; letter-spacing: -.01em; gap: 10px; }
 html .brand img { width: 28px; height: 28px; }
 html .brand small { color: var(--faint); font-size: 12px; }
-html .workspace-shell .workspace-picker { margin: 28px 2px 8px; font-weight: 500; color: var(--faint); font-size: 12px; }
-html .workspace-shell nav { margin-top: 16px; }
+html .workspace-shell nav { margin-top: 24px; }
 html .nav { padding: 8px 12px; margin: 2px 0; border-radius: var(--radius-s); color: var(--muted); font-size: 14px; transition: background var(--speed) var(--ease), color var(--speed) var(--ease); }
 html .nav:hover { background: var(--fill); color: var(--ink); }
 html .nav.active { background: var(--surface); color: var(--accent-ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color); }
