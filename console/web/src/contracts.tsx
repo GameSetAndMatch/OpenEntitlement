@@ -36,8 +36,8 @@ export function ContractsPanel({ organizationId, overrides, grants }: { organiza
         await api("POST", "/api/contracts", { organizationId, title, reference, externalReferences: system && externalReference ? [{ system, reference: externalReference }] : [], reason });
         setTitle(""); setReference(""); setSystem(""); setExternalReference("");
       }); }}>
-        <div className="two-cols"><label>Agreement title<input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)} placeholder="Customer agreement"/></label><label>Contract reference<input maxLength={500} value={reference} onChange={e => setReference(e.target.value)} placeholder="MSA-42"/></label></div>
-        <div className="two-cols"><label>External system (optional)<input value={system} onChange={e => setSystem(e.target.value)} placeholder="e.g. stripe" maxLength={80}/></label><label>External reference<input value={externalReference} onChange={e => setExternalReference(e.target.value)} placeholder="e.g. sub_…" maxLength={500}/></label></div>
+        <div className="two-cols"><label>Agreement title<input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)}/></label><label>Contract reference<input maxLength={500} value={reference} onChange={e => setReference(e.target.value)}/></label></div>
+        <div className="two-cols"><label>External system (optional)<input value={system} onChange={e => setSystem(e.target.value)} maxLength={80}/></label><label>External reference<input value={externalReference} onChange={e => setExternalReference(e.target.value)} maxLength={500}/></label></div>
         <button className="btn" disabled={busy || !title.trim() || Boolean(system.trim()) !== Boolean(externalReference.trim())}>Create contract</button>
       </form>
       {!contracts.length && <p className="muted">No contracts for this organization yet.</p>}
@@ -79,7 +79,7 @@ function ContractCard({ contract: c, overrides, grants, busy, change }: { contra
     <form onSubmit={e => { e.preventDefault(); const chosen = entities.find(item => `${item.kind}:${item.id}` === entity); if (chosen) void change("Link entitlement evidence", reason => api("POST", `${path}/evidence`, { kind: chosen.kind, entityId: chosen.id, ...(documentId ? { documentId } : {}), ...(page ? { page: Number(page) } : {}), note, reason })); }}>
       <label>Override or grant<select required value={entity} onChange={e => setEntity(e.target.value)}><option value="">Select an existing entitlement source</option>{entities.map(item => <option key={`${item.kind}:${item.id}`} value={`${item.kind}:${item.id}`}>{item.kind}: {item.privilege} ({item.id.slice(0, 8)})</option>)}</select></label>
       <div className="two-cols"><label>Supporting PDF<select value={documentId} onChange={e => { setDocumentId(e.target.value); setPage(""); }}><option value="">Contract record only</option>{c.documents.map(d => <option key={d.id} value={d.id}>{d.filename}</option>)}</select></label><label>Page (optional)<input type="number" min={1} step={1} disabled={!documentId} value={page} onChange={e => setPage(e.target.value)}/></label></div>
-      <label>Clause / note<textarea maxLength={2000} value={note} onChange={e => setNote(e.target.value)} placeholder="Section 4.2: 250 full seats"/></label><button className="btn" disabled={busy || !entity}>Link evidence</button>
+      <label>Clause / note<textarea maxLength={2000} value={note} onChange={e => setNote(e.target.value)}/></label><button className="btn" disabled={busy || !entity}>Link evidence</button>
     </form>
     <details><summary>Contract history ({c.history.length})</summary><ul>{c.history.map((h, i) => <li key={i}>{h.at} · {h.actor} · {h.action}: {h.reason}</li>)}</ul></details>
   </article>;

@@ -29,10 +29,10 @@ try {
     assert.match(await settings.textContent(), /Storage.*in-memory/);
     assert.match(await settings.textContent(), /Protocol.*OEREP v1/);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: /Refresh/ }).click();
-    // Wait for the lists requested by Refresh to complete, then for any delayed failure.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    // Wait for the lists reloaded on window focus to complete, then for any delayed failure.
     await page.waitForLoadState('networkidle');
-    assert.equal(badRequests.length, 0, 'Refresh must not load an empty organization');
+    assert.equal(badRequests.length, 0, 'Reloading on focus must not load an empty organization');
     assert.equal(await page.getByRole('heading', { name: 'Set up your workspace' }).isVisible(), true);
     assert.equal(await page.getByRole('alert').count(), 0);
     await page.getByRole('link', { name: 'Tiers', exact: true }).click();
@@ -51,9 +51,7 @@ try {
     const code = page.getByLabel('Read-only YAML configuration');
     const shown = await code.textContent();
     assert.deepEqual(parse(shown).plans, []);
-    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.getByRole('button', { name: 'Copy YAML', exact: true }).click();
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), shown);
+    assert.equal(await page.getByRole('button', { name: 'Copy YAML' }).count(), 0, 'one export action: Download YAML');
     const pending = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download YAML', exact: true }).click();
     const download = await pending;
@@ -120,5 +118,5 @@ try {
       for(const [key,value] of [['max_mcp_calls','100'],['mcp_mode','read'],['max_connections','3']]){const input=page.getByLabel(key,{exact:true});assert.equal(await input.isDisabled(),key==='max_connections');assert.equal(await input.inputValue(),value);}
       assert.equal(await page.getByRole('switch',{name:'internal_enabled'}).count(),0);assert.match(await page.locator('main').innerText(),/MCP_INSTALLED=False/);assert.match(await page.locator('main').innerText(),/Frozen to the Catalog default/);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.close();}
   }finally{await controlled.close();}
-  console.log('Setup, YAML copy/download, and Unlimited checkbox tests passed at desktop and mobile widths');
+  console.log('Setup, YAML download, and Unlimited checkbox tests passed at desktop and mobile widths');
 } finally { await browser?.close(); await service.close(); }

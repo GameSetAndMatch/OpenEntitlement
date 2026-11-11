@@ -11,6 +11,17 @@ export default meta;
 type Story=StoryObj<typeof meta>;
 export const GroupedAndTagged:Story={play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText('MCP access')).toBeVisible();await expect(canvas.queryByText('Internal privilege')).not.toBeInTheDocument();await expect(canvas.getByRole('note')).toHaveTextContent('MCP_INSTALLED=False');await userEvent.selectOptions(canvas.getByLabelText('Filter by tag'),'integration');await expect(canvas.queryByText('Seats')).not.toBeInTheDocument();}};
 export const Authoring:Story={args:{canEdit:true}};
+export const OneFormAtATime:Story={args:{canEdit:true},play:async({canvasElement})=>{
+ const canvas=within(canvasElement);
+ await userEvent.click(canvas.getByRole('button',{name:'Edit Seats'}));
+ // While a form is open it is the only thing on the page: no list, no filter, no other Edit buttons.
+ await expect(canvas.getAllByRole('heading',{level:2}).map(h=>h.textContent)).toEqual(['Edit Seats']);
+ await expect(canvas.queryByRole('button',{name:/^Edit /})).not.toBeInTheDocument();
+ await expect(canvas.queryByLabelText('Filter by tag')).not.toBeInTheDocument();
+ await userEvent.click(canvas.getByRole('button',{name:'Cancel'}));
+ await expect(canvas.getByRole('button',{name:'Edit Seats'})).toBeVisible();
+ canvasElement.dataset.playComplete='true';
+}};
 
 const nested=structuredClone(data);
 nested.groups=[{id:'product',name:'Product',description:''},{id:'integration',name:'Integrations',description:'',parentId:'product'},{id:'analytics',name:'Analytics',description:'',parentId:'product'},{id:'scheduled',name:'Scheduled',description:'',parentId:'integration'}];

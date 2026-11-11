@@ -81,6 +81,8 @@ Primary users:
 |---|---|---|
 | Landing product scenes using the console Catalog, value editor and resolver, with concise copy and no playground controls | ✅ | #43; replaces the #42 playground; `website/src/components/ProductScenes.tsx` |
 | Privilege-local Tag picker with search, selection, removable labels and inline creation; Group management remains separate | ✅ | #44; `console/web/src/workspace/tag-picker.tsx` |
+| Privilege form redesign: sections ordered Basics → Value → Organize (optional), key and Group ID derived from the title, numbered enum choice list, Finder-like Group picker that creates nested Groups in place, freely chosen (including negative) integer bounds, shared form primitives and UI guidelines with an automated layout check | 🚧 in review | `console/web/UI-GUIDELINES.md`, `console/test/form-layout.mjs` |
+| One way to do each thing across the console: create Groups only from the Privilege form, variants from their tier, workspaces from the Workspaces page; no breadcrumb bar, setup stepper, refresh buttons or duplicate copy/download actions; a form replaces the list while open; IDs filled from names | 🚧 in review | `console/web/UI-GUIDELINES.md` (One way to do each thing) |
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
 | Automatic website deployment to Cloudflare on every merge to `main` | ✅ | #36, #41: runs only from `main` in the protected `website` environment (token scoped there), fails without credentials, verifies the live revision |
 | Landing page rebuilt on the docs' theme and components, showing the current model | ✅ | #33 |

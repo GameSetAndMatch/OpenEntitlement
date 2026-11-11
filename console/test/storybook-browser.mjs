@@ -3,6 +3,7 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
+import {assertFormLayout} from './form-layout.mjs';
 import assert from 'node:assert/strict';
 const root=resolve(import.meta.dirname,'../build/storybook');
 const server=createServer(async(req,res)=>{try{const path=resolve(root,'.'+new URL(req.url,'http://localhost').pathname);if(!path.startsWith(root+sep))throw new Error();const file=path.endsWith(sep)?path+'index.html':path;const body=await readFile(file);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml'})[extname(file)]??'application/octet-stream');res.end(body);}catch{res.writeHead(404).end();}});
@@ -24,6 +25,22 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
  assert.equal(await page.getByText('Reports',{exact:true}).count(),0);
  assert.equal(await page.getByText('Scheduled exports',{exact:true}).count(),0);
  assert.equal(await page.locator('#error-stack').isVisible(),false);
+ for(const width of [1280,390,360]){
+  await page.setViewportSize({width,height:900});
+  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator']){
+   await page.goto(`${origin}/iframe.html?id=privilege-catalog-privilege-form--${story}&viewMode=story`);
+   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-form--${story} did not finish its play function at ${width}px`);});
+   await assertFormLayout(page);
+  }
+  await page.goto(`${origin}/iframe.html?id=privilege-catalog--one-form-at-a-time&viewMode=story`);
+  await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-catalog--one-form-at-a-time did not finish at ${width}px`);});
+  for(const story of ['folders-and-new-groups','long-name-collisions','save-failure']){
+   await page.goto(`${origin}/iframe.html?id=catalog-group-picker--${story}&viewMode=story`);
+   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story group-picker--${story} did not finish its play function at ${width}px`);});
+   await assertFormLayout(page);
+  }
+ }
+ await page.setViewportSize({width:1280,height:720});
  for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
  for(const story of ['inline-labels','save-failure']){await page.goto(`${origin}/iframe.html?id=catalog-privilege-tags--${story}&viewMode=story`);if(story==='inline-labels'){await page.getByRole('button',{name:'Remove tag Operations'}).waitFor();await page.waitForFunction(()=>!document.querySelector('details').open);}else{await page.getByRole('alert').waitFor();}assert.equal(await page.locator('#error-stack').isVisible(),false);}
  assert.deepEqual(failures,[]);console.log('Compiled Storybook stories rendered successfully in Chromium');

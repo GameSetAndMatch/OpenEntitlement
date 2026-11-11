@@ -26,7 +26,7 @@ Use existing components and typed validation before adding abstractions. Maintai
 
 Do not read, commit or print credentials or user .env files. Keep private operational/security/commercial findings out of public product documentation. Install integrations may expose only explicitly selected non-secret configuration.
 
-Run checks relevant to the change and report exact results/limits. Service changes use console typechecks and tests; UI changes use reusable component stories and meaningful Playwright regressions. SDK/transport changes need shared conformance coverage. Use the repository's CI commands as the source for current verification; documentation-only changes usually need link/format checks and relevant website diagnostics, not unrelated suites.
+Run checks relevant to the change and report exact results/limits. Service changes use console typechecks and tests; UI changes follow [console/web/UI-GUIDELINES.md](console/web/UI-GUIDELINES.md) and use reusable component stories and meaningful Playwright regressions. SDK/transport changes need shared conformance coverage. Use the repository's CI commands as the source for current verification; documentation-only changes usually need link/format checks and relevant website diagnostics, not unrelated suites.
 
 ## Pull requests
 
