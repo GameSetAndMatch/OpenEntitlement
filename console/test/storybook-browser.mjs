@@ -41,6 +41,9 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   }
   await page.goto(`${origin}/iframe.html?id=workspace-switcher--switch-and-create&viewMode=story`);
   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story workspace-switcher--switch-and-create did not finish at ${width}px`);});
+  await page.goto(`${origin}/iframe.html?id=workspace-switcher--long-name&viewMode=story`);
+  await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`A long workspace name widens the page at ${width}px`);
  }
  await page.setViewportSize({width:1280,height:720});
  for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}

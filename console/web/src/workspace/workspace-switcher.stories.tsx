@@ -24,3 +24,11 @@ export const SwitchAndCreate:Story={play:async({canvasElement})=>{
  await expect(c.queryByRole('menu')).not.toBeInTheDocument();
  canvasElement.dataset.playComplete='true';
 }};
+
+// A long name must truncate, not widen the page (the phone layout is a wrapping row).
+const long={id:'long',name:'Northwind Traders international entitlement operations',role:'Owner'};
+export const LongName:Story={render:()=><div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,width:'100%'}}><WorkspaceSwitcher workspaces={[long,...workspaces]} current={long} onSelect={()=>{}} onCreate={()=>{}}/><a href="#tiers">Tiers</a></div>,play:async({canvasElement})=>{
+ const c=within(canvasElement);
+ await expect(c.getByRole('button',{name:`Workspace: ${long.name}`})).toBeVisible();
+ canvasElement.dataset.playComplete='true';
+}};
