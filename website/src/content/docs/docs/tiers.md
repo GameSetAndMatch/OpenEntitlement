@@ -17,9 +17,9 @@ A Tier holds its values in **variants**: standard, trial and grace. A trial or g
 
 Hidden and read-only Privileges keep their Catalog defaults. An editable Privilege without a default needs a value in every variant.
 
-## Organizations and their terms
+## Organizations
 
-Each [Organization](/reference/glossary/) is assigned one Tier variant. When a deal needs different terms, set them on the Organization instead of cloning the Tier. Globex on Business standard with `seat_max=40` resolves to 40, and the result says why: Catalog 5, then Business 25, then the Organization override 40.
+Each [Organization](/docs/organizations/) is assigned one Tier variant. When a deal needs different terms, set them on the Organization instead of cloning the Tier.
 
 Tiers are your offers to your customers. They are separate from OpenEntitlement Cloud's own service tiers.
 
