@@ -106,13 +106,12 @@
 .settings-reveal label { margin: 0; font-size: 14px; font-weight: 500; }
 .settings-reveal small { font-size: 12px; color: var(--muted); }
 .settings-save { justify-content: flex-end; }
-.member { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
 .member-mark { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; }
 .member { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; }
 .member-email { min-width: 0; overflow-wrap: anywhere; }
 .member-you { flex: none; padding: 1px 8px; border-radius: 999px; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 500; }
 /* Every control in a row shares one height, so inputs, selects and buttons line up. */
-.settings-row :is(input:not([type=checkbox]),select,.btn) { margin: 0; height: 38px; min-height: 38px; padding-top: 0; padding-bottom: 0; }
+.settings-row :is(input:not([type=checkbox]),select,.btn,.btn-quiet) { margin: 0; height: 38px; min-height: 38px; padding-top: 0; padding-bottom: 0; }
 .settings-row .btn { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
 .settings-inline { justify-content: flex-start; flex-wrap: nowrap; gap: 8px; }
 .settings-inline > input { flex: 1 1 auto; width: auto; }

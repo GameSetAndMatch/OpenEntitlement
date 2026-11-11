@@ -21,7 +21,7 @@ const pages=[
 const settingsPages=[
   {name:"Members",hash:"settings/members",about:"Who can manage this workspace."},
   {name:"API keys",hash:"settings/api-keys",about:"Connect your application to this workspace."},
-  {name:"Plan",hash:"settings/plan",about:"What OpenEntitlement evaluates for this workspace."},
+  {name:"Service",hash:"settings/service",about:"How OpenEntitlement runs this workspace."},
   {name:"Configuration",hash:"settings/configuration",about:"A read-only YAML snapshot of this workspace."},
   {name:"Audit log",hash:"settings/audit-log",about:"Every change records who made it and why."},
 ];
@@ -33,7 +33,7 @@ const LAST_WORKSPACE="oe.workspace";
 function rememberedWorkspace(){try{return localStorage.getItem(LAST_WORKSPACE)??"";}catch{return "";}}
 function remember(id:string){try{if(id)localStorage.setItem(LAST_WORKSPACE,id);else localStorage.removeItem(LAST_WORKSPACE);}catch{/* storage unavailable */}}
 function pick(list:Array<{id:string}>,preferred=rememberedWorkspace()){return list.find(w=>w.id===preferred)?.id??list[0]?.id??"";}
-function currentPage(){const hash=location.hash.slice(1);return allPages.find(p=>p.hash===hash)?.name??legacy[hash]??"Privilege Catalog";}
+function currentPage(){const hash=location.hash.slice(1);return allPages.find(p=>p.hash===hash)?.name??(Object.hasOwn(legacy,hash)?legacy[hash]:undefined)??"Privilege Catalog";}
 export function WorkspaceApp(){
   const [session,setSession]=useState<any>(),[ready,setReady]=useState(false),[error,setError]=useState("");
   const [list,setList]=useState<Array<{id:string;name:string;role:string}>>([]),[selected,setSelected]=useState(""),[workspace,setWorkspace]=useState<Workspace>(),[page,setPage]=useState(currentPage);
@@ -55,7 +55,10 @@ export function WorkspaceApp(){
     window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
     return()=>{active=false;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};},[selected]);
   useEffect(()=>{if(!selected)return;remember(selected);let active=true;setWorkspace(undefined);request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active)setWorkspace(value);}).catch(e=>{if(!active)return;if(isGone(e))void lostAccess(selected);else setError(e.message);});return()=>{active=false;};},[selected]);
-  useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main")setPage(currentPage());};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
+  // Following "Settings" or "Back to workspace" swaps the sidebar and removes the focused link. Keep focus on the current page's link.
+  const navigated=useRef(false);
+  useEffect(()=>{if(!navigated.current)return;navigated.current=false;if(document.activeElement&&document.activeElement!==document.body)return;document.querySelector<HTMLElement>('aside nav a[aria-current="page"]')?.focus();},[page]);
+  useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;setPage(currentPage());}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit log"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);
   const save:Save=async(section,entry,title,method="PUT")=>{
     if(!workspace||savingRef.current)return false;savingRef.current=true;
@@ -70,7 +73,7 @@ export function WorkspaceApp(){
   const current=list.find(w=>w.id===selected);
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
   // API keys are an Owner's page; anyone else lands on Members instead.
-  const visibleSettings=settingsPages.filter(p=>p.name!=="API keys"||canEdit||!workspace);
+  const visibleSettings=settingsPages.filter(p=>p.name!=="API keys"||canEdit);
   const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canEdit))??settingsPages[0]!;
   const inSettings=settingsPages.includes(shown);
   const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
@@ -89,7 +92,7 @@ export function WorkspaceApp(){
       {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
-      {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Plan")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
+      {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
       {shown.name==="Audit log"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
       </>}
     </main></div>;

@@ -5,11 +5,12 @@ import { stringify } from "yaml";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
 import { useReason,useToast } from "../ui.tsx";
-export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess}:{section:"Members"|"API keys"|"Plan";workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
+export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
+  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
   const ask=useReason(),toast=useToast();
   const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||w.role==="Manager";
   const base=`/api/workspaces/${w.id}`;
@@ -50,7 +51,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
       {secret&&<Field label="Save this secret securely" hint="It will not be shown again."><input readOnly type="password" value={secret} onFocus={e=>e.target.select()}/></Field>}
       {secret&&<Item label="Copy the secret to your application’s configuration."><button className="btn" onClick={()=>copy(secret,"API key copied")}>Copy key</button></Item>}
     </Group></>}
-    {section==="Plan"&&<Group description="Your OpenEntitlement plan. It is separate from the tiers you sell to your customers.">
+    {section==="Service"&&<Group description="The OpenEntitlement service this workspace runs on. It is separate from the Tiers you sell to your customers.">
       {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
         <Row label="Cloud service tier" description="Enterprise adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
         {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
