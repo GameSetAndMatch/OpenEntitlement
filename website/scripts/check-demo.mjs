@@ -17,10 +17,12 @@ try {
   });
   await page.goto('https://scenes.test/');
   assert.equal(await page.locator('.product-scene').count(),3);
-  for(const title of ['Define what your product offers.','Package it into Tiers.','Make room for a customer deal.'])assert.equal(await page.getByRole('heading',{name:title,exact:true}).isVisible(),true);
+  for(const title of ['Define what you offer.','Package it into Tiers.','Explain every exception.','One question from your application.','Open source. Yours to run.'])assert.equal(await page.getByRole('heading',{name:title,exact:true}).isVisible(),true);
   assert.equal(await page.locator('.product-scenes astro-island').count(),0);
   assert.equal(await page.getByRole('button',{name:/demo|catalog|create/i}).count(),0);
-  assert.equal(await page.locator('details').getAttribute('open'),null);
+  // One primary action in the hero and one at the close; no collapsed explanations or link cards.
+  assert.equal(await page.locator('.hero .sl-link-button.primary').count(),1);
+  assert.equal(await page.locator('main details, main .sl-link-card').count(),0);
   const tier=page.locator('.product-scene').nth(1);
   assert.equal(await tier.locator('input[aria-label="seat_max"]').inputValue(),'∞');
   assert.equal(await tier.locator('[role=switch][aria-label="export_enabled"]').getAttribute('aria-checked'),'true');

@@ -1,10 +1,25 @@
-:root { --sl-color-accent-low: #12312e; --sl-color-accent: #2dd4bf; --sl-color-accent-high: #ccfbf1; --sl-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-:root[data-theme='light'] { --sl-color-accent-low: #ccfbf1; --sl-color-accent: #0f766e; --sl-color-accent-high: #134e4a; }
-.site-title { font-weight: 700; letter-spacing: -.045em; }
-.site-title img { height: 1.8rem; }
+/* Same tokens as docs/design/visual-language.md: one teal accent, quiet hairlines, system type. */
+:root {
+  --sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sl-font-system-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --sl-color-accent-low: #0e2b28; --sl-color-accent: #3cbfae; --sl-color-accent-high: #bff0e8;
+  --sl-color-bg: #0f1011; --sl-color-bg-nav: rgb(15 16 17 / 82%); --sl-color-bg-sidebar: #0f1011;
+  --sl-color-hairline: rgb(255 255 255 / 8%); --sl-color-hairline-light: rgb(255 255 255 / 8%); --sl-color-hairline-shade: rgb(0 0 0 / 40%);
+  --oe-shadow: 0 1px 1px rgb(0 0 0 / 30%), 0 40px 80px -40px rgb(0 0 0 / 70%);
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d9efec; --sl-color-accent: #0f766e; --sl-color-accent-high: #0b4f49;
+  --sl-color-bg: #ffffff; --sl-color-bg-nav: rgb(255 255 255 / 82%); --sl-color-bg-sidebar: #ffffff;
+  --sl-color-hairline: rgb(22 24 27 / 8%); --sl-color-hairline-light: rgb(22 24 27 / 8%); --sl-color-hairline-shade: rgb(22 24 27 / 12%);
+  --oe-shadow: 0 1px 1px rgb(22 24 27 / 3%), 0 40px 80px -40px rgb(22 24 27 / 22%);
+}
+header.header { backdrop-filter: saturate(180%) blur(16px); -webkit-backdrop-filter: saturate(180%) blur(16px); }
+.site-title { font-weight: 600; letter-spacing: -.02em; color: var(--sl-color-white); }
+.sl-link-button { border-radius: 999px; font-weight: 500; }
+.site-title img { height: 1.6rem; }
 .sl-markdown-content h1, .sl-markdown-content h2 { letter-spacing: -.035em; }
 :root { --sl-content-width: 48rem; --sl-text-body: 1rem; }
-.content-panel h1 { font-size: clamp(2rem, 4vw, 2.65rem); line-height: 1.15; letter-spacing: -.04em; }
+.content-panel h1 { font-size: clamp(2rem, 4vw, 2.65rem); font-weight: 600; line-height: 1.12; letter-spacing: -.03em; }
 .sl-markdown-content { line-height: 1.8; }
 .sl-markdown-content p, .sl-markdown-content li { color: var(--sl-color-gray-2); }
 :root[data-theme='light'] .sl-markdown-content p, :root[data-theme='light'] .sl-markdown-content li { color: var(--sl-color-gray-2); }
@@ -21,3 +36,8 @@
   background: #fff;
   border: 1px solid var(--sl-color-gray-5);
 }
+
+/* The current page is marked quietly, as in the console sidebar. */
+.sidebar-content a[aria-current='page'], .sidebar-content a[aria-current='page']:hover, .sidebar-content a[aria-current='page']:focus { background-color: var(--sl-color-accent-low); color: var(--sl-color-white); font-weight: 600; border-radius: 8px; }
+.sidebar-content a { border-radius: 8px; }
+.pagination-links a { border-radius: 14px; border-color: var(--sl-color-hairline); box-shadow: none; }
