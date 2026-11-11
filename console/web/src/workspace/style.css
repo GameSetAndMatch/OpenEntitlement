@@ -82,3 +82,62 @@
 .workspace-menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
 .workspace-create { max-width: 560px; display: grid; gap: 16px; }
 .workspace-create > h1, .workspace-create > p { margin: 0; }
+/* Settings: one column of sections. Each row names a setting (and one line of why) on the
+   left, and holds its value and one action on the right. On narrow screens the right side
+   wraps under the text. */
+.settings-page { display: grid; max-width: 760px; }
+.settings-page > .notice { margin: 0 0 24px; }
+.settings-group { padding: 32px 0; border-top: 1px solid var(--line); }
+.settings-group:first-of-type { border-top: 0; padding-top: 0; }
+.settings-group > h2 { margin: 0; font-size: 19px; }
+.settings-purpose { margin: 4px 0 0; font-size: 14px; max-width: 60ch; }
+.settings-rows { display: grid; margin-top: 12px; }
+.settings-rows > form { display: contents; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; padding: 14px 0; border-top: 1px solid var(--line); }
+.settings-rows > :first-child, .settings-rows > form:first-child > .settings-row { border-top: 0; }
+.settings-text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+.settings-text label, .settings-name { display: block; margin: 0; font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.settings-text small { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.settings-controls { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
+.settings-controls input:not([type=checkbox]) { width: 240px; max-width: 100%; }
+.settings-value { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.settings-page select.fit { width: auto; padding-right: 32px; }
+.settings-reveal { display: grid; justify-content: stretch; gap: 6px; }
+.settings-reveal label { margin: 0; font-size: 14px; font-weight: 500; }
+.settings-reveal small { font-size: 12px; color: var(--muted); }
+.settings-save { justify-content: flex-end; }
+.member-mark { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; }
+.member { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; }
+.member-email { min-width: 0; overflow-wrap: anywhere; }
+.member-you { flex: none; padding: 1px 8px; border-radius: 999px; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 500; }
+/* Every control in a row shares one height, so inputs, selects and buttons line up. */
+.settings-row :is(input:not([type=checkbox]),select,.btn,.btn-quiet) { margin: 0; height: 38px; min-height: 38px; padding-top: 0; padding-bottom: 0; }
+.settings-row .btn { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+.settings-inline { justify-content: flex-start; flex-wrap: nowrap; gap: 8px; }
+.settings-inline > input { flex: 1 1 auto; width: auto; }
+.settings-inline > :not(input) { flex: none; }
+.btn-quiet { padding: 6px 10px; border: 0; border-radius: var(--radius-s); background: transparent; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; transition: background var(--speed) var(--ease), color var(--speed) var(--ease); }
+.btn-quiet:hover:not(:disabled) { background: var(--fill); color: var(--ink); }
+.btn-quiet.danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+.btn-quiet:disabled { color: var(--faint); cursor: not-allowed; }
+@media (max-width: 560px) {
+  .settings-controls { flex: 1 1 100%; justify-content: flex-start; }
+  .settings-controls input:not([type=checkbox]) { flex: 1 1 100%; width: auto; }
+  .settings-inline { flex-wrap: wrap; }
+  .settings-inline > input { flex-basis: 100%; }
+}
+.tier-policy { margin-top: 40px; }
+.tier-policy .settings-group { padding-top: 0; border-top: 0; }
+
+/* Settings has its own sidebar. "Back to workspace" returns to the daily pages. */
+.settings-back { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 20px; padding: 6px 8px; border-radius: var(--radius-s); color: var(--muted); font-size: 14px; text-decoration: none; }
+.settings-back:hover { background: var(--fill); color: var(--ink); }
+.nav-heading { margin: 0 0 6px; padding: 0 12px; font-size: 12px; font-weight: 600; color: var(--faint); }
+.workspace-shell .settings-link { margin-top: auto; }
+.workspace-shell .settings-link + .sidebar-footer { margin-top: 0; }
+.settings-group > .settings-purpose:first-child { margin-top: 0; }
+@media (max-width: 760px) {
+  .settings-back { margin: 0; }
+  .nav-heading { display: none; }
+  .workspace-shell .settings-link { margin-top: 0; }
+}

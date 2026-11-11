@@ -67,7 +67,7 @@ Create reusable **Business** and **Enterprise** Tiers, then their variants. Thes
 | `mcp_enabled` | Disabled | Disabled | Enabled, subject to installation |
 | `retention` | 30d | 30d | 365d |
 
-A Tier can have standard, trial and grace variants; a trial/grace condition is not another Tier. For example, a Business trial could allow 5,000 tokens, and its grace variant 1,000. Configure grace days on the Tier and the post-grace policy in Settings. Grace/fallback suspend negotiated personal terms and grants. A read-only status is returned for the application to enforce; no customer documents are deleted.
+A Tier can have standard, trial and grace variants; a trial/grace condition is not another Tier. For example, a Business trial could allow 5,000 tokens, and its grace variant 1,000. Configure grace days on the Tier and the post-grace policy at the bottom of the Tiers page. Grace/fallback suspend negotiated personal terms and grants. A read-only status is returned for the application to enforce; no customer documents are deleted.
 
 These allowances contain no embedded time window. If ACME sells tokens per month, ACME's application or metering integration owns the month boundary, counting, resets and idempotency.
 

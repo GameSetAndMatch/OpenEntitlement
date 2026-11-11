@@ -3,6 +3,7 @@ import type {Workspace,Save} from "./app.tsx";
 import type {Tier,Variant} from "../../../server/workspace/model.ts";
 import {ValuesEditor} from "./fields.tsx";
 import {FormField} from "../form.tsx";
+import {StatusPolicy} from "./status-policy.tsx";
 import {identifierFromTitle} from "./identifier.ts";
 
 const purpose=(kind:Variant["kind"])=>kind==="grace"?"Grace period":kind==="trial"?"Trial":"Standard";
@@ -62,5 +63,6 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
       {!w.data.variants.some(v=>v.tierId===t.id)&&<p className="empty-note">Add a variant before assigning this tier to an Organization.</p>}
       {canEdit&&<div className="panel-footer"><button className="btn-link" onClick={()=>newVariant(t)} aria-label={`Add a variant to ${t.name}`}>+ Add variant</button></div>}
     </section>)}
+    {canEdit&&!open&&tiers.length>0&&<div className="settings-page tier-policy"><StatusPolicy key={JSON.stringify(w.data.statusPolicy)} workspace={w} save={save} busy={busy}/></div>}
   </>;
 }

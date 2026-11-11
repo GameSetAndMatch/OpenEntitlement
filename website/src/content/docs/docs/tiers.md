@@ -13,7 +13,7 @@ A **Tier** is one of your commercial offers, such as Business or Enterprise. It 
 
 ## Variants
 
-A Tier holds its values in **variants**: standard, trial and grace. A trial or grace period is a way to be on a Tier, not another Tier. A Business trial could allow 5,000 tokens, and its grace variant 1,000. Grace days belong to the Tier; the policy after grace is a Workspace setting.
+A Tier holds its values in **variants**: standard, trial and grace. A trial or grace period is a way to be on a Tier, not another Tier. A Business trial could allow 5,000 tokens, and its grace variant 1,000. Grace days belong to the Tier; the policy after grace is set once for the Workspace, at the bottom of the Tiers page.
 
 Hidden and read-only Privileges keep their Catalog defaults. An editable Privilege without a default needs a value in every variant.
 
