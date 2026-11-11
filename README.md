@@ -1,12 +1,30 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/icon-dark.svg">
-  <img src="assets/icon.svg" width="64" height="64" alt="OpenEntitlement logo: an O-shaped doorway whose door is the letter E">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/icon-dark.svg">
+    <img src="assets/icon.svg" width="72" height="72" alt="OpenEntitlement logo: an O-shaped doorway whose door is the letter E">
+  </picture>
+</p>
 
-# OpenEntitlement
+<h1 align="center">OpenEntitlement</h1>
 
-**An open-source entitlement service and protocol: what an organization may do, and how much of it.**
-OpenEntitlement combines its own server and administrative console with OEREP, a remote evaluation protocol modeled on OFREP. Generic Python and TypeScript SDKs use the same contract; the server owns plans, overrides, grants, and resolution.
+<p align="center">
+  <strong>Entitlements you can explain.</strong><br>
+  An open model, protocol and self-hostable service for what each customer may do, and how much of it.
+</p>
+
+<p align="center">
+  <a href="https://openentitlement.dev/docs/quickstart/">Get started</a>
+  &nbsp;·&nbsp;
+  <a href="https://openentitlement.dev/docs/specification/">Specification</a>
+  &nbsp;·&nbsp;
+  <a href="https://openentitlement.dev">openentitlement.dev</a>
+</p>
+
+<br>
+
+```sh
+pip install openentitlement-sdk
+```
 
 ```python
 from openentitlement import Catalog, FixedProvider, create_client, feature, integer
@@ -16,41 +34,34 @@ client = create_client(FixedProvider(catalog, {"seat_max": 40}), catalog)
 assert client.get_limit("seat_max", {"organizationId": "globex"}) == 40
 ```
 
-Install the Python runtime with `pip install openentitlement-sdk` (imports remain `openentitlement`). Start with the [ACME Workspace walkthrough](docs/guides/acme-workspace.md) for Workspaces, the Privilege Catalog, Groups, Tags, Tiers, variants, Organizations and user entitlements. It includes Pydantic `Privilege` models, JSON serialization and evaluation examples; TypeScript/Zod follows Python.
+## The idea
 
-Run the [service and local demo](console/README.md), backed by memory or Postgres. SDKs also support embedded storage and a `FixedProvider` for self-hosted installs.
+- **Privilege Catalog.** What your product allows or limits: booleans, integers or `UNLIMITED`, and string enums, under flat keys like `seat_max`.
+- **Tiers.** Offers such as Basic and Pro. Their variants change only what differs from the Catalog.
+- **Organizations.** Your customers. Each gets a variant, plus its own terms when a deal needs them.
+- **Every value is explained.** A result says where it came from: Catalog default, Tier value, Organization override or environment restriction.
 
-## What's here
+Your application asks through OEREP, an open remote evaluation protocol modeled on OFREP. The Python and TypeScript SDKs share one contract. The service owns the values and audits every change. Billing, roles and usage stay in your existing tools.
 
-| Path | What |
+## Start
+
+- **Learn the model:** the [ACME Workspace walkthrough](docs/guides/acme-workspace.md) covers Workspaces, the Privilege Catalog, Tiers, Organizations and user entitlements.
+- **Run the service and console:** [`console/`](console/README.md), backed by memory or Postgres, with Docker.
+- **Embed it:** the SDKs also run in-process, with embedded storage or a `FixedProvider`. The example above uses the SDK's v1 Feature/Plan compatibility API; new authoring uses the Privilege Catalog.
+
+## Repository
+
+| | |
 |---|---|
-| [`website/`](website/README.md) | Public landing page and documentation, with Cloudflare static hosting |
-| [`console/`](console/README.md) | Our entitlement server, OEREP API, and administrative web console |
-| [`spec/`](spec/README.md) | Semantic specification and OEREP v1 [OpenAPI](spec/oerep.openapi.json) |
-| [`spec/assets/gherkin/`](spec/assets/gherkin/README.md) | Conformance suite: 11 feature files, tagged by requirement and provider capability |
-| [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk` (core requires only Pydantic; optional `[postgres]` extra) |
-| [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core` (one dependency, Zod; `/authoring` and optional `/postgres` entry points) |
-| [`PRIOR_ART.md`](PRIOR_ART.md) | What exists, the vendor mapping table, where billing leaks, link check |
-| [`ADR-0001.md`](ADR-0001.md) | Why an open protocol plus our own entitlement server |
-
-See the [glossary](GLOSSARY.md) for shared domain and review terminology.
-
-## The model in one screen
-
-New authoring uses flat keys, a Privilege Catalog, one Group and multiple Tags, then Tiers → variants → Organizations → optional user exceptions. The compatibility SDK still uses its v1 Feature/Plan API. Keys are always flat (`seat_max`); dotted keys are not accepted.
-
-- **Layers stay separate.** Authentication (401), RBAC (403), **entitlement (403 `entitlement_required` + `requiredPlan`)**, and feature flags (404). This spec covers only the entitlement layer.
-- **Definitions in code, values as data.** Features and privileges (`seat_max`, `sso_enabled`, `report_retention`) are declared by the app. Plan values, overrides, and grants are runtime data, audited.
-- **Plan** → a value per privilege. A trial is a *variant* of a plan. The payment channel never affects resolution.
-- **Override** → *replaces* the plan value for an org, user, or resource. It is dated, needs a reason, and is bound to the plan family. It goes **stale, not deleted**, when the plan changes.
-- **Grant** → *adds* quota (+500 API calls until Friday). It survives plan changes. Subject-scoped grants are personal allowances drawn before the shared pool.
-- **`UNLIMITED`** is its own value (`{"unlimited": true}`), never `MAX_INT` or `null`.
-- **Downgrades** gate new consumption only: decrements always pass, and nothing is hidden or deleted.
-- **Errors fail closed** to the privilege default, with no upsell on `ERROR`.
+| [`spec/`](spec/README.md) | Semantic specification, the OEREP v1 [OpenAPI](spec/oerep.openapi.json), and an 11-feature [conformance suite](spec/assets/gherkin/README.md) |
+| [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk`: Pydantic is the only core dependency; optional `[postgres]` extra |
+| [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core`: Zod is the only dependency; `/authoring` and optional `/postgres` entry points |
+| [`console/`](console/README.md) | The entitlement service, OEREP API and administrative console |
+| [`website/`](website/README.md) | openentitlement.dev: landing page and documentation |
 
 ## Status
 
-`v0.1.0`, a draft. Both SDKs pass the full conformance suite on every provider for the capabilities it declares:
+`v0.1.0`, a draft. OEREP v1 is implemented in both SDKs and the reference service, with cross-language HTTP integration tests. Both SDKs pass the conformance suite on every provider, for the capabilities each provider declares:
 
 | Target | Python | TypeScript |
 |---|---|---|
@@ -58,11 +69,11 @@ New authoring uses flat keys, a Privilege Catalog, one Group and multiple Tags, 
 | Postgres (16) | ✅ 110/110 | ✅ 110/110 |
 | fixed provider | ✅ 6/6 | ✅ 6/6 |
 
-OEREP v1 is implemented in both SDKs and the reference service, with real cross-language HTTP integration tests. Roadmap: add-ons and change events. See [spec/README.md](spec/README.md#roadmap).
+Next on the [roadmap](spec/README.md#roadmap): add-ons and change events.
 
-## Project direction
+## Direction
 
-[Vision](VISION.md), [shared glossary](GLOSSARY.md), [decisions and RFCs](docs/decisions.md), and [contributor workflows](docs/agents/workflows.md) record the long-term direction and distinguish accepted design from released protocol behavior.
+[Vision](VISION.md) · [Glossary](GLOSSARY.md) · [Decisions and RFCs](docs/decisions.md) · [Visual language](docs/design/visual-language.md) · [Prior art](PRIOR_ART.md) · [ADR-0001](ADR-0001.md) · [Contributor workflows](docs/agents/workflows.md)
 
 ## License
 
