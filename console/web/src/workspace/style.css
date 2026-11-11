@@ -1,8 +1,8 @@
 .sign-in { margin: 12vh auto; width: min(520px, calc(100% - 40px)); padding: 32px; }
 .sign-in h1 { margin-top: 24px; }
 .sign-in .btn { display: inline-block; text-decoration: none; }
-.workspace-shell .workspace-picker { margin-top: 32px; }
 .workspace-shell .sidebar-footer p { font-size: 12px; overflow-wrap: anywhere; margin: 16px 0; }
+.workspace-shell .sidebar-footer p small { display: block; margin-top: 2px; }
 .workspace-shell nav { margin-top: 12px; }
 .workspace-shell .workspace-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
 .workspace-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 16px; margin-bottom: 24px; }
@@ -34,7 +34,8 @@
 .variant-row { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 20px 24px; border-top: 1px solid var(--line); }
 .variant-row small { display: block; color: var(--muted); margin-top: 8px; }
 @media(max-width:760px) {
-  .workspace-shell .workspace-picker { width: 100%; margin: 8px 0; }
+  .workspace-switcher { margin-right: auto; }
+  .workspace-menu { width: min(280px, calc(100vw - 32px)); }
   .workspace-shell nav { display: flex; flex-wrap: wrap; margin-top: 0; }
   .workspace-shell .sidebar-footer { display: flex; flex-wrap: wrap; gap: 8px; }
   .workspace-shell .sidebar-footer p { display: none; }
@@ -64,3 +65,21 @@
 .tag-options label { display:flex; align-items:center; gap:8px; padding:8px 0; }
 .tag-options input { width:16px; height:16px; }
 .tag-picker :focus-visible,.tag-chip:focus-visible { outline:2px solid var(--accent-dark); outline-offset:3px; }
+
+/* Workspace switcher: the current workspace's mark, top left. The others live behind it. */
+.workspace-switcher { position: relative; }
+.workspace-trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 6px; margin: -6px 0 0; border: 0; border-radius: var(--radius-s); background: transparent; color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; letter-spacing: -.01em; text-align: left; cursor: pointer; transition: background var(--speed) var(--ease); }
+.workspace-trigger:hover:not(:disabled), .workspace-trigger[aria-expanded="true"] { background: var(--fill); }
+.workspace-trigger-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-mark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-s); background: var(--accent); color: var(--on-accent); font-size: 15px; font-weight: 600; }
+.workspace-mark.add { background: var(--fill); color: var(--muted); font-weight: 500; }
+.workspace-menu { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: 260px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow); }
+.workspace-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px; border: 0; border-radius: var(--radius-s); background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.workspace-menu button:hover, .workspace-menu button:focus-visible { background: var(--fill); outline: none; }
+.workspace-menu button[aria-checked="true"] { font-weight: 600; }
+.workspace-menu button[aria-checked="true"]::after { content: "✓"; margin-left: auto; padding-right: 6px; color: var(--accent-ink); }
+.workspace-menu-name { min-width: 0; overflow-wrap: anywhere; }
+.workspace-menu-name small { display: block; color: var(--faint); font-size: 12px; font-weight: 400; }
+.workspace-menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.workspace-create { max-width: 560px; display: grid; gap: 16px; }
+.workspace-create > h1, .workspace-create > p { margin: 0; }
