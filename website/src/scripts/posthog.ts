@@ -38,9 +38,9 @@ function trackJourney(): void {
       posthog.capture('docs_code_copied', { path, language, first_line: firstLine });
       return;
     }
-    // Starlight's hero actions come from frontmatter and cannot carry attributes, so they are named by label.
-    const cta = target.closest<HTMLElement>('[data-ph-cta], .hero .actions a');
-    if (cta) posthog.capture('cta_clicked', { path, cta: cta.dataset.phCta ?? `hero_${(cta.textContent ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}` });
+    // Names are stable identifiers set in markup (Starlight hero actions use frontmatter attrs), never labels.
+    const cta = target.closest<HTMLElement>('[data-ph-cta]');
+    if (cta) posthog.capture('cta_clicked', { path, cta: cta.dataset.phCta });
     const link = target.closest<HTMLAnchorElement>('a[href]');
     if (!link) return;
     const url = new URL(link.href, location.href);

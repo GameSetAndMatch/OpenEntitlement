@@ -26,6 +26,7 @@ try {
   // Each product screen is the one way into its docs page, and every homepage action is named for analytics.
   assert.deepEqual(await page.locator('.scene-link').evaluateAll(a=>a.map(l=>[l.getAttribute('href'),l.dataset.phCta])),[['/docs/privilege-catalog/','scene_catalog'],['/docs/acme-workspace/','scene_tiers'],['/docs/acme-workspace/','scene_exception']]);
   assert.equal(await page.locator('.landing-close-actions a[data-ph-cta]').count(),2);
+  assert.deepEqual(await page.locator('.hero .actions a').evaluateAll(a=>a.map(l=>l.dataset.phCta)),['hero_get_started','hero_specification']);
   const tier=page.locator('.product-scene').nth(1);
   assert.equal(await tier.locator('input[aria-label="seat_max"]').inputValue(),'∞');
   assert.equal(await tier.locator('[role=switch][aria-label="export_enabled"]').getAttribute('aria-checked'),'true');

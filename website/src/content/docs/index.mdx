@@ -10,9 +10,13 @@ hero:
   actions:
     - text: Get started
       link: /docs/quickstart/
+      attrs:
+        data-ph-cta: hero_get_started
     - text: Read the specification
       link: /docs/specification/
       variant: minimal
+      attrs:
+        data-ph-cta: hero_specification
 ---
 
 import ProductScenes from '../../components/ProductScenes';
@@ -23,16 +27,15 @@ import ProductScenes from '../../components/ProductScenes';
 
 <h2 id="ask">One question from your application.</h2>
 
-<p>The same contract in Python and TypeScript, against your own service or an embedded provider.</p>
+<p>Ask for a value, and why. The same contract in Python and TypeScript.</p>
 
 ```python
-from openentitlement import Catalog, FixedProvider, create_client
-from openentitlement import feature, integer
-
-catalog = Catalog([feature("seats", "Seats", [integer("seat_max")])])
-client = create_client(FixedProvider(catalog, {"seat_max": 40}), catalog)
-client.get_limit("seat_max", {"organizationId": "globex"})  # 40
+client = create_client(RemoteProvider("http://localhost:8787"), catalog)
+client.get_limit("seat_max", {"organization_id": "acme"})           # 250
+client.get_details("seat_max", {"organization_id": "acme"}).reason  # OVERRIDE
 ```
+
+<p class="landing-code-more"><a href="/docs/python/">See the complete setup</a></p>
 
 </section>
 

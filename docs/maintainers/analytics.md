@@ -28,7 +28,7 @@ The `phc_` project key is public by design: it can only send events. It lives in
 | `$pageview` | Every page load (automatic) | `$pathname` |
 | `docs_code_copied` | The copy button of any code block is clicked | `path`, `language`, `first_line` |
 | `outbound_link_clicked` | A link to another site is clicked | `path`, `destination` (`github`, `docker`, `pypi`, `npm`, `other`), `href` |
-| `cta_clicked` | A call to action is clicked: an element with `data-ph-cta="<name>"`, or a homepage hero action (named `hero_<label>`, e.g. `hero_get_started`). Homepage names: `hero_get_started`, `hero_read_the_specification`, `scene_catalog`, `scene_tiers`, `scene_exception`, `close_get_started`, `close_github` | `path`, `cta` |
+| `cta_clicked` | An element with `data-ph-cta="<name>"` is clicked. Names are stable identifiers, never labels; Starlight hero actions set them through frontmatter `attrs`. Homepage names: `hero_get_started`, `hero_specification`, `scene_catalog`, `scene_tiers`, `scene_exception`, `close_get_started`, `close_github` | `path`, `cta` |
 
 ### Console activation
 
