@@ -44,7 +44,7 @@ export function decodeRemoteDetails(raw: unknown, p: PrivilegeDefinition, ctx?: 
   if ((d.grants.length > 0 && p.valueType !== "integer") ||
       new Set(d.grants.map((g) => g.id)).size !== d.grants.length || !isInt(total) ||
       d.grants.some((g) => g.subjectId !== undefined && g.subjectId !== ctx?.subjectId) ||
-      (!isUnlimited(value) && p.valueType === "integer" && total > (value as number)))
+      (!isUnlimited(value) && p.valueType === "integer" && !isInt((value as number) - total)))
     throw new Error("inconsistent OEREP grants");
   if ((d.errorCode !== undefined && !Object.values(ErrorCode).includes(d.errorCode)) ||
       (d.reason === Reason.ERROR && (!d.errorCode || d.requiredPlan !== undefined)))

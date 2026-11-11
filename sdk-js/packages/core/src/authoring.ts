@@ -239,7 +239,7 @@ export function standaloneCatalog(input: unknown): unknown {
         );
       if (
         p.type === "integer" &&
-        ((p.minimum ?? 0) > 0 || p.maximum !== undefined)
+        ((p.minimum ?? 0) !== 0 || p.maximum !== undefined)
       )
         throw new Error(
           "Bounded integer Privileges require the workspace service",

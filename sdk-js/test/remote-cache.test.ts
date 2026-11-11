@@ -132,7 +132,7 @@ describe("RemoteProvider opt-in decision cache", () => {
 
   it("rejects an invalid bulk response without caching any of it", async () => {
     const { state, provider, client } = cached();
-    state.values.seat_max = -5;
+    state.values.seat_max = 1.5; // not an integer
     await assert.rejects(provider.resolveAll(catalog.privileges, acme));
     state.values.seat_max = 10;
     await client.getLimit("project_max", acme);

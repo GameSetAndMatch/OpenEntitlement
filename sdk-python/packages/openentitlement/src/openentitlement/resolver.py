@@ -144,7 +144,10 @@ def check_within(details: ResolutionDetails[Any], current: Usage, requested: int
         raise InvalidArgument(f"requested must be an integer, got {requested!r}")
     usage = normalize_usage(current)
     value = details.value
-    subject_allowance = sum(g.amount for g in details.grants if g.subject_id is not None)
+    subject_grants = sum(g.amount for g in details.grants if g.subject_id is not None)
+    # Personal grants never allow more than the resolved value. With a non-negative base they cannot
+    # exceed it anyway; with a negative base (allowed since integer values may be negative) they could.
+    subject_allowance = subject_grants if is_unlimited(value) else min(subject_grants, max(0, value))
     org_grants = sum(g.amount for g in details.grants if g.subject_id is None)
     remaining_subject = max(0, subject_allowance - usage.subject)
     needed = max(1, usage.pool + requested - remaining_subject - org_grants)

@@ -28,7 +28,7 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
         raise ValueError("invalid OEREP details")
     reason = Reason(raw["reason"])
     value = decode_value(raw["value"])
-    if p.validate_value(value) or (is_int(value) and value > 9007199254740991):
+    if p.validate_value(value):
         raise ValueError("OEREP value does not match local catalog")
     grants, stale = raw.get("grants"), raw.get("staleOverrides")
     if not isinstance(grants, list) or not isinstance(stale, list) or any(not isinstance(v, str) for v in stale):
@@ -44,7 +44,8 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
     if ((decoded and p.value_type is not ValueType.INTEGER)
             or len({g.id for g in decoded}) != len(decoded) or total > 9007199254740991
             or any(g.subject_id is not None and g.subject_id != (ctx.subject_id if ctx else None) for g in decoded)
-            or (p.value_type is ValueType.INTEGER and not is_unlimited(value) and total > value)):
+            or (p.value_type is ValueType.INTEGER and not is_unlimited(value)
+                and not -9007199254740991 <= value - total <= 9007199254740991)):
         raise ValueError("inconsistent OEREP grants")
     for key in ("feature", "planId", "overrideId", "requiredPlan", "errorMessage"):
         if key in raw and not isinstance(raw[key], str):
@@ -53,7 +54,7 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
     if reason == Reason.ERROR and (code is None or "requiredPlan" in raw):
         raise ValueError("invalid OEREP error")
     plan_value = decode_value(raw["planValue"]) if "planValue" in raw else None
-    if "planValue" in raw and (p.validate_value(plan_value) or (is_int(plan_value) and plan_value > 9007199254740991)):
+    if "planValue" in raw and p.validate_value(plan_value):
         raise ValueError("invalid OEREP planValue")
     return ResolutionDetails(
         privilege=p.key, value=value, reason=reason, grants=tuple(decoded), stale_overrides=tuple(stale),
