@@ -73,13 +73,16 @@ try {
     await page.goto(service.url);
     const input = page.getByLabel('seat_max', { exact: true });
     const checkbox = page.getByRole('checkbox', { name: 'Unlimited seat_max', exact: true });
+    // Negative integers are valid values; fractions are not.
     await input.fill('-5');
-    assert.equal(await input.inputValue(), '-5');
+    assert.equal(await input.getAttribute('aria-invalid'), 'false');
+    await input.fill('1.5');
+    assert.equal(await input.inputValue(), '1.5');
     assert.equal(await input.getAttribute('aria-invalid'), 'true');
     const inlineError = await page.getByRole('alert').textContent();
     const invalid = await fetch(service.url + '/api/plans/checkbox-test/values', {
       method: 'PUT', headers: { 'content-type': 'application/json', 'x-oe-actor': 'browser-test' },
-      body: JSON.stringify({ values: { 'seat_max': -5 }, reason: 'negative value regression' }),
+      body: JSON.stringify({ values: { 'seat_max': 1.5 }, reason: 'fractional value regression' }),
     });
     assert.equal(invalid.status, 422);
     assert.equal((await invalid.json()).message, inlineError);

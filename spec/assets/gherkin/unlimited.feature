@@ -40,7 +40,7 @@ Feature: Unlimited
 
     Examples:
       | privilege         | value  |
-      | seat_max         | -1     |
+      | seat_max         | "5"    |
       | seat_max         | true   |
       | sso_enabled       | 1      |
       | report_retention | "30d"  |

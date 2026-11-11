@@ -55,7 +55,7 @@ export function validateValue(p: PrivilegeDefinition, value: unknown): string | 
       return typeof value === "boolean" ? undefined : `${p.key} expects a boolean`;
     case "integer":
       if (isUnlimited(value)) return p.unlimitedAllowed ? undefined : `${p.key} does not allow UNLIMITED`;
-      return isInt(value) && value >= 0 ? undefined : `${p.key} expects a non-negative integer or UNLIMITED`;
+      return isInt(value) ? undefined : `${p.key} expects an integer or UNLIMITED`;
     case "enum":
       return typeof value === "string" && p.options.includes(value) ? undefined : `${p.key} expects one of ${JSON.stringify(p.options)}`;
   }

@@ -80,12 +80,17 @@ def test_invalid_remote_grants_and_unlimited_never_inflate_quota():
         c = create_client(catalog=catalog, provider=RemoteProvider(f"http://127.0.0.1:{server.server_port}"))
         ctx = {"organization_id": "acme", "subject_id": "alice"}
         for grants in ([{"id": "g", "amount": 100, "subjectId": "bob"}],
-                       [{"id": "g", "amount": 100, "subjectId": "alice"}],
                        [{"id": "g", "amount": 5}, {"id": "g", "amount": 5}]):
             payload.update(privilege="seat_max", value=10, reason="GRANT", grants=grants, staleOverrides=[])
             assert c.get_details("seat_max", ctx).reason is Reason.ERROR
             with pytest.raises(EntitlementLimitExceeded):
                 c.require_within("seat_max", 0, 100, ctx)
+        # A personal grant above the resolved value is consistent (the base may be negative), but it
+        # still never allows more than the resolved value.
+        payload.update(value=10, grants=[{"id": "g", "amount": 100, "subjectId": "alice"}])
+        assert c.get_details("seat_max", ctx).value == 10
+        with pytest.raises(EntitlementLimitExceeded):
+            c.require_within("seat_max", 0, 11, ctx)
         payload.update(value={"unlimited": 1}, grants=[])
         assert c.get_details("seat_max", ctx).reason is Reason.ERROR
     finally:
@@ -264,7 +269,7 @@ def test_bulk_without_cache_and_invalid_bulk(fake):
     from openentitlement.details import EvaluationContext
     provider = RemoteProvider(fake.url)
     assert provider.resolve_all(_catalog().privileges, EvaluationContext(organization_id="acme"))["project_max"].value == 5
-    fake.seat_value = -5
+    fake.seat_value = 1.5  # not an integer
     cached = RemoteProvider(fake.url, cache_ttl=10)
     with pytest.raises(ValueError):
         cached.resolve_all(_catalog().privileges, EvaluationContext(organization_id="acme"))
@@ -440,3 +445,40 @@ def test_historical_bulk_neither_seeds_nor_evicts_current_cache(fake):
         provider.resolve_all(_catalog().privileges, past)
     assert c.get_limit("seat_max", {"organization_id": "acme"}) == 20
     assert len(fake.requests) == 4
+
+
+# -- negative integer values -----------------------------------------------------------------------
+
+def _offset():
+    from openentitlement import Catalog, feature, integer
+    return Catalog([feature("climate", "Climate", [integer("temperature_offset", default=0)])]).privilege("temperature_offset")
+
+
+def _details(value, grants=()):
+    return decode_remote_details({"privilege": "temperature_offset", "value": value, "reason": "PLAN",
+                                  "grants": list(grants), "staleOverrides": []}, _offset(), None)
+
+
+def test_negative_remote_values_decode_with_and_without_grants():
+    assert _details(-5).value == -5
+    assert _details(5, [{"id": "g", "amount": 10}]).value == 5  # base -5 plus a grant of 10
+    assert _details(-(2**53 - 1)).value == -(2**53 - 1)
+    with pytest.raises(ValueError):
+        _details(-(2**53))
+    with pytest.raises(ValueError):
+        decode_remote_details({"privilege": "temperature_offset", "value": 5, "reason": "PLAN", "grants": [],
+                               "staleOverrides": [], "planValue": -(2**53)}, _offset(), None)
+
+
+def test_python_runtime_validation_matches_the_safe_integer_range():
+    p = _offset()
+    assert p.validate_value(-(2**53 - 1)) is None and p.validate_value(2**53 - 1) is None
+    assert p.validate_value(-(2**53)) and p.validate_value(2**53)
+
+
+def test_personal_grants_never_allow_more_than_the_resolved_value():
+    from openentitlement.details import GrantApplied, ResolutionDetails
+    from openentitlement.resolver import check_within
+    d = ResolutionDetails(privilege="temperature_offset", value=10, reason=Reason.GRANT,
+                          grants=(GrantApplied(id="g", amount=100, subject_id="alice"),))  # base -90
+    assert check_within(d, 0, 10).passed and not check_within(d, 0, 11).passed

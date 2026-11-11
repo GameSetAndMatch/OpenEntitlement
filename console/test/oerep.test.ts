@@ -111,8 +111,13 @@ test("malformed requests return protocol errors without terminating the service"
   assert.equal((await post("resolve", { context: { organizationId: "acme" } })).status, 200);
 });
 
-test("remote quota checks reject grants for another subject or above the resolved total", async () => {
-  for (const grants of [[{ id: "g", amount: 100, subjectId: "bob" }], [{ id: "g", amount: 100, subjectId: "alice" }], [{ id: "g", amount: 5 }, { id: "g", amount: 5 }]]) {
+test("remote quota checks reject grants for another subject and never exceed the resolved value", async () => {
+  // A personal grant above the resolved value is consistent once a base may be negative (-90 + 100 = 10),
+  // but it still never allows more than the resolved value.
+  const personal = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants: [{ id: "g", amount: 100, subjectId: "alice" }], staleOverrides: [] })) }) });
+  await personal.requireWithin("seat_max", 0, 10, { organizationId: "acme", subjectId: "alice" });
+  await assert.rejects(personal.requireWithin("seat_max", 0, 11, { organizationId: "acme", subjectId: "alice" }));
+  for (const grants of [[{ id: "g", amount: 100, subjectId: "bob" }], [{ id: "g", amount: 5 }, { id: "g", amount: 5 }]]) {
     const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants, staleOverrides: [] })) }) });
     const ctx = { organizationId: "acme", subjectId: "alice" };
     const details = await c.getDetails("seat_max", ctx);

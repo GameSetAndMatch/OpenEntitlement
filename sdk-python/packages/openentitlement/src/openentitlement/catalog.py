@@ -12,6 +12,9 @@ from .errors import InvalidArgument
 from .model import OpenEntitlementModel
 from .values import UNLIMITED, Value, is_int, is_unlimited
 
+MAX_SAFE_INTEGER = 2**53 - 1
+"""Integers exact in every supported language; values range over -(2**53 - 1)..2**53 - 1."""
+
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -39,9 +42,9 @@ class PrivilegeDefinition(OpenEntitlementModel):
         if self.value_type is ValueType.INTEGER:
             if is_unlimited(value):
                 return None if self.unlimited_allowed else f"{self.key} does not allow UNLIMITED"
-            if is_int(value) and value >= 0:
+            if is_int(value) and -MAX_SAFE_INTEGER <= value <= MAX_SAFE_INTEGER:
                 return None
-            return f"{self.key} expects a non-negative integer or UNLIMITED"
+            return f"{self.key} expects an integer or UNLIMITED"
         if isinstance(value, str) and value in self.options:
             return None
         return f"{self.key} expects one of {list(self.options)}"

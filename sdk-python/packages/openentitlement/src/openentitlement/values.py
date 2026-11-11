@@ -73,7 +73,7 @@ class Unlimited:
 UNLIMITED = Unlimited()
 
 Limit = Union[StrictInt, Unlimited]
-"""An integer privilege value: a non-negative int or UNLIMITED."""
+"""An integer privilege value: an int (negative values are allowed) or UNLIMITED."""
 
 Value = Union[StrictBool, StrictInt, StrictStr, Unlimited]
 """Any privilege value."""

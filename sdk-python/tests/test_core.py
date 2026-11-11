@@ -85,7 +85,7 @@ def test_unlimited_is_distinct_and_unordered() -> None:
         [feature("a", "A", [boolean("a_x"), boolean("a_y")])],  # no gate
         [feature("a", "A", [enum("a_tier", ["x"])])],  # enum gate
         [feature("a", "A", [boolean("a_x")]), feature("b", "B", [boolean("a_x")])],  # dup key
-        [feature("a", "A", [integer("a_max", default=-1)])],
+        [feature("a", "A", [integer("a_max", default=1.5)])],  # not an integer
         [feature("a", "A", [integer("a_max", default=UNLIMITED)])],  # unlimited not allowed
         [feature("a", "A", [])],
         [feature("a", "A", [boolean("a_x")], gate="b_y")],

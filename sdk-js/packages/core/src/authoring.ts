@@ -65,8 +65,8 @@ const identifier = z
   .regex(/^[a-z][a-z0-9_]*$(?![\s\S])/, "Expected a flat identifier");
 const title = z.string().trim().min(1).max(200);
 const description = z.string().max(2000).default("");
-/** Integers that are exact in every supported language: 0..2^53-1. */
-const safeInteger = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+/** Integers that are exact in every supported language: -(2^53-1)..2^53-1. */
+const safeInteger = z.number().int().min(-Number.MAX_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const common = {
   key: identifier,
   title,
@@ -239,7 +239,7 @@ export function standaloneCatalog(input: unknown): unknown {
         );
       if (
         p.type === "integer" &&
-        ((p.minimum ?? 0) > 0 || p.maximum !== undefined)
+        ((p.minimum ?? 0) !== 0 || p.maximum !== undefined)
       )
         throw new Error(
           "Bounded integer Privileges require the workspace service",

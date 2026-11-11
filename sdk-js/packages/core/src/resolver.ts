@@ -110,7 +110,10 @@ export function checkWithin(details: ResolutionDetails, current: Usage, requeste
   if (!isInt(requested)) throw new InvalidArgument(`requested must be an integer, got ${String(requested)}`);
   const usage = normalizeUsage(current);
   const value = details.value as Limit;
-  const subjectAllowance = details.grants.filter((g) => g.subjectId !== undefined).reduce((s, g) => s + g.amount, 0);
+  const subjectGrants = details.grants.filter((g) => g.subjectId !== undefined).reduce((s, g) => s + g.amount, 0);
+  // Personal grants never allow more than the resolved value. With a non-negative base they cannot
+  // exceed it anyway; with a negative base (allowed since integer values may be negative) they could.
+  const subjectAllowance = isUnlimited(details.value) ? subjectGrants : Math.min(subjectGrants, Math.max(0, details.value as number));
   const orgGrants = details.grants.filter((g) => g.subjectId === undefined).reduce((s, g) => s + g.amount, 0);
   const remainingSubject = Math.max(0, subjectAllowance - usage.subject);
   const neededPlanValue = Math.max(1, usage.pool + requested - remainingSubject - orgGrants);

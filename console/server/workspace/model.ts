@@ -90,7 +90,7 @@ export function privilege(data: WorkspaceData, input: unknown): Privilege {
   if (b.featureId) { result.featureId=text(b.featureId,"Feature");if(!data.features.some(f=>f.id===result.featureId))throw new WorkspaceError("Feature does not exist"); }
   if(b.tags!==undefined){if(!Array.isArray(b.tags)||b.tags.length>50||b.tags.some((id:unknown)=>typeof id!=="string"||!data.tags.some(t=>t.id===id))||new Set(b.tags).size!==b.tags.length)throw new WorkspaceError("Select unique existing Tags");result.tags=[...b.tags];}
   for (const field of ["minimum", "maximum"] as const) if (b[field] !== undefined) {
-    if (b.type !== "integer" || !Number.isSafeInteger(b[field]) || b[field] < 0) throw new WorkspaceError(`${field} must be a non-negative integer on an integer privilege`);
+    if (b.type !== "integer" || !Number.isSafeInteger(b[field])) throw new WorkspaceError(`${field} must be a whole number on an integer privilege`);
     result[field] = b[field];
   }
   if ((result.minimum ?? 0) > (result.maximum ?? Number.MAX_SAFE_INTEGER)) throw new WorkspaceError("Minimum cannot exceed maximum");
