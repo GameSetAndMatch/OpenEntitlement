@@ -19,10 +19,16 @@ export default defineConfig({
       { label: 'Start here', items: [
         { label: 'Introduction', slug: 'docs' },
         { label: 'Quickstart', slug: 'docs/quickstart' },
-        { label: 'ACME Workspace walkthrough', slug: 'docs/acme-workspace' },
         { label: 'Core concepts', slug: 'docs/concepts' },
-        { label: 'Privilege Catalog', slug: 'docs/privilege-catalog' },
         { label: 'Specification overview', slug: 'docs/specification' },
+      ] },
+      { label: 'Workspace', items: [
+        { label: 'Privilege Catalog', slug: 'docs/privilege-catalog' },
+        { label: 'Tiers', slug: 'docs/tiers' },
+        { label: 'Organizations', slug: 'docs/organizations' },
+      ] },
+      { label: 'Guides', items: [
+        { label: 'ACME Workspace walkthrough', slug: 'docs/acme-workspace' },
       ] },
       { label: 'Build with OpenEntitlement', items: [
         { label: 'Python SDK', slug: 'docs/python' },
