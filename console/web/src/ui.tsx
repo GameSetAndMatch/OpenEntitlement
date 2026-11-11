@@ -137,7 +137,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const push = (text: string, tone: "ok" | "err" = "ok") => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, text, tone }]);
+    // One message at a time: a newer toast replaces the previous one.
+    setToasts([{ id, text, tone }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
   };
   return (

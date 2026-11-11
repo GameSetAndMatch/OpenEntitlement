@@ -33,6 +33,6 @@ export function Catalog({workspace:w,save,canEdit,busy}:{workspace:Workspace;sav
   {show&&canEdit&&<PrivilegeForm key={draft.key+String(editing)} initial={draft} editing={editing} groups={groups} tags={w.data.tags} environment={w.environment} envEditable={envEditable} busy={busy}
    onSave={p=>save('catalog',p,editing?'Update Privilege':'Define Privilege').then(ok=>{if(ok)setShow(false);return ok;})} onCreateTag={tag=>save('tags',tag,'Add tag')} takenGroupIds={w.data.groups.map(g=>g.id)} onCreateGroup={group=>save('groups',group,'Create Group')} onCancel={()=>setShow(false)}/>}
   {!visible.length&&!show&&!container&&(definitions.length?<section className="panel empty-workspace"><h2>No privileges match</h2><p>Choose another tag, or all tags.</p></section>:<section className="panel empty-workspace"><h2>Define your first privilege</h2><p>A privilege is one thing your product allows or limits, such as a feature or a seat limit.</p>{canEdit&&<button className="btn primary" onClick={()=>begin()}>Define privilege</button>}</section>)}
-  {!show&&!container&&<>{groups.filter(g=>!g.parentId).map(groupRows)}{visible.filter(p=>!p.groupId).map(row)}</>}
+  {!show&&!container&&<>{groups.filter(g=>!g.parentId).map(groupRows)}{visible.some(p=>!p.groupId)&&<section className="catalog-group catalog-ungrouped" aria-label="Ungrouped privileges">{visible.filter(p=>!p.groupId).map(row)}</section>}</>}
  </>;
 }

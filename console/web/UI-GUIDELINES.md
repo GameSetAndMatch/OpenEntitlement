@@ -1,5 +1,7 @@
 # Console UI guidelines
 
+Visual decisions (tokens, type, shape, depth, light and dark) live in the [visual language](../../docs/design/visual-language.md). Every color comes from a token in `web/src/design.css`; never hard-code one.
+
 ## One way to do each thing
 
 Every task has exactly one entry point, shown only when it can be used:

@@ -5,6 +5,7 @@ import { actor, api, token, formatValue, type Meta, type Plan, type Details, typ
 import { EnvironmentNotice, ReasonChip, Value, ValueInput, ReasonProvider, ToastProvider, useReason, useToast } from "./ui.tsx";
 import { ContractsPanel } from "./contracts.tsx";
 import "./style.css";
+import "./design.css";
 import { ConfigurationPanel } from "./configuration.tsx";
 import { WorkspaceSetup } from "./setup.tsx";
 
@@ -89,7 +90,7 @@ function App() {
   const needsSetup = !loading && !error && meta?.capabilities.mutations && plans !== undefined && orgs.length === 0;
   return <div className="shell">
     <a className="skip-link" href="#workspace">Skip to workspace</a>
-    <aside><a className="brand" href="/"><img src="/logo.svg" alt="" width="32" height="32"/><span>OpenEntitlement<small>Service console</small></span></a><div className="nav-label">WORKSPACE</div>{sections.map((t) => <a aria-current={tab === t ? "page" : undefined} aria-label={t} className={`nav ${tab === t ? "active" : ""}`} href={`#/${t.toLowerCase()}`} key={t}>{t === "Organizations" ? "▦" : t === "Tiers" ? "▤" : t === "Audit" ? "◷" : "{ }"} <span>{t}</span></a>)}<div className="sidebar-footer"><button className="btn" onClick={() => setSettings(!settings)}>Settings</button></div></aside>
+    <aside><a className="brand" href="/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement<small>Service console</small></span></a><div className="nav-label">WORKSPACE</div>{sections.map((t) => <a aria-current={tab === t ? "page" : undefined} aria-label={t} className={`nav ${tab === t ? "active" : ""}`} href={`#/${t.toLowerCase()}`} key={t}>{t === "Organizations" ? "▦" : t === "Tiers" ? "▤" : t === "Audit" ? "◷" : "{ }"} <span>{t}</span></a>)}<div className="sidebar-footer"><button className="btn" onClick={() => setSettings(!settings)}>Settings</button></div></aside>
     <main id="workspace" tabIndex={-1}><header><span>Workspace <span className="muted">/ {tab}</span></span><span className="badge">{meta?.provider.name === "in-memory" ? "Temporary workspace" : "Service console"}</span></header>
       {settings && <section className="panel settings"><h2>Settings</h2><dl className="service-details"><div><dt>Storage</dt><dd>{meta?.provider.name === "postgres" ? "PostgreSQL" : meta?.provider.name ?? "Not connected"}</dd></div><div><dt>Protocol</dt><dd>OEREP v1</dd></div><div><dt>Specification</dt><dd>{meta?.specVersion ?? "Not connected"}</dd></div></dl><h3>Connection</h3><label>Admin bearer token<input type="password" value={adminToken} onChange={(e) => setAdminToken(e.target.value)}/></label><label>Audit actor<input value={who} onChange={(e) => setWho(e.target.value)}/></label><button className="btn primary" onClick={() => { token.set(adminToken); actor.set(who); setConnectionEpoch(n => n + 1); setLoading(true); setSettings(false); void load(); }}>Connect</button></section>}
       <div className="page-heading"><div><h1>{tab}</h1><p>{tab === "Organizations" ? "See what each customer can do, and why." : tab === "Tiers" ? "Set the access and limits included in each tier." : tab === "Audit" ? "Every change has an actor and a reason." : "Inspect your catalog and tier defaults as YAML."}</p></div></div>
