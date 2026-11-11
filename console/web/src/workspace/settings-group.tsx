@@ -1,9 +1,9 @@
 import { cloneElement,useId,type ReactElement,type ReactNode } from "react";
 
-/** One settings section: a heading, an optional sentence of purpose, then its rows. */
-export function Group({title,description,children}:{title:string;description?:string;children:ReactNode}){
+/** One settings section: an optional heading and sentence of purpose, then its rows. */
+export function Group({title,description,children}:{title?:string;description?:string;children:ReactNode}){
   const id=useId();
-  return <section className="settings-group" aria-labelledby={id}><h2 id={id}>{title}</h2>{description&&<p className="settings-purpose">{description}</p>}<div className="settings-rows">{children}</div></section>;
+  return <section className="settings-group" aria-labelledby={title?id:undefined}>{title&&<h2 id={id}>{title}</h2>}{description&&<p className="settings-purpose">{description}</p>}<div className="settings-rows">{children}</div></section>;
 }
 /** A row with a control: the name and one line of explanation on the left, the control on the right. */
 export function Row({label,description,children}:{label:string;description?:string;children:ReactElement<{id?:string;"aria-describedby"?:string}>|[ReactElement<{id?:string;"aria-describedby"?:string}>,...ReactNode[]]}){

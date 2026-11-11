@@ -82,24 +82,6 @@
 .workspace-menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
 .workspace-create { max-width: 560px; display: grid; gap: 16px; }
 .workspace-create > h1, .workspace-create > p { margin: 0; }
-/* Settings: grouped rows, like a system settings pane. Title and purpose sit beside
-   the rows when there is room, and above them when there is not. */
-.settings { container-type: inline-size; display: grid; gap: 40px; max-width: 980px; }
-.settings > .notice { margin: 0; }
-.settings-group { display: grid; gap: 12px; }
-.settings-group > header { display: block; height: auto; border: 0; font-size: inherit; }
-.settings-group > header h2 { margin: 0 0 4px; font-size: 17px; }
-.settings-group > header p { margin: 0; font-size: 14px; line-height: 1.5; max-width: 52ch; }
-@container (min-width: 760px) {
-  .settings-group { grid-template-columns: 240px minmax(0, 1fr); gap: 40px; align-items: start; }
-  .settings-group > header { padding-top: 14px; }
-}
-.settings-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; }
-.settings-card > form:not(.settings-row) { display: contents; }
-.settings-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: 56px; padding: 10px 16px; border-top: 1px solid var(--line); }
-.settings-card > :first-child, .settings-card > form:first-child > :first-child { border-top: 0; }
-.settings-label { min-width: 0; font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
-.settings-label small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--faint); }
 /* Settings: one column of sections. Each row names a setting (and one line of why) on the
    left, and holds its value and one action on the right. On narrow screens the right side
    wraps under the text. */
@@ -137,3 +119,16 @@
 }
 .tier-policy { margin-top: 40px; }
 .tier-policy .settings-group { padding-top: 0; border-top: 0; }
+
+/* Settings has its own sidebar. "Back to workspace" returns to the daily pages. */
+.settings-back { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 20px; padding: 6px 8px; border-radius: var(--radius-s); color: var(--muted); font-size: 14px; text-decoration: none; }
+.settings-back:hover { background: var(--fill); color: var(--ink); }
+.nav-heading { margin: 0 0 6px; padding: 0 12px; font-size: 12px; font-weight: 600; color: var(--faint); }
+.workspace-shell .settings-link { margin-top: auto; }
+.workspace-shell .settings-link + .sidebar-footer { margin-top: 0; }
+.settings-group > .settings-purpose:first-child { margin-top: 0; }
+@media (max-width: 760px) {
+  .settings-back { margin: 0; }
+  .nav-heading { display: none; }
+  .workspace-shell .settings-link { margin-top: 0; }
+}

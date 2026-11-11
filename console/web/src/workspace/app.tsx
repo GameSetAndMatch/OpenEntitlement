@@ -12,13 +12,28 @@ import { FormField } from "../form.tsx";
 import "./style.css";
 export interface Workspace {hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
-const pages=["Privilege Catalog","Tiers","Organizations","Configuration","Audit","Settings"];
+// The workspace's daily pages. Administration lives in Settings, which swaps the sidebar (as in Linear).
+const pages=[
+  {name:"Privilege Catalog",hash:"catalog",about:"What your product allows or limits."},
+  {name:"Tiers",hash:"tiers",about:"Build reusable offers from your privilege defaults."},
+  {name:"Organizations",hash:"organizations",about:"Assign access and record customer-specific terms."},
+];
+const settingsPages=[
+  {name:"Members",hash:"settings/members",about:"Who can manage this workspace."},
+  {name:"API keys",hash:"settings/api-keys",about:"Connect your application to this workspace."},
+  {name:"Plan",hash:"settings/plan",about:"What OpenEntitlement evaluates for this workspace."},
+  {name:"Configuration",hash:"settings/configuration",about:"A read-only YAML snapshot of this workspace."},
+  {name:"Audit log",hash:"settings/audit-log",about:"Every change records who made it and why."},
+];
+const allPages=[...pages,...settingsPages];
+// Links from before Settings had its own sidebar.
+const legacy:Record<string,string>={settings:"Members",configuration:"Configuration",audit:"Audit log"};
 // The last workspace this browser used. A convenience only: the list from the server decides access.
 const LAST_WORKSPACE="oe.workspace";
 function rememberedWorkspace(){try{return localStorage.getItem(LAST_WORKSPACE)??"";}catch{return "";}}
 function remember(id:string){try{if(id)localStorage.setItem(LAST_WORKSPACE,id);else localStorage.removeItem(LAST_WORKSPACE);}catch{/* storage unavailable */}}
 function pick(list:Array<{id:string}>,preferred=rememberedWorkspace()){return list.find(w=>w.id===preferred)?.id??list[0]?.id??"";}
-function currentPage(){const hash=location.hash.slice(1);if(hash==="catalog")return "Privilege Catalog";return pages.find(p=>p.toLowerCase()===hash)??"Privilege Catalog";}
+function currentPage(){const hash=location.hash.slice(1);return allPages.find(p=>p.hash===hash)?.name??legacy[hash]??"Privilege Catalog";}
 export function WorkspaceApp(){
   const [session,setSession]=useState<any>(),[ready,setReady]=useState(false),[error,setError]=useState("");
   const [list,setList]=useState<Array<{id:string;name:string;role:string}>>([]),[selected,setSelected]=useState(""),[workspace,setWorkspace]=useState<Workspace>(),[page,setPage]=useState(currentPage);
@@ -41,7 +56,7 @@ export function WorkspaceApp(){
     return()=>{active=false;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};},[selected]);
   useEffect(()=>{if(!selected)return;remember(selected);let active=true;setWorkspace(undefined);request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active)setWorkspace(value);}).catch(e=>{if(!active)return;if(isGone(e))void lostAccess(selected);else setError(e.message);});return()=>{active=false;};},[selected]);
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main")setPage(currentPage());};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
-  useEffect(()=>{if(page!=="Audit"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);
+  useEffect(()=>{if(page!=="Audit log"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);
   const save:Save=async(section,entry,title,method="PUT")=>{
     if(!workspace||savingRef.current)return false;savingRef.current=true;
     setBusy(true);setError("");
@@ -54,21 +69,28 @@ export function WorkspaceApp(){
   if(!session)return <main className="sign-in"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="48" height="48"/></picture><h1>Sign in to OpenEntitlement</h1><p>Manage your privileges, tiers, and customer access in one workspace.</p>{error&&<p role="alert" className="notice error">{error}</p>}<a className="btn primary" href="/auth/login">Sign in</a></main>;
   const current=list.find(w=>w.id===selected);
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
+  // API keys are an Owner's page; anyone else lands on Members instead.
+  const visibleSettings=settingsPages.filter(p=>p.name!=="API keys"||canEdit||!workspace);
+  const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canEdit))??settingsPages[0]!;
+  const inSettings=settingsPages.includes(shown);
+  const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
   return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>{setSelected(id);setError("");}} onCreate={()=>{setCreating(true);setError("");}}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
-    {selected&&!creating&&<nav aria-label="Workspace navigation">{pages.map(p=><a className={`nav ${page===p?"active":""}`} aria-current={page===p?"page":undefined} aria-label={p} href={`#${p==="Privilege Catalog"?"catalog":p.toLowerCase()}`} key={p}><span>{p}</span></a>)}</nav>}
+    {selected&&!creating&&(inSettings
+      ?<><a className="settings-back" href="#catalog"><span aria-hidden="true">‹</span> Back to workspace</a><nav aria-label="Settings"><p className="nav-heading" aria-hidden="true">Settings</p>{visibleSettings.map(link)}</nav></>
+      :<><nav aria-label="Workspace navigation">{pages.map(link)}</nav><a className="nav settings-link" href="#settings/members">Settings</a></>)}
     <div className="sidebar-footer"><p>{session.account.email}{session.account.platformAdmin&&<small>Platform administrator</small>}</p><button className="btn" onClick={()=>void request("/auth/logout","POST").then(()=>{resetIdentity();remember("");setCsrf("");setSession(undefined);setWorkspace(undefined);setSelected("");setCreating(false);setList([]);}).catch(e=>setError(e.message))}>Sign out</button></div></aside>
     <main id="workspace-main" tabIndex={-1}>
       {error&&<div role="alert" className="notice error">{error}{selected&&<button className="btn" onClick={()=>{setError("");void loadWorkspace(selected).catch(e=>{if(isGone(e))void lostAccess(selected);else setError(e.message);});}}>Refresh workspace</button>}</div>}
       {invite&&<section className="panel invitation"><h2>You have a workspace invitation</h2><p>Join using the verified email address you signed in with.</p><button className="btn primary" disabled={busy} onClick={()=>void accept()}>Join workspace</button><button className="btn" disabled={busy} onClick={()=>{sessionStorage.removeItem("oe.invite");setInvite("");setError("");}}>Dismiss invitation</button></section>}
       {(creating||!selected)&&<form className="panel workspace-create" onSubmit={e=>{e.preventDefault();void create();}}><h1>Create a workspace</h1><p>A workspace holds one product’s privileges, tiers and Organizations. To join an existing one, open the invitation link its Owner sent you.</p><FormField label="Workspace name"><input required autoFocus={creating} maxLength={200} value={name} onChange={e=>setName(e.target.value)} /></FormField><div className="form-actions">{selected&&<button type="button" className="btn" onClick={()=>{setCreating(false);requestAnimationFrame(()=>document.querySelector<HTMLElement>(".workspace-trigger")?.focus());}}>Cancel</button>}<button className="btn primary" disabled={busy}>{busy?"Creating…":"Create workspace"}</button></div></form>}
       {selected&&!creating&&!workspace&&!error&&<p role="status" className="notice">Loading workspace…</p>}
-      {workspace&&!creating&&<><div className="page-heading"><div><h1>{page}</h1><p>{page==="Privilege Catalog"?"What your product allows or limits.":page==="Tiers"?"Build reusable offers from your privilege defaults.":page==="Organizations"?"Assign access and record customer-specific terms.":page==="Audit"?"Every change records who made it and why.":page==="Configuration"?"A read-only YAML snapshot of this workspace.":"Manage workspace access and application credentials."}</p></div></div>
-      {page==="Privilege Catalog"&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
-      {page==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
-      {page==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
-      {page==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
-      {page==="Settings"&&<WorkspaceSettings key={workspace.id} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
-      {page==="Audit"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
+      {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
+      {shown.name==="Privilege Catalog"&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
+      {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
+      {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
+      {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
+      {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Plan")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
+      {shown.name==="Audit log"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
       </>}
     </main></div>;
 }
