@@ -6,7 +6,7 @@
 .workspace-shell nav { margin-top: 12px; }
 .workspace-shell .workspace-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
 .workspace-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 16px; margin-bottom: 24px; }
-.workspace-card { display: grid; gap: 10px; text-align: left; padding: 22px; background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+.workspace-card { display: grid; gap: 10px; text-align: left; padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
 .workspace-card:hover { border-color: var(--accent); }
 .workspace-card small { color: var(--muted); }
 .workspace-card span { font-size: 13px; color: var(--accent-dark); }
@@ -16,7 +16,7 @@
 .workspace-form form { margin: 28px 0; }
 .workspace-progress { display: flex; flex-wrap: wrap; gap: 24px; margin: 0 0 28px; padding: 16px 24px; color: var(--muted); border-bottom: 1px solid var(--line); font-size: 13px; }
 .workspace-progress .current { color: var(--accent-dark); font-weight: 650; }
-.catalog-group { border: 1px solid var(--line); background: #fff; border-radius: 6px; margin-bottom: 24px; }
+.catalog-group { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; margin-bottom: 24px; }
 .catalog-group .catalog-group { margin: 0 20px 20px; }
 .catalog-group .section-title p { margin: 8px 0 0; font-size: 14px; }
 .catalog-feature { display: grid; grid-template-columns: minmax(0,1fr) 120px auto; gap: 20px; align-items: center; padding: 20px 24px; border-top: 1px solid var(--line); }
@@ -27,7 +27,7 @@
 .empty-note { padding: 8px 24px 24px; font-size: 14px; }
 .default-field { margin: 24px 0; max-width: 320px; }
 .default-field>span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
-.inherited-value { padding: 12px; background: #f3f6f8; border: 1px dashed #b5c6ce; border-radius: 5px; }
+.inherited-value { padding: 12px; background: var(--fill); border: 1px dashed var(--line-strong); border-radius: 5px; }
 .inherited-value small { color: var(--muted); display: block; margin-top: 5px; }
 .workspace-values .setup-value p { font-size: 13px; margin-bottom: 4px; }
 .workspace-values code { display: block; margin-top: 6px; }
@@ -44,7 +44,7 @@
   .catalog-group .catalog-group { margin: 0 10px 16px; }
 }
 
-.catalog-feature-block { background: #fff; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
+.catalog-feature-block { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
 .catalog-group .catalog-feature-block { border-inline: 0; border-radius: 0; }
 
 .workspace-card { min-width: 0; }
@@ -54,10 +54,10 @@
 .privilege-tags { margin:20px 0; }
 .tag-field-title { display:block; font-weight:600; margin-bottom:8px; }
 .selected-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-.tag-chip { border:1px solid #b9dcd6; border-radius:20px; background:#e2f3ef; color:#145b51; padding:5px 10px; font:inherit; font-size:13px; cursor:pointer; }
+.tag-chip { border:1px solid transparent; border-radius:20px; background:var(--accent-soft); color:var(--accent-ink); padding:5px 10px; font:inherit; font-size:13px; cursor:pointer; }
 .tag-picker { position:relative; max-width:360px; }
 .tag-picker summary { cursor:pointer; display:list-item; color:var(--accent-dark); font-size:14px; padding:8px 0; }
-.tag-popover { border:1px solid var(--line); padding:14px; border-radius:8px; background:white; box-shadow:0 6px 20px #182f4014; }
+.tag-popover { border:1px solid var(--line); padding:14px; border-radius:8px; background:var(--surface); box-shadow:0 6px 20px var(--shadow-color); }
 .tag-popover label { display:block; }
 .tag-popover input:not([type=checkbox]) { width:100%; margin-top:8px; }
 .tag-options { max-height:220px; overflow:auto; margin:10px 0; }

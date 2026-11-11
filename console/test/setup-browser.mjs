@@ -94,7 +94,9 @@ try {
     await checkbox.check();
     assert.equal(await input.isDisabled(), true);
     assert.equal(await input.inputValue(), '∞');
-    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(237, 241, 244)');
+    // A disabled value uses the quiet fill token, distinct from an editable surface.
+    const fill = await page.evaluate(() => { const probe = document.body.appendChild(document.createElement('div')); probe.style.background = 'var(--fill)'; const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; });
+    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), fill);
     await checkbox.focus(); await page.keyboard.press('Space');
     assert.equal(await input.isEnabled(), true);
     assert.equal(await input.inputValue(), '25');

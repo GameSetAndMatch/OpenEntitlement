@@ -1,0 +1,157 @@
+/*
+ * OpenEntitlement visual language. See docs/design/visual-language.md.
+ *
+ * Reduction first: one accent, quiet hairlines instead of boxes, type that does
+ * the work of hierarchy, and space instead of decoration. Every color is a token,
+ * so light and dark come from the same rules.
+ */
+:root {
+  --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --canvas: #f6f6f4;
+  --surface: #ffffff;
+  --fill: #f0f0ed;
+  --ink: #16181b;
+  --muted: #62666d;
+  --faint: #8d9198;
+  --line: rgb(22 24 27 / 8%);
+  --line-strong: rgb(22 24 27 / 16%);
+  --accent: #0f766e;
+  --accent-ink: #0b5f58;
+  --accent-hover: #0b5f58;
+  --accent-soft: rgb(15 118 110 / 9%);
+  --accent-disabled: rgb(15 118 110 / 35%);
+  --on-accent: #ffffff;
+  --danger: #b42318;
+  --danger-soft: rgb(180 35 24 / 8%);
+  --warn: #93370d;
+  --warn-soft: rgb(220 104 3 / 10%);
+  --scrim: rgb(10 12 14 / 40%);
+  --shadow-color: rgb(22 24 27 / 6%);
+  --shadow: 0 1px 1px rgb(22 24 27 / 3%), 0 12px 32px -12px rgb(22 24 27 / 10%);
+
+  --radius-s: 8px;
+  --radius: 10px;
+  --radius-l: 16px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --speed: 160ms;
+
+  /* Kept for components written against the first palette. */
+  --accent-dark: var(--accent-ink);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0f1011;
+    --surface: #17181a;
+    --fill: #202124;
+    --ink: #f1f1ef;
+    --muted: #a3a6ab;
+    --faint: #75797f;
+    --line: rgb(255 255 255 / 8%);
+    --line-strong: rgb(255 255 255 / 16%);
+    --accent: #3cbfae;
+    --accent-ink: #6fd6c8;
+    --accent-hover: #5ccdbf;
+    --accent-soft: rgb(60 191 174 / 13%);
+    --accent-disabled: rgb(60 191 174 / 30%);
+    --on-accent: #06201d;
+    --danger: #f97066;
+    --danger-soft: rgb(249 112 102 / 12%);
+    --warn: #fdb022;
+    --warn-soft: rgb(253 176 34 / 12%);
+    --scrim: rgb(0 0 0 / 60%);
+    --shadow-color: rgb(0 0 0 / 40%);
+    --shadow: 0 1px 1px rgb(0 0 0 / 30%), 0 16px 40px -16px rgb(0 0 0 / 60%);
+    color-scheme: dark;
+  }
+}
+
+/* Type: one family, few sizes, weight and space for hierarchy. */
+html body { background: var(--canvas); color: var(--ink); line-height: 1.5; text-rendering: optimizeLegibility; }
+html h1 { font-size: clamp(28px, 3.2vw, 36px); font-weight: 600; letter-spacing: -.022em; line-height: 1.1; margin: 0 0 10px; }
+html h2 { font-size: 19px; font-weight: 600; letter-spacing: -.012em; line-height: 1.25; }
+html h3 { font-size: 15px; font-weight: 600; letter-spacing: -.006em; }
+html p { color: var(--muted); line-height: 1.6; }
+html code { font-family: var(--mono); color: var(--muted); }
+html a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+html ::selection { background: var(--accent-soft); }
+html :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Shell: the sidebar recedes; the content is the interface. */
+html aside { background: var(--canvas); border-right: 1px solid var(--line); padding: 24px 14px; }
+html .brand { font-weight: 600; font-size: 15px; letter-spacing: -.01em; gap: 10px; }
+html .brand img { width: 28px; height: 28px; }
+html .brand small { color: var(--faint); font-size: 12px; }
+html .workspace-shell .workspace-picker { margin: 28px 2px 8px; font-weight: 500; color: var(--faint); font-size: 12px; }
+html .workspace-shell nav { margin-top: 16px; }
+html .nav { padding: 8px 12px; margin: 2px 0; border-radius: var(--radius-s); color: var(--muted); font-size: 14px; transition: background var(--speed) var(--ease), color var(--speed) var(--ease); }
+html .nav:hover { background: var(--fill); color: var(--ink); }
+html .nav.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color); }
+html .sidebar-footer { color: var(--faint); }
+html main { padding: 56px 48px 48px; max-width: 1180px; }
+html .page-heading { margin: 0 0 32px; }
+html .skip-link { top: 12px; transform: translateY(-200%); background: var(--surface); color: var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); }
+html .skip-link:focus { transform: none; }
+html .catalog-ungrouped > .catalog-feature:first-child { border-top: 0; }
+html .brand picture { display: contents; }
+html main.sign-in { padding: 32px; max-width: 420px; margin: 18vh auto 0; }
+html main.sign-in h1 { margin-top: 28px; }
+html .page-heading p { font-size: 16px; margin: 0; }
+
+/* Surfaces: hairline, generous radius, no heavy borders. */
+html .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow); }
+html .catalog-group, html .catalog-feature-block, html .workspace-card { background: var(--surface); border-color: var(--line); border-radius: var(--radius-l); }
+html .catalog-feature, html .variant-row, html td { border-color: var(--line); }
+html .workspace-card { box-shadow: var(--shadow); transition: border-color var(--speed) var(--ease), transform var(--speed) var(--ease); }
+html .workspace-card:hover { border-color: var(--line-strong); }
+html .empty-workspace { padding: 40px; text-align: left; }
+html .empty-workspace h2 { font-size: 22px; letter-spacing: -.016em; }
+html .empty-workspace p { margin: 8px 0 24px; font-size: 15px; }
+
+/* Controls: one primary per view, quiet secondaries. */
+html .btn { min-height: 36px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 500; letter-spacing: -.005em; transition: background var(--speed) var(--ease), border-color var(--speed) var(--ease), transform var(--speed) var(--ease); }
+html .btn:hover:not(:disabled) { background: var(--fill); border-color: var(--line-strong); }
+html .btn:active:not(:disabled) { transform: scale(.98); }
+html .btn.primary { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+html .btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+html .btn:disabled { background: var(--fill); color: var(--faint); border-color: transparent; }
+html .btn.primary:disabled { background: var(--accent-disabled); color: var(--on-accent); }
+html input:where(:not([type=checkbox]):not([type=radio])), html select, html textarea, html .input { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 9px 12px; transition: border-color var(--speed) var(--ease), box-shadow var(--speed) var(--ease); }
+html input:where(:not([type=checkbox]):not([type=radio])):hover, html select:hover, html textarea:hover { border-color: var(--faint); }
+html input:where(:not([type=checkbox]):not([type=radio])):focus, html select:focus, html textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+html input:disabled, html select:disabled, html textarea:disabled { background: var(--fill); color: var(--faint); }
+html label, html .field-label, html label.field-label { font-weight: 500; }
+
+/* Tables: no fills; alignment and hairlines carry the structure. */
+html th { background: transparent; color: var(--faint); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--line); }
+html td { border-bottom: 1px solid var(--line); }
+
+/* Forms. */
+html .form-header h2 { font-size: 22px; letter-spacing: -.016em; }
+html .form-section > legend { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+html .form-actions { background: transparent; }
+
+/* Feedback. */
+html .notice { background: var(--fill); color: var(--ink); border-radius: var(--radius); }
+html .notice.error { background: var(--danger-soft); color: var(--danger); }
+html .toast { background: var(--ink); color: var(--canvas); border-radius: 999px; padding: 10px 18px; box-shadow: var(--shadow); font-size: 14px; }
+html .toast-err { background: var(--danger); color: var(--surface); }
+html .modal-backdrop { background: var(--surface); color: var(--ink); border-radius: var(--radius-l); box-shadow: var(--shadow); }
+html .modal { background: var(--surface); }
+html .badge, html .chip { background: var(--fill); color: var(--muted); border: 0; border-radius: 999px; }
+html .tag-chip { background: var(--accent-soft); color: var(--accent-ink); border: 0; }
+html .toggle-track { background: var(--line-strong); border-color: transparent; }
+html .toggle.on .toggle-track { background: var(--accent); }
+
+@media (max-width: 760px) {
+  html main { padding: 28px 16px 32px; }
+  html .page-heading { margin: 0 0 20px; }
+  html .empty-workspace { padding: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html .btn:active:not(:disabled) { transform: none; }
+}
