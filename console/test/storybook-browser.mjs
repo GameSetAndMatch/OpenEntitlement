@@ -25,7 +25,7 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
  assert.equal(await page.getByText('Reports',{exact:true}).count(),0);
  assert.equal(await page.getByText('Scheduled exports',{exact:true}).count(),0);
  assert.equal(await page.locator('#error-stack').isVisible(),false);
- for(const width of [1280,390]){
+ for(const width of [1280,390,360]){
   await page.setViewportSize({width,height:900});
   for(const story of ['key-from-title','negative-integer','enum-choices','boolean-for-administrator']){
    await page.goto(`${origin}/iframe.html?id=privilege-catalog-privilege-form--${story}&viewMode=story`);

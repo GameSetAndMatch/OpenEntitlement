@@ -192,7 +192,7 @@ input::placeholder, textarea::placeholder { color: #8797a3; }
 .form-header { padding: 28px 32px 4px; }
 .form-header h2 { margin: 0 0 4px; }
 .form-header p { margin: 0; font-size: 14px; }
-.form-section { display: grid; gap: 20px; min-width: 0; margin: 0; padding: 24px 32px; border: 0; border-top: 1px solid var(--line); }
+.form-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; margin: 0; padding: 24px 32px; border: 0; border-top: 1px solid var(--line); }
 .form-header + .form-section { border-top: 0; }
 .form-section > legend { float: left; width: 100%; padding: 0; margin: 0; font-size: 15px; font-weight: 650; color: var(--ink); }
 .form-section > .section-hint { margin: -12px 0 0; font-size: 13px; line-height: 1.5; }
@@ -255,7 +255,7 @@ fieldset.bare { min-width: 0; margin: 8px 0 0; padding: 0; border: 0; }
 .folder-icon { flex: none; width: 16px; height: 16px; color: #7b9aa8; }
 .group-option[aria-current="true"] .folder-icon { color: var(--accent); }
 .group-new { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 8px; }
-.group-new > input { flex: 1; width: auto; min-width: 0; margin: 0; padding: 6px 10px; }
+.group-new > input { flex: 1; width: 0; min-width: 0; margin: 0; padding: 6px 10px; }
 .group-new > .btn { min-height: 34px; padding: 6px 12px; }
 .group-popover > .btn-link { margin: 6px 0 0 8px; }
 .group-popover > .field-error { margin: 6px 8px 0; }
