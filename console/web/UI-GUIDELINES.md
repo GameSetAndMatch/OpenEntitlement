@@ -11,6 +11,8 @@ Every task has exactly one entry point, shown only when it can be used:
 - While a form is open, it is the only thing on the page. Hide the list and the page's create button until the person saves or cancels.
 - Settings has its own sidebar (Members, API keys, Service, Configuration, Audit log), opened from the one Settings link and left with "Back to workspace". The main sidebar keeps only daily work: Privilege Catalog, Tiers and Organizations.
 - Do not repeat information. The page title, workspace switcher and sidebar already say where the person is and what role they have, so there is no breadcrumb bar or role badge. Each value appears once (a member's role is the role control itself).
+- Ask for a reason only where the record needs one: changes to an Organization's own terms and to user terms and grants. Everything else saves directly and is audited with its actor. Removing a member or revoking a key asks to confirm, without a reason.
+- Each thing has one direct way to create it. A Group is created with "New group" on the Catalog, or named in place from the Group picker while defining a Privilege.
 - Keep the person where they were. The console reopens the last workspace this browser used. Switching and creating workspaces live behind the workspace mark at the top left, not on a page of their own.
 - No manual refresh buttons. Pages reload their data when the window regains focus.
 - One export format action per page (Download YAML). Copying is available from the shown text.

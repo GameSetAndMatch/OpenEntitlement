@@ -66,6 +66,12 @@ test("workspace HTTP authorization, RLS, invitations, keys, optimistic locking a
     await put("variants",{id:"pro",name:"Pro",tierId:"pro",kind:"standard",values:{retention:"30d"}});
     await put("variants",{id:"pro_grace",name:"Pro grace",tierId:"pro",kind:"grace",values:{retention:"30d",max_exports:1}});
     await put("organizations",{id:"acme",name:"Acme",variantId:"pro",terms:{max_exports:25}});
+    // A reason is required only for contract terms: renaming keeps the terms, so none is needed; changing a term needs one.
+    const bare=async(section:string,entry:unknown)=>{const result=await call(path+"/"+section,a,{revision,entry},"PUT");if(result.status===200)revision=result.data.revision;return result;};
+    assert.equal((await bare("organizations",{id:"acme",name:"Acme Inc",variantId:"pro",terms:{max_exports:25}})).status,200);
+    const noReason=await bare("organizations",{id:"acme",name:"Acme Inc",variantId:"pro",terms:{max_exports:26}});assert.equal(noReason.status,400);assert.match(noReason.data.error??JSON.stringify(noReason.data),/reason/i);
+    const subjectNoReason=await bare("subjects",{organizationId:"acme",subjectId:"nobody",name:"Nobody",variantId:"pro",terms:{},grants:{}});assert.equal(subjectNoReason.status,400);assert.match(JSON.stringify(subjectNoReason.data),/reason for changing contract terms/);
+    await put("organizations",{id:"acme",name:"Acme",variantId:"pro",terms:{max_exports:25}});
     assert.equal((await call(path+"/evaluate",u,{organizationId:"acme",privilege:"max_exports"})).data.value,25);
     const alice={organizationId:"acme",subjectId:"external|alice",name:"Alice",terms:{max_exports:30},grants:{max_exports:5}};
     await put("subjects",alice);

@@ -4,14 +4,14 @@ import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
 import { stringify } from "yaml";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
-import { useReason,useToast } from "../ui.tsx";
+import { useConfirm,useToast } from "../ui.tsx";
 export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
   useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
-  const ask=useReason(),toast=useToast();
+  const confirm=useConfirm(),toast=useToast();
   const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||w.role==="Manager";
   const base=`/api/workspaces/${w.id}`;
   // Every load takes a generation number; only the newest one may update the lists.
@@ -23,7 +23,8 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     const onFocus=()=>{if(document.visibilityState==="visible")void refresh();};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
   },[base,manager,owner]); // load reads exactly base, manager and owner
-  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);try{const reason=await ask(label);if(!reason)return;setError("");const result=await action(reason);if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
+  // Settings changes are audited with their actor; only removals ask to confirm.
+  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);try{if(ask&&!await confirm(label))return;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
   const tierChanged=hostedTier!==(w.hosting?.tier??"pro");
   const roleSelect=(m:{id:string;email:string;role:string})=><select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>;
   const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
@@ -31,7 +32,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     {section==="Members"&&<><Group description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}>
       {manager&&members.map(m=><Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span><span className="member-email">{m.email}</span>{m.id===account.id&&<span className="member-you">You</span>}</span>}>
         {owner?roleSelect(m):<span className="settings-value">{m.role}</span>}
-        {(owner||m.role!=="Owner")&&<button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate("Remove workspace member",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}})}>Remove</button>}
+        {(owner||m.role!=="Owner")&&<button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate(`Remove ${m.email} from this workspace?`,async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}},true)}>Remove</button>}
       </Item>)}
     </Group>
     {manager&&<Group title="Invite a member" description="They get a link that expires in 7 days.">
@@ -42,7 +43,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     </Group>}</>}
     {section==="API keys"&&owner&&<><Group description="Your application evaluates entitlements in this workspace with these keys.">
       <Item label="Workspace ID" description="Identifies this workspace in the API and in support requests."><code className="settings-value">{w.id}</code><button className="btn-quiet" onClick={()=>copy(w.id,"Workspace ID copied")}>Copy</button></Item>
-      {keys.map(k=><Item key={k.id} label={k.name} description={<><code>{k.prefix}…</code> · {k.revoked?"Revoked":k.scope}</>}>{!k.revoked&&<button className="btn-quiet danger" disabled={locked} aria-label={`Revoke ${k.name}`} onClick={()=>void mutate("Revoke API key",async reason=>{await request(base+"/keys/"+k.id,"DELETE",{reason});})}>Revoke</button>}</Item>)}
+      {keys.map(k=><Item key={k.id} label={k.name} description={<><code>{k.prefix}…</code> · {k.revoked?"Revoked":k.scope}</>}>{!k.revoked&&<button className="btn-quiet danger" disabled={locked} aria-label={`Revoke ${k.name}`} onClick={()=>void mutate(`Revoke ${k.name}? Applications using it stop working.`,async reason=>{await request(base+"/keys/"+k.id,"DELETE",{reason});},true)}>Revoke</button>}</Item>)}
     </Group>
     <Group title="Create a key">
       <form aria-label="Create an evaluation key" onSubmit={e=>{e.preventDefault();void mutate("Create evaluation key",async reason=>{const result=await request(base+"/keys","POST",{name,scope:"evaluate",reason});setSecret(result.secret);setName("");});}}>

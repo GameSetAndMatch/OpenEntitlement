@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readJson, send } from "../http.ts";
 import { Authentication } from "./auth.ts";
 import { WorkspaceStore } from "./store.ts";
-import { WorkspaceError, object, text, group, feature, privilege, tag, tier, variant, organization, resolve, catalogEnvironment, type StatusPolicy } from "./model.ts";
+import { WorkspaceError, object, text, group, feature, privilege, tag, tier, variant, organization, resolve, catalogEnvironment, changesContractTerms, type StatusPolicy } from "./model.ts";
 
 export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:NodeJS.ProcessEnv={...process.env}) {
   const mode=deploymentMode(env);
@@ -42,7 +42,8 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     if (path === "/api/session" && method === "GET") { send(res,200,{account,csrf:session.csrf});return true; }
     if (path === "/api/workspaces" && method === "GET") { send(res,200,await store.list(account));return true; }
     const body=method === "GET" ? {} : object(await readJson(req));
-    const reason=() => text(body.reason,"Reason",2000);
+    // A reason is optional, except for contract terms (checked in the change below).
+    const reason=() => typeof body.reason==="string"&&body.reason.trim() ? text(body.reason,"Reason",2000) : "";
     if (path === "/api/workspaces" && method === "POST") { const created=view(await store.create(account,text(body.name,"Workspace name"),reason()));productEvent(account.id,"workspace_created",{workspace_id:created.id});send(res,201,created);return true; }
     if (path === "/api/invitations/accept" && method === "POST") { const accepted=await store.acceptInvite(account,text(body.token,"Invitation token"));productEvent(account.id,"invitation_accepted");send(res,200,accepted);return true; }
     const match=/^\/api\/workspaces\/([^/]+)(?:\/(groups|tags|catalog|features|privileges|tiers|variants|organizations|policy|audit|members|invitations|keys|evaluate|subjects|hosting))?(?:\/([^/]+))?$/.exec(path);
@@ -73,8 +74,10 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     if ((method !== "PUT" && !(method === "DELETE" && section === "subjects")) || !["groups","tags","catalog","features","privileges","tiers","variants","organizations","policy","subjects","hosting"].includes(section ?? "")) throw new WorkspaceError("Method not allowed",405);
     if (!Number.isSafeInteger(body.revision) || body.revision < 1) throw new WorkspaceError("Current workspace revision is required");
     const action=section==="hosting"?"hosting:write":section==="subjects"?"contracts:write":section === "groups" || section === "tags" || section === "catalog" || section === "features" || section === "privileges" ? "catalog:write" : section === "organizations" ? "contracts:write" : section === "policy" ? "contracts:write" : "tiers:write";
-    const changed=await store.change(account,id!,action,reason(),body.revision,data => {
+    const changeReason=reason();
+    const changed=await store.change(account,id!,action,changeReason,body.revision,data => {
       let entry=body.entry;
+      if(!changeReason&&changesContractTerms(data,section!,entry))throw new WorkspaceError("Add a reason for changing contract terms");
       if(section==='hosting'){
         if(mode!=='saas')throw new WorkspaceError('Cloud service tiers apply only to SaaS deployments');
         const b=object(entry);if(Object.keys(b).some(k=>k!=='tier')||!['pro','enterprise'].includes(b.tier))throw new WorkspaceError('Choose Cloud Pro or Enterprise');
