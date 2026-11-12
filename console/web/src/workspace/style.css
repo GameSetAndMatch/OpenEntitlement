@@ -29,6 +29,9 @@
 .default-field>span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 .inherited-value { padding: 12px; background: var(--fill); border: 1px dashed var(--line-strong); border-radius: 5px; }
 .inherited-value small { color: var(--muted); display: block; margin-top: 5px; }
+/* Each value row is a <fieldset> (for its disabled state); drop the browser's fieldset frame and keep one divider. */
+.workspace-values > .setup-value { margin: 0; padding-left: 0; padding-right: 0; min-width: 0; border-width: 0 0 1px; border-style: solid; border-color: var(--line); }
+.workspace-values > .setup-value:last-child { border-bottom: 0; }
 .workspace-values .setup-value p { font-size: 13px; margin-bottom: 4px; }
 .workspace-values code { display: block; margin-top: 6px; }
 .variant-row { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 20px 24px; border-top: 1px solid var(--line); }
@@ -141,3 +144,16 @@
   .nav-heading { display: none; }
   .workspace-shell .settings-link { margin-top: 0; }
 }
+
+/* Creating a tier: review its values, then offer a trial and a grace period. */
+.tier-review { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tier-review th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); }
+.tier-review td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.tier-review td code { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.tier-review td:last-child { color: var(--muted); white-space: nowrap; }
+.tier-next-list { list-style: none; margin: 0; padding: 0; }
+.tier-next-list li:first-child { border-top: 0; padding-top: 0; }
+.tier-next-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; padding: 14px 0; border-top: 1px solid var(--line); }
+.tier-next-list li > div { flex: 1 1 240px; display: grid; gap: 2px; }
+.tier-next-list small { color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { .tier-review td:last-child { white-space: normal; } }

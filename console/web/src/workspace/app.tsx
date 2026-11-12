@@ -41,6 +41,8 @@ export function WorkspaceApp(){
   const [invite,setInvite]=useState(()=>{const incoming=location.hash.startsWith("#invite=")?location.hash.slice(8):"";if(incoming){sessionStorage.setItem("oe.invite",incoming);history.replaceState(null,"","/app/");}return incoming||sessionStorage.getItem("oe.invite")||"";});
   const savingRef=useRef(false);
   const selectedRef=useRef(selected);selectedRef.current=selected;
+  // Saves read the newest revision, so a flow can save twice in a row (a tier, then its first variant).
+  const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const ask=useReason(),toast=useToast();
   async function loadList(){const data=await request<typeof list>("/api/workspaces");setList(data);return data;}
   async function loadWorkspace(id:string){setWorkspace(undefined);const next=await request<Workspace>(`/api/workspaces/${id}`);if(selectedRef.current===id)setWorkspace(next);}
@@ -61,9 +63,10 @@ export function WorkspaceApp(){
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;setPage(currentPage());}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit log"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>setError(e.message));return()=>{active=false;};},[page,workspace]);
   const save:Save=async(section,entry,title,method="PUT")=>{
+    const workspace=workspaceRef.current;
     if(!workspace||savingRef.current)return false;savingRef.current=true;
     setBusy(true);setError("");
-    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
+    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
     catch(e){setError((e as Error).message);return false;}finally{savingRef.current=false;setBusy(false);}
   };
   async function create(){setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name});await loadList();setSelected(value.id);setCreating(false);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
