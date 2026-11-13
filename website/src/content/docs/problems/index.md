@@ -29,7 +29,16 @@ The Python service returns these types. It is in development on the `service/pyt
 | Type | Status | Meaning |
 |---|---|---|
 | [`validation-failed`](/problems/validation-failed/) | 400 | The request body or parameters are not valid. |
-| [`not-found`](/problems/not-found/) | 404 | Nothing exists at the requested address. |
+| [`sign-in-required`](/problems/sign-in-required/) | 401 | The request needs a signed-in session. |
+| [`sign-in-failed`](/problems/sign-in-failed/) | 401 | The OpenID Connect sign-in could not be completed. |
+| [`sign-in-refused`](/problems/sign-in-refused/) | 403 | The identity may not sign in here. |
+| [`csrf-rejected`](/problems/csrf-rejected/) | 403 | A change did not come from the console. |
+| [`permission-denied`](/problems/permission-denied/) | 403 | The Role does not allow this action. |
+| [`not-found`](/problems/not-found/) | 404 | Nothing exists at the requested address, or you cannot see it. |
 | [`method-not-allowed`](/problems/method-not-allowed/) | 405 | The address exists but does not accept this HTTP method. |
+| [`already-exists`](/problems/already-exists/) | 409 | Another record already uses this unique key. |
+| [`revision-conflict`](/problems/revision-conflict/) | 409 | The record changed since it was read. |
+| [`product-in-use`](/problems/product-in-use/) | 409 | Customers use the Product, so it can only be archived. |
+| [`last-product`](/problems/last-product/) | 409 | A Workspace keeps at least one Product. |
 | [`internal-error`](/problems/internal-error/) | 500 | The service failed unexpectedly. |
-| [`service-unavailable`](/problems/service-unavailable/) | 503 | The service cannot reach its database. |
+| [`service-unavailable`](/problems/service-unavailable/) | 503 | The service cannot reach its database, or sign-in is not configured. |
