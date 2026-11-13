@@ -1,6 +1,6 @@
 ---
 name: implement-train
-description: Run the work train for a spec: build its tickets one PR each, review with Codex, merge, and start the next until every ticket is done.
+description: "Run the work train for a spec: build its tickets one PR each, review with Codex, merge, and start the next until every ticket is done."
 disable-model-invocation: true
 ---
 # Implement train
@@ -14,8 +14,8 @@ The argument names the spec: a Linear project whose description is the spec, and
 ## Steps
 
 1. **Load the graph.** Read the spec, every open ticket with its blocking links, and the decisions they cite (AGENTS.md, GLOSSARY.md, ADRs, RFCs). The tickets are a task graph. Done when you can name the **frontier**: every open ticket whose blockers are all Done.
-2. **Pick the base.** Spec tickets merge into the integration branch the spec names; create it from `main` if it is missing. A ticket outside the spec targets `main`. Done when the base exists on `origin`.
-3. **Dispatch the frontier.** For each frontier ticket, up to the parallel limit (two agents unless the person says otherwise), start an implementer with `delegate_task` (`isolation: "worktree"`, async) and the brief in [BRIEF.md](BRIEF.md). Move the ticket to In Progress. Done when every frontier ticket has an implementer or waits only on the limit.
+2. **Pick the base.** Spec tickets merge into the integration branch the spec names; create it from `main` if it is missing. The **closing ticket** (the one that merges the integration branch into `main`) and any ticket outside the spec target `main`. Done when the base exists on `origin`.
+3. **Dispatch the frontier.** For each frontier ticket except the closing ticket, up to the parallel limit (two agents unless the person says otherwise), start an implementer with `delegate_task` (`isolation: "worktree"`, async) and the brief in [BRIEF.md](BRIEF.md). Move the ticket to In Progress. Done when every frontier ticket has an implementer or waits only on the limit.
 4. **Gate.** When an implementer reports back, check GitHub yourself:
    - the pull request targets the base from step 2;
    - the latest Codex review comment says "OK to merge" for the current head SHA;
@@ -27,7 +27,7 @@ The argument names the spec: a Linear project whose description is the spec, and
 7. **Repeat** from step 3 with the new frontier.
 8. **Close the spec.** When only the ticket that merges the integration branch into `main` is left:
    1. run the `code-review` skill on the whole integration branch against `main`, and fix its findings through one more ticket;
-   2. run the final ticket through the same gate, which merges the integration branch into `main`;
+   2. open the closing ticket's pull request from the integration branch into `main`, with the same Codex review loop as the brief (steps 7 and 8), and run it through the gate with `main` as its base; its merge moves it to Done;
    3. run Matt Pocock's `retro` skill on the train.
 
    Done when every spec ticket is Done and the integration branch is merged.
