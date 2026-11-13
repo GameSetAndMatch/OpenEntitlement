@@ -137,7 +137,7 @@ export function WorkspaceApp(){
       {selected&&!creating&&!workspace&&!error.message&&<p role="status" className="notice">Loading workspace…</p>}
       {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
       {shown.name==="Privilege Catalog"&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
-      {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
+      {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy} leave={leave}/>}
       {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
       {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}

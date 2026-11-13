@@ -79,7 +79,13 @@ try{
  await page.getByText('Simulated failure').first().waitFor();
  await review.getByRole('button',{name:'Create tier',exact:true}).click();
  const ready=page.getByRole('region',{name:'Pro is ready'});await ready.waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await noDialog();assert.equal(await ready.getByRole('button',{name:'Add a free trial',exact:true}).count(),1);
- await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro grace period');assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');await page.getByLabel('Grace period (days)').fill('5');await save('Save variant');
+ await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro grace period');assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');
+ // Changing only the grace days is a change too: leaving asks, Keep editing keeps the days, and the saved days clear it.
+ {const holds=()=>page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),days=page.getByLabel('Grace period (days)'),leaving=page.getByRole('dialog',{name:'Discard your changes?'});
+  assert.equal(await holds(),false);await days.fill('6');assert.equal(await holds(),true,'Changed grace days hold the tab');
+  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await leaving.getByRole('button',{name:'Keep editing',exact:true}).click();await leaving.waitFor({state:'hidden'});
+  assert.equal(await days.inputValue(),'6');assert.equal(new URL(page.url()).hash,'#tiers');await days.fill('7');assert.equal(await holds(),false,'The opening days again are no change');}
+ await page.getByLabel('Grace period (days)').fill('5');await save('Save variant');
  await ready.getByText('Added: Pro grace period · 5 days').waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await ready.getByRole('button',{name:'Done',exact:true}).click();
  const proPanel=page.locator('.tier-panel').filter({has:page.getByRole('heading',{name:'Pro',exact:true})});await proPanel.getByText('Pro standard',{exact:true}).waitFor();await proPanel.getByText('5 days of past-due grace',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Edit tier',exact:true}).click();assert.equal(await page.getByLabel('Rank').inputValue(),'0');assert.equal(await page.getByLabel('Past-due grace period').inputValue(),'5');await page.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -224,7 +230,13 @@ try{
  // The contract-status policy is a form too.
  {const policy=page.locator('.tier-policy select').first(),saved=await policy.inputValue();await policy.selectOption({index:1});assert.equal(await holdsTab(),true,'A changed status policy holds the tab');
   await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.notEqual(await policy.inputValue(),saved);
-  await page.locator('.tier-policy').getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await holdsTab(),false);}
+  // Opening a tier or variant form replaces the policy, so it asks too: Keep editing keeps the policy change, Discard opens the form.
+  for(const open of [page.getByRole('button',{name:'Create tier',exact:true}),page.getByRole('button',{name:'Edit tier',exact:true}).first(),page.getByRole('button',{name:'Edit Legacy grace',exact:true}),page.getByRole('button',{name:'Add a variant to Legacy',exact:true})]){
+   await open.click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await discard.waitFor({state:'hidden'});assert.notEqual(await policy.inputValue(),saved,'Keep editing keeps the policy change');assert.equal(await holdsTab(),true);}
+  await page.getByRole('button',{name:'Edit tier',exact:true}).first().click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('button',{name:'Save tier',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await policy.inputValue(),saved,'Discard dropped the policy change');assert.equal(await holdsTab(),false);
+  // An unchanged policy asks nothing.
+  await page.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByLabel('Name',{exact:true}).waitFor();assert.equal(await discard.count(),0);await page.getByRole('button',{name:'Cancel',exact:true}).click();}
  // So is creating a workspace: a typed name asks before signing out.
  await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).click();await page.getByRole('menu',{name:'Workspaces'}).getByRole('menuitem',{name:'Create a workspace'}).click();await page.getByLabel('Workspace name').fill('Half-named');assert.equal(await holdsTab(),true);
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();assert.equal(await page.getByLabel('Workspace name').inputValue(),'Half-named');
