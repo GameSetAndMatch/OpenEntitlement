@@ -47,6 +47,7 @@ Primary users:
 | Feature | Status | Where |
 |---|---|---|
 | Reference service: OEREP API, audited administration, Postgres storage | ✅ | `console/`, #1 |
+| Python service: rewrite of the reference service in three layers (FastAPI and FastMCP interfaces → service layer → repositories), SQLAlchemy Core + asyncpg + Alembic, RFC 9457 Problem Details for every error, Products from the start, one switch-over from Node | 📋 accepted (ADR-0009) | `ADR-0009.md`; Linear project "Python service" (OPE-37 to OPE-48) |
 | Docker image, empty first install with setup screen, Compose files (memory and Postgres) | ✅ | #8, #14 |
 | Contracts with private PDF evidence | ✅ | #13 |
 | Read-only YAML configuration view | ✅ | #19 |

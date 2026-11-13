@@ -47,11 +47,11 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 | `set_organization_terms` | Set, schedule or remove Organization terms, with an optional end date |
 | `set_user_terms`, `grant_allowance` | Application-user exceptions |
 
-Each write tool returns a preview with an opaque, unforgeable `change_id` that expires after five minutes. The server binds it to the authenticated Account, OAuth client, Workspace, exact operation, immutable validated payload and reason, and Workspace revision. The apply call supplies only that identifier; it cannot replace fields or a reason after preview.
+Each write tool returns a preview with an opaque, unforgeable `change_id` that expires after five minutes. The server binds it to the authenticated Account, OAuth client, Workspace, exact operation, immutable validated payload and reason, and the versions of the records it changes (per-record versions under [ADR-0009](../../ADR-0009.md), which replace the single Workspace revision). The apply call supplies only that identifier; it cannot replace fields or a reason after preview.
 
-`apply_change(change_id)` rechecks the token/resource scope, current membership and operation Permission, selected Workspace and its MCP opt-in. A revision match is necessary but never substitutes for authorization. A changed selection, removed membership, reduced Permission, disabled MCP, expired token or expired preview refuses application. Applying as another Account or OAuth client is refused even if the caller otherwise has write access.
+`apply_change(change_id)` rechecks the token/resource scope, current membership and operation Permission, selected Workspace and its MCP opt-in. A version match is necessary but never substitutes for authorization. A changed selection, removed membership, reduced Permission, disabled MCP, expired token or expired preview refuses application. Applying as another Account or OAuth client is refused even if the caller otherwise has write access.
 
-Successful application atomically checks the revision, consumes the preview once, commits the mutation and records its audit entry. Concurrent/repeated apply calls cannot duplicate a change; a consumed preview is refused. A failed authorization, expiry or revision check makes no entitlement mutation. Changing Workspace selection invalidates outstanding previews for the previous Workspace.
+Successful application atomically checks the record versions, consumes the preview once, commits the mutation and records its audit entry. Concurrent/repeated apply calls cannot duplicate a change; a consumed preview is refused. A failed authorization, expiry or version check makes no entitlement mutation. Changing Workspace selection invalidates outstanding previews for the previous Workspace.
 
 **No delete tools.** MCP never deletes Privileges, Groups, Tags, Tiers, variants, Organizations, members or API keys. Removing a value goes back to its inherited default through the same write tools, for example by removing an Organization term. Deletions stay in the console.
 
@@ -89,6 +89,6 @@ Each tool call records a product event (`mcp_tool_called`, with `tool` and `work
 
 - **Manager authority:** *superseded by [ADR-0008](../../ADR-0008.md).* A Manager may preview and apply `set_organization_terms` for the Products they manage, exactly as in the console; for any other Product it receives the same Permission refusal as the console. MCP never grants more than the console.
 - **Preview identity:** another Account or OAuth client cannot apply a preview. Switching Workspaces invalidates the old preview; the change ID cannot be used to bypass selection.
-- **Revocation:** removing membership, demoting the Account or disabling MCP between preview and apply refuses the change, even when the Workspace revision is otherwise unchanged.
+- **Revocation:** removing membership, demoting the Account or disabling MCP between preview and apply refuses the change, even when the record versions are otherwise unchanged.
 - **Expiry and replay:** an expired preview makes no change. Two concurrent applications of a valid preview commit at most once; subsequent replay is refused and produces no second mutation audit entry.
 - **Immutable payload:** a person cannot change values or the reason through `apply_change`; a different proposal requires a new preview.

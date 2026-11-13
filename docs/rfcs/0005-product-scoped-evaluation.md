@@ -79,7 +79,7 @@ The implementation must add Gherkin scenarios covering:
 ### Implementation handoff
 
 This RFC is accepted direction only. Before the change is described as implemented, these change together in one release:
-- §10 and the protocol name (OEREP 0.1);
+- §10 and the protocol name (OEREP 0.1), including the Problem Details error shape that replaces `{error, message}` in Requirement 10.1.2;
 - `spec/oerep.openapi.json`, including the new routes and 403 responses;
 - both SDKs' `RemoteProvider`, including reading Problem Details;
 - the shared conformance suite.
