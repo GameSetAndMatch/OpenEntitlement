@@ -30,7 +30,7 @@ The `phc_` project key is public by design: it can only send events. It lives in
 | `docs_code_copied` | The copy button of any code block is clicked | `path`, `language`, `first_line` |
 | `outbound_link_clicked` | A link to another site is clicked | `path`, `destination` (`github`, `docker`, `pypi`, `npm`, `other`), `href` |
 | `$set` with `$internal_or_test_user` | A maintainer opens a page with `?oe_internal=1` (`true`) or `?oe_internal=0` (`false`); see [Leave your own visits out](#leave-your-own-visits-out) | — |
-| `cta_clicked` | An element with `data-ph-cta="<name>"` is clicked. Names are stable identifiers, never labels; Starlight hero actions set them through frontmatter `attrs`. Homepage names: `hero_get_started`, `hero_specification`, `scene_catalog`, `scene_tiers`, `scene_exception`, `close_get_started`, `close_github` | `path`, `cta` |
+| `cta_clicked` | An element with `data-ph-cta="<name>"` is clicked. Names are stable identifiers, never labels; Starlight hero actions set them through frontmatter `attrs`. Homepage names: `hero_get_started`, `hero_specification`, `scene_catalog`, `scene_tiers`, `scene_exception`, `code_quickstart`, `close_get_started`, `close_github` | `path`, `cta` |
 
 ### Console activation
 

@@ -94,6 +94,7 @@ Primary users:
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
 | Automatic website deployment to Cloudflare on every merge to `main` | ✅ | #36, #41: runs only from `main` in the protected `website` environment (token scoped there), fails without credentials, verifies the live revision |
 | Landing page rebuilt on the docs' theme and components, showing the current model | ✅ | #33 |
+| One path from the homepage to a short quickstart: every primary homepage action opens it, and it ends with the SDK command and its exact output, run from a source checkout of `main`; copy-code tracking verified in production | ✅ built; 📋 watch 3–5 developers try it and fix where they stop | OPE-52; `website/src/content/docs/docs/quickstart.md`, `website/scripts/check-quickstart.mjs` |
 | PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
 | PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |
 | Funnel dashboards: website acquisition (landing → docs → quickstart → install → GitHub/Docker) and console activation (sign-in → Workspace → Privilege → Tier → Organization → API key → first evaluation) | ✅ created in PostHog; 📋 hosted console must set `OE_POSTHOG_KEY` to feed the activation funnel | #34, `tools/posthog/dashboards.mjs` |
