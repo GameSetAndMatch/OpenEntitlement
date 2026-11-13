@@ -25,6 +25,7 @@ from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
+from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
     Member,
@@ -40,6 +41,7 @@ from ...services.repositories import AlreadyExists, Repositories, StaleVersion, 
 from .migrate import migrate
 from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
 from .tables import catalog_variant_values, catalog_changes, catalog_groups, catalog_tags, catalog_privileges
+from .tables import status_policies, tier_changes, tiers
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
 
 
@@ -285,6 +287,17 @@ class PostgresCatalogRepository:
             if (await self.connection.execute(statement)).rowcount != 1:
                 raise StaleVersion(variant.id)
 
+    async def delete_variant(self, product_id: UUID, variant_id: str, *, expected_version: int) -> None:
+        table = catalog_variant_values
+        statement = table.delete().where(
+            table.c.workspace_id == self.workspace_id,
+            table.c.product_id == product_id,
+            table.c.key == variant_id,
+            table.c.version == expected_version,
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(variant_id)
+
     async def audit(self, change: CatalogChange) -> None:
         ensure_bound_workspace(self.workspace_id, change.workspace_id)
         await self.connection.execute(catalog_changes.insert().values(id=change.id, workspace_id=change.workspace_id, entry=change.model_dump(mode="json")))
@@ -317,6 +330,94 @@ class PostgresCatalogRepository:
             statement = table.update().where(table.c.workspace_id == self.workspace_id, table.c.product_id == record.product_id, table.c.key == record.key, table.c.version == expected_version).values(version=record.version, entry=values["entry"])
             if (await self.connection.execute(statement)).rowcount != 1:
                 raise StaleVersion(record.key)
+
+
+class PostgresTiersRepository:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self.workspace_id = connection, workspace_id
+
+    async def list(self, product_id: UUID) -> Sequence[TierRecord]:
+        query = (
+            select(tiers.c.entry)
+            .where(tiers.c.workspace_id == self.workspace_id, tiers.c.product_id == product_id)
+            .order_by(tiers.c.key)
+        )
+        return [TierRecord.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
+
+    async def save(self, tier: TierRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, tier.workspace_id)
+        entry = tier.model_dump(mode="json")
+        if expected_version == 0:
+            values = dict(workspace_id=tier.workspace_id, product_id=tier.product_id, key=tier.id, version=tier.version, entry=entry)
+            await _insert(self.connection, tiers.insert().values(**values))
+            return
+        statement = (
+            tiers.update()
+            .where(
+                tiers.c.workspace_id == self.workspace_id,
+                tiers.c.product_id == tier.product_id,
+                tiers.c.key == tier.id,
+                tiers.c.version == expected_version,
+            )
+            .values(version=tier.version, entry=entry)
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(tier.id)
+
+    async def delete(self, product_id: UUID, tier_id: str, *, expected_version: int) -> None:
+        statement = tiers.delete().where(
+            tiers.c.workspace_id == self.workspace_id,
+            tiers.c.product_id == product_id,
+            tiers.c.key == tier_id,
+            tiers.c.version == expected_version,
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(tier_id)
+
+    async def in_use(self, product_id: UUID, tier_id: str) -> bool:
+        # Organizations and their Tier variants arrive with OPE-41; until then no Organization uses a Tier.
+        return False
+
+    async def policy(self, product_id: UUID) -> StatusPolicyRecord | None:
+        query = select(status_policies.c.entry).where(
+            status_policies.c.workspace_id == self.workspace_id, status_policies.c.product_id == product_id
+        )
+        row = (await self.connection.execute(query)).scalars().first()
+        return StatusPolicyRecord.model_validate(row) if row else None
+
+    async def save_policy(self, policy: StatusPolicyRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, policy.workspace_id)
+        entry = policy.model_dump(mode="json")
+        if expected_version == 0:
+            values = dict(workspace_id=policy.workspace_id, product_id=policy.product_id, version=policy.version, entry=entry)
+            await _insert(self.connection, status_policies.insert().values(**values))
+            return
+        statement = (
+            status_policies.update()
+            .where(
+                status_policies.c.workspace_id == self.workspace_id,
+                status_policies.c.product_id == policy.product_id,
+                status_policies.c.version == expected_version,
+            )
+            .values(version=policy.version, entry=entry)
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(str(policy.product_id))
+
+    async def audit(self, change: TierChange) -> None:
+        ensure_bound_workspace(self.workspace_id, change.workspace_id)
+        values = dict(
+            id=change.id, workspace_id=change.workspace_id, product_id=change.product_id, at=change.at, entry=change.model_dump(mode="json")
+        )
+        await self.connection.execute(tier_changes.insert().values(**values))
+
+    async def changes(self, product_id: UUID) -> Sequence[TierChange]:
+        query = (
+            select(tier_changes.c.entry)
+            .where(tier_changes.c.workspace_id == self.workspace_id, tier_changes.c.product_id == product_id)
+            .order_by(tier_changes.c.seq)
+        )
+        return [TierChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
 
 
 @dataclass(frozen=True)
@@ -353,6 +454,7 @@ class PostgresStore:
                 sessions=PostgresSessionsRepository(connection),
                 sign_in_flows=PostgresSignInFlowsRepository(connection),
                 catalog=PostgresCatalogRepository(connection, workspace_id),
+                tiers=PostgresTiersRepository(connection, workspace_id),
                 directory=PostgresDirectoryRepository(connection, account_id),
                 connection=connection,
             )

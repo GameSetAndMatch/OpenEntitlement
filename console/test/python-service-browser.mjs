@@ -7,6 +7,7 @@ import {resolve} from 'node:path';
 import pg from 'pg';
 import {chromium} from 'playwright';
 import {startDevIssuer} from '../dev/issuer.ts';
+import {assertFormLayout} from './form-layout.mjs';
 if(!process.env.OE_PG_DSN)throw new Error('OE_PG_DSN is required; this test creates its own disposable database');
 const root=resolve(import.meta.dirname,'../..');
 async function port(){const s=createServer();await new Promise(ok=>s.listen(0,'127.0.0.1',ok));const p=s.address().port;await new Promise(ok=>s.close(ok));return p;}
@@ -90,6 +91,57 @@ try{
  await page.getByRole('button',{name:'Cancel',exact:true}).click();
  await page.getByRole('button',{name:'Refresh workspace',exact:true}).click();
  await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+
+ // Tiers: the guided creation saves the Tier with its standard variant in one request, then offers a trial and a grace period.
+ const productPath=app+`/api/workspaces/${workspaceId}/products/${workspace.products[0].id}`;
+ const tierRequests=[];page.on('request',r=>{if(r.url().startsWith(productPath+'/tiers')&&r.method()!=='GET')tierRequests.push(`${r.method()} ${r.url().slice(productPath.length)}`);});
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();
+ await page.getByRole('heading',{name:'Create your first tier',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Create tier',exact:true}).click();
+ await page.getByLabel('Name',{exact:true}).fill('Pro');assert.equal(await page.getByLabel('ID',{exact:true}).inputValue(),'pro');
+ await page.getByLabel('Override seats').check();await page.getByLabel('seats',{exact:true}).fill('20');
+ await page.getByRole('button',{name:'Review tier',exact:true}).click();
+ const review=page.getByRole('region',{name:'Review Pro'});assert.match(await review.getByRole('row').filter({hasText:'seats'}).innerText(),/20\s+Set for this tier/);
+ await review.getByRole('button',{name:'Create tier',exact:true}).click();
+ const ready=page.getByRole('region',{name:'Pro is ready'});await ready.waitFor();
+ assert.deepEqual(tierRequests,['POST /tiers'],'One request creates the Tier and its standard variant');
+ await ready.getByRole('button',{name:'Add a free trial',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro trial');
+ await page.getByRole('button',{name:'Save variant',exact:true}).click();await ready.getByText('Added: Pro trial').waitFor();
+ await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');
+ await page.getByLabel('Grace period (days)').fill('5');await page.getByRole('button',{name:'Save variant',exact:true}).click();
+ await ready.getByText('Added: Pro grace period · 5 days').waitFor();await ready.getByRole('button',{name:'Done',exact:true}).click();
+ const proPanel=page.locator('.tier-panel').filter({has:page.getByRole('heading',{name:'Pro',exact:true})});
+ await proPanel.getByText('Pro standard',{exact:true}).waitFor();await proPanel.getByText('5 days of past-due grace',{exact:true}).waitFor();
+ // Grace days and rank are edited on the Tier; each save names the version it was made from.
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();assert.equal(await page.getByLabel('Rank').inputValue(),'0');
+ await page.getByLabel('Past-due grace period').fill('3');await page.getByRole('button',{name:'Save tier',exact:true}).click();
+ await proPanel.getByText('3 days of past-due grace',{exact:true}).waitFor();
+ let tiersView=await (await page.request.get(productPath+'/tiers')).json();
+ assert.deepEqual(tiersView.tiers.map(t=>[t.id,t.gracePeriodDays,t.version]),[['pro',3,3]]);
+ assert.deepEqual(tiersView.variants.map(v=>[v.id,v.kind,v.values]),[['pro_grace_period','grace',{}],['pro_standard','standard',{seats:20}],['pro_trial','trial',{}]]);
+ // The status policy is per Product and lives beside its Tiers.
+ const policy=page.getByRole('region',{name:'When a contract lapses'});
+ await policy.getByLabel('Contract ended').selectOption({label:'Fallback to Pro standard'});await policy.getByRole('button',{name:'Save status policy',exact:true}).click();
+ await policy.getByRole('button',{name:'Save status policy',exact:true}).waitFor({state:'hidden'});
+ tiersView=await (await page.request.get(productPath+'/tiers')).json();
+ assert.deepEqual(tiersView.policy,{pastDue:{action:'readOnly'},ended:{action:'fallback',variantId:'pro_standard'}});
+ // Archive and restore from the Tier's edit form; an archived Tier keeps its variants.
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();await assertFormLayout(page);await page.getByRole('button',{name:'Archive tier',exact:true}).click();
+ await proPanel.getByText(/^Archived/).waitFor();
+ tiersView=await (await page.request.get(productPath+'/tiers')).json();assert.ok(tiersView.tiers[0].archivedAt);assert.equal(tiersView.variants.length,3);
+ // An archived Tier is not offered as a new fallback; the one the policy already uses stays listed.
+ assert.deepEqual(await policy.getByLabel('Past due, after grace').locator('option').allInnerTexts(),['Read-only']);
+ assert.deepEqual(await policy.getByLabel('Contract ended').locator('option').allInnerTexts(),['Read-only','Fallback to Pro standard']);
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();await page.getByRole('button',{name:'Restore tier',exact:true}).click();
+ await proPanel.getByText(/^Archived/).waitFor({state:'hidden'});
+ // The status policy falls back to one of its variants, so it cannot be deleted.
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();await page.getByRole('button',{name:'Delete tier',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
+ await page.getByRole('alert').filter({hasText:'The status policy falls back to pro_standard'}).waitFor();
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ // The Catalog sees the new variants: a Privilege without a default asks for a value in each.
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+ assert.deepEqual((await (await page.request.get(catalogPath)).json()).variants.map(v=>v.tierId),['pro','pro','pro']);
 
  // The console reopens the last Workspace; the switcher lists it.
  await page.reload();const switcher=page.getByRole('button',{name:'Workspace: Acme product',exact:true});await switcher.waitFor();

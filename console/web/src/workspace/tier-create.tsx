@@ -36,6 +36,8 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
     // Validate both records with the server's rules before saving either, so a tier is never left without its variant.
     try{validTier(tier);validVariant({...w.data,tiers:[...w.data.tiers.filter(t=>t.id!==id),tier]},standard);}catch(e){setError((e as Error).message);return;}
     setError("");setSubmitting(true);
+    // The Python service creates the Tier and its standard variant in one transaction.
+    if(w.products){try{if(await save("tiers",{...tier,standard},"Create tier"))onCreated(id);}finally{setSubmitting(false);}return;}
     try{
       if(savedTier!==id){if(!await save("tiers",tier,"Create tier"))return;setSavedTier(id);}
       if(await save("variants",standard,"Create standard variant"))onCreated(id);

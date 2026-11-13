@@ -46,6 +46,7 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   }
   await page.goto(`${origin}/iframe.html?id=workspace-switcher--switch-and-create&viewMode=story`);
   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story workspace-switcher--switch-and-create did not finish at ${width}px`);});
+  await page.goto(`${origin}/iframe.html?id=workspace-tier-availability--archive-and-restore&viewMode=story`);await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story tier-availability--archive-and-restore did not finish at ${width}px`);});await assertFormLayout(page);
   for(const story of ['several-products','one-product']){await page.goto(`${origin}/iframe.html?id=workspace-product-selector--${story}&viewMode=story`);await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story product-selector--${story} did not finish at ${width}px`);});}
   await page.goto(`${origin}/iframe.html?id=workspace-switcher--long-name&viewMode=story`);
   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});
