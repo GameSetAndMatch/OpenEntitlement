@@ -198,6 +198,27 @@ class WorkspaceService:
             await repos.products.add(product)
             await repos.members.add(Member(workspace_id=workspace.id, account_id=account.id, owner=True, created_at=now))
             actor = Actor(account=account, workspace_id=workspace.id, owner=True)
+            # The creation is the Workspace's first audited change, in the same transaction, for Owners only (ADR-0007).
+            ws = OpenWorkspace(repos=repos, actor=actor, now=now)
+            await audit.record(
+                ws,
+                action=AuditAction.CREATED,
+                target_kind=TargetKind.WORKSPACE,
+                target_id=str(workspace.id),
+                target_name=name,
+                owners_only=True,
+                changes=audit.diff(None, {"name": name}),
+            )
+            await _audit_product(ws, AuditAction.CREATED, product, None, product)
+            await audit.record(
+                ws,
+                action=AuditAction.CREATED,
+                target_kind=TargetKind.MEMBER,
+                target_id=str(account.id),
+                target_name=account.email,
+                owners_only=True,
+                changes=audit.diff(None, {"role": OWNER}),
+            )
             return WorkspaceView(
                 id=workspace.id,
                 name=name,
