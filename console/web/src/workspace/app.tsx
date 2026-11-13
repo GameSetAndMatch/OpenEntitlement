@@ -56,11 +56,14 @@ export function WorkspaceApp(){
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const ask=useReason(),toast=useToast();
   async function loadList(){const data=await request<typeof list>("/api/workspaces");setList(data);return data;}
-  async function loadWorkspace(id:string){setWorkspace(undefined);const next=await request<Workspace>(`/api/workspaces/${id}`);if(selectedRef.current===id)setWorkspace(next);}
+  // Resolves true when this load is still the newest one for the open workspace and its snapshot was applied.
+  // An older load never overwrites a newer snapshot, and its failure is dropped.
+  async function loadWorkspace(id:string){const token=++loadToken.current,current=()=>token===loadToken.current&&selectedRef.current===id;setWorkspace(undefined);
+    try{const next=await request<Workspace>(`/api/workspaces/${id}`);if(!current())return false;setWorkspace(next);return true;}catch(e){if(current())throw e;return false;}}
   // Access to the open workspace ended (another Owner removed you, or it was deleted): move to another one.
   async function lostAccess(id:string){const next=await loadList();if(selectedRef.current!==id)return;setWorkspace(undefined);setError("");setSelected(pick(next.filter(w=>w.id!==id)));toast("You no longer have access to that workspace");}
   const isGone=(e:unknown)=>(e as {status?:number}).status===404;
-  function retryLoad(id:string){const token=++loadToken.current,current=()=>token===loadToken.current&&selectedRef.current===id;setError("");void loadWorkspace(id).then(()=>{if(current())loadFailed.current=false;}).catch(e=>{if(!current())return;if(isGone(e))void lostAccess(id);else{loadFailed.current=true;setError(e.message,true);}});}
+  function retryLoad(id:string){setError("");void loadWorkspace(id).then(applied=>{if(applied)loadFailed.current=false;}).catch(e=>{if(isGone(e))void lostAccess(id);else{loadFailed.current=true;setError(e.message,true);}});}
   const retryRef=useRef(retryLoad);retryRef.current=retryLoad;
   async function refreshAccess(){const next=await loadList();if(!selected)return;try{await loadWorkspace(selected);}catch(e){if((e as {status?:number}).status===404){setWorkspace(undefined);setSelected(pick(next.filter(w=>w.id!==selected)));}else throw e;}}
   useEffect(()=>{let active=true;request("/api/session").then(async value=>{if(!active)return;setCsrf(value.csrf);setSession(value);identify(value.account.id);const workspaces=await loadList();if(active)setSelected(pick(workspaces));}).catch(e=>{if(e.status!==401)setError(e.message);}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
@@ -69,7 +72,7 @@ export function WorkspaceApp(){
     const onFocus=()=>{if(document.visibilityState!=="visible"||document.querySelector("main form.form"))return;request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active&&selectedRef.current===selected)setWorkspace(value);}).catch(e=>{if(active&&isGone(e))void lostAccess(selected);});};
     window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
     return()=>{active=false;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};},[selected]);
-  useEffect(()=>{if(!selected)return;remember(selected);let active=true;setWorkspace(undefined);loadFailed.current=false;loadToken.current++;request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active)setWorkspace(value);}).catch(e=>{if(!active)return;if(isGone(e))void lostAccess(selected);else{loadFailed.current=true;setError(e.message,true);}});return()=>{active=false;};},[selected]);
+  useEffect(()=>{if(!selected)return;remember(selected);let active=true;setWorkspace(undefined);loadFailed.current=false;const token=++loadToken.current;request<Workspace>(`/api/workspaces/${selected}`).then(value=>{if(active&&token===loadToken.current)setWorkspace(value);}).catch(e=>{if(!active)return;if(isGone(e))void lostAccess(selected);else{loadFailed.current=true;setError(e.message,true);}});return()=>{active=false;};},[selected]);
   // Following "Settings" or "Back to workspace" swaps the sidebar and removes the focused link. Keep focus on the current page's link.
   const navigated=useRef(false);
   useEffect(()=>{if(!navigated.current)return;navigated.current=false;if(document.activeElement&&document.activeElement!==document.body)return;document.querySelector<HTMLElement>('aside nav a[aria-current="page"]')?.focus();},[page]);

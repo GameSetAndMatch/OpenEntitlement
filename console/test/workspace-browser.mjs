@@ -172,6 +172,15 @@ try{
   await retry;await page.waitForTimeout(300);assert.equal(await page.getByText('Load failure').count(),0,'A late retry of another workspace reports nothing here');
   await page.getByRole('button',{name:'Workspace: Another business',exact:true}).click();await page.getByRole('menuitemradio',{name:/Acme product/}).click();await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).waitFor();}
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('heading',{name:'Privilege Catalog',exact:true,level:1}).waitFor();
+ // Overlapping retries: an older snapshot that arrives last never replaces the newer one.
+ {await page.route(`**/api/workspaces/${workspaceId}`,route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Load failure',message:'Load failure'})}),{times:1});
+  await page.reload();await pageError.getByText('Load failure').waitFor();assert.equal(await page.evaluate(()=>location.hash),'#catalog');
+  let fetched,delivered;const olderFetched=new Promise(ok=>{fetched=ok;}),olderDelivered=new Promise(ok=>{delivered=ok;});
+  await page.route(`**/api/workspaces/${workspaceId}`,async route=>{const response=await route.fetch();fetched();await new Promise(ok=>setTimeout(ok,1500));await route.fulfill({response});delivered();},{times:1});
+  await page.getByRole('link',{name:'Tiers',exact:true}).click();await olderFetched;
+  const latest=await (await page.request.get(running.url+`/api/workspaces/${workspaceId}`)).json();assert.equal((await page.request.put(running.url+`/api/workspaces/${workspaceId}/catalog`,{headers:{origin:running.url,'x-oe-csrf':csrf},data:{entry:{key:'newer_flag',title:'Newer flag',type:'boolean',default:false},revision:latest.revision}})).status(),200);
+  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByText('Newer flag',{exact:true}).waitFor();
+  await olderDelivered;await page.waitForTimeout(300);assert.equal(await page.getByText('Newer flag',{exact:true}).count(),1,'An older retry response must not replace the newer snapshot');}
  // In a workspace without tiers, a Privilege without a default says so once.
  await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).click();await page.getByRole('menu',{name:'Workspaces'}).getByRole('menuitem',{name:'Create a workspace'}).click();await page.getByLabel('Workspace name').fill('Fresh product');await page.locator('form.workspace-create').getByRole('button',{name:'Create workspace'}).click();await page.getByRole('button',{name:'Workspace: Fresh product',exact:true}).waitFor();
  await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('API calls');await page.getByLabel('Value type').selectOption('integer');await page.getByLabel('Require a value in every Tier variant',{exact:true}).check();await save('Save privilege');
