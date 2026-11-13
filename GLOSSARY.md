@@ -7,24 +7,28 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | Term | Definition |
 |---|---|
 | **Privilege** | One typed entitlement value: a boolean permission, integer allowance or string-enum choice. |
-| **Privilege Catalog** | The definitions, defaults and metadata of a product's Privileges. Preferred over Feature Catalog for the authoring surface. |
+| **Product** | Something a Workspace sells to Organizations, with its own Privilege Catalog and Tiers. Preferred over project. |
+| **Privilege Catalog** | The definitions, defaults and metadata of one Product's Privileges. Preferred over Feature Catalog for the authoring surface. |
 | **Group** | A hierarchical container for Privileges. A Privilege can belong to at most one Group. |
 | **Tag** | A reusable label independent of Group hierarchy. A Privilege may have several Tags. |
 | **Visibility** | Whether a Privilege is editable, read-only or hidden in normal controls. |
 | **Read-only Privilege** | A visible, locked Privilege whose Catalog default supplies its value. |
 | **Hidden Privilege** | A Privilege omitted from normal controls that still has an effective value. |
 | **Environment prerequisite** | An install condition that can veto a boolean Privilege but cannot grant it. |
-| **Tier** | A reusable commercial level, such as Basic, Business or Enterprise. Preferred over Plan in new authoring language. |
+| **Tier** | A reusable commercial level of one Product, such as Basic, Business or Enterprise. Preferred over Plan in new authoring language. |
 | **Tier variant** | A Tier's standard, trial or grace conditions and default Privilege values. |
+| **Archived** | A Tier or Product that its current Organizations keep, but that can no longer be given to another Organization. |
 | **Trial** | A time-limited variant of a Tier, not a commercial Tier itself. |
 | **Grace period** | A bounded period of defined rights after a qualifying contract-status change. |
 | **Organization** | An entitled customer managed within a Workspace. Distinct from the Workspace, Account and technical Tenant. |
 | **Application user** | An Organization-scoped Subject whose entitlement values may inherit or have personal terms/grants. Not a console Account or membership Role. |
+| **Organization terms** | An Organization's own values that replace its Tier variant's values; they belong to that variant. Preferred over own terms. |
+| **Personal terms** | An Application user's own values that replace their Organization's values; they belong to the assigned Tier variant. Preferred over user terms. |
 | **Cloud service tier** | OpenEntitlement hosted capabilities (Pro or Enterprise), managed by the platform; distinct from customer-defined Tiers. |
 | **Subject** | A person, service account or other actor to whom an entitlement may apply. |
 | **Resource** | An application object that may be subject to an entitlement. |
 | **Contract** | The link between agreed commercial terms and an Organization's entitled rights. |
-| **Assignment** | The association between an Organization and its current commercial offer. |
+| **Assignment** | The association between an Organization and its current Tier variant in one Product. |
 | **Override** | A scoped replacement for an inherited commercial value. Distinct from a restrictive environment prerequisite. |
 | **Grant** | An additive allowance for a scope, rather than a replacement value. |
 | **Unlimited** | An explicit absence of a numeric cap, not a missing value, null or an arbitrary large number. |
@@ -36,14 +40,14 @@ Shared domain language for the authoring model and service. Compatibility terms 
 
 | Term | Definition |
 |---|---|
-| **Workspace** | A business's control plane for its Catalog, Tiers, Organizations, members and records. |
+| **Workspace** | A business's control plane for its Products, Organizations, members and records. The customer OpenEntitlement bills. |
 | **Tenant** | A technical isolation context in shared infrastructure. Not the preferred name for a Workspace or an Organization. |
 | **Account** | A person's sign-in identity, which may participate in multiple Workspaces. |
 | **Member** | An Account's membership in a Workspace. |
-| **Role** | A member's administrative authority within a Workspace. |
-| **Owner** | A Role with full Workspace administration, including membership management. |
-| **Manager** | A Role with delegated membership management. |
-| **User** | A Role with read access to the Workspace. |
+| **Role** | A member's administrative authority within a Product, or the whole Workspace for an Owner. |
+| **Owner** | A Role with full administration of the whole Workspace and every Product. |
+| **Manager** | A Role that administers one Product and its members. |
+| **User** | A Role with read access to one Product. |
 | **Platform administrator** | An operator with authority across Workspaces, distinct from an Organization's entitled users. |
 | **Permission** | Authority to perform an administrative/application action; separate from commercial entitlement. |
 

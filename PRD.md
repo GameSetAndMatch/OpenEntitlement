@@ -25,6 +25,7 @@ Primary users:
 | Entitlements v0.2 proposal: Tier variants, contracts, JSON Schema definitions | ✅ proposed (RFC-0001) | #20 |
 | Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | ✅ | #40, merged on `main` |
 | Privilege Catalog authoring contract: Groups, Tags, visibility | ✅ accepted (RFC-0002) | #24 |
+| Product-scoped evaluation in OEREP 0.1: `/oerep/v1/products/{product}/privileges/{privilege}/resolve`, `upgrade` replaces `suggest`, keys bound to one Product | 📋 accepted (RFC-0005) | `docs/rfcs/0005-product-scoped-evaluation.md` |
 | Read-only consumption dashboard | 📋 proposed (RFC-0003), blocked on a real usage source | `docs/rfcs/0003-consumption-dashboard.md` |
 | Generated JSON Schema as the shared cross-language contract | 🚧 | ADR-0006, #39; regenerated from #38 models, shared parity and serialization fixtures |
 
@@ -55,6 +56,9 @@ Primary users:
 | Tiers and Tier variants (standard, trial, grace), Organization terms | ✅ preview | #22, #27 |
 | Application-user entitlements: personal terms and grants | ✅ | #27 |
 | Workspace API keys and evaluation endpoint | ✅ preview | #22 |
+| Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 📋 accepted (ADR-0008) | — |
+| Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 📋 accepted (ADR-0007) | — |
+| Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, glossary names for value sources, standard user form | 📋 | — |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |
 | YAML import with diff preview and audited apply | 📋 | — |
