@@ -191,6 +191,24 @@ class LastProduct(Problem):
         super().__init__("A Workspace keeps at least one Product. Create another one before deleting this one.", id=id)
 
 
+class TierInUse(Problem):
+    """Organizations or the status policy use the Tier, so it can be archived but not deleted (ADR-0008)."""
+
+    slug = "tier-in-use"
+    status = 409
+    title = "Tier in use"
+
+    def __init__(self, *, id: str, variant_id: str | None = None) -> None:  # noqa: A002
+        if variant_id is None:
+            super().__init__("Customers use this Tier. Archive it instead of deleting it.", id=id)
+        else:
+            super().__init__(
+                f"The status policy falls back to {variant_id}. Choose another fallback before deleting this Tier.",
+                id=id,
+                variantId=variant_id,
+            )
+
+
 def escape_pointer_token(token: object) -> str:
     return str(token).replace("~", "~0").replace("/", "~1")
 

@@ -54,12 +54,17 @@ class VariantValue(OpenEntitlementModel):
     value: CatalogValue
 
 
+VariantKind = Literal["standard", "trial", "grace"]
+
+
 class VariantValues(OpenEntitlementModel):
-    """The Catalog-facing values of a Tier variant; lifecycle and Tier authoring arrive in OPE-40."""
+    """A Tier variant and its values. The Catalog writes its values; the Tier service its lifecycle (OPE-40)."""
 
     workspace_id: UUID
     product_id: UUID
     id: Identifier
+    tier_id: Identifier
+    kind: VariantKind
     name: str
     version: int = Field(ge=1, strict=True)
     values: dict[str, CatalogValue]
@@ -175,6 +180,20 @@ def _reference_errors(entry: CatalogEntry, records: list[CatalogRecord]) -> list
     return []
 
 
+def value_error(entry: TypedPrivilege, value: CatalogValue) -> str | None:
+    """Why ``value`` is not a valid value of the Privilege, with the same type and bounds rules as its default."""
+    data = entry.model_dump(mode="json") | {
+        "default": value.model_dump(mode="json") if isinstance(value, Unlimited) else value
+    }
+    try:
+        Privilege.from_dict(data)
+    except ValidationError as exc:
+        # One message per value: union alternatives would otherwise repeat it.
+        first = exc.errors()[0]
+        return str((first.get("ctx") or {}).get("error", "")) or first["msg"]
+    return None
+
+
 def _variant_pointer(variant_id: str, *members: str) -> str:
     return "".join("/" + escape_pointer_token(t) for t in ("variantValues", variant_id, *members))
 
@@ -280,18 +299,9 @@ class CatalogService:
                 if value is None:
                     errors.append(FieldError(_variant_pointer(variant.id), "Set a value in every Tier variant."))
                     continue
-                try:
-                    # Validate assigned values with precisely the same bounds/type rules as a default.
-                    data = entry.model_dump(mode="json") | {
-                        "default": value.model_dump(mode="json") if isinstance(value, Unlimited) else value
-                    }
-                    Privilege.from_dict(data)
-                except ValidationError as exc:
-                    # One message per value: union alternatives would otherwise repeat it.
-                    first = exc.errors()[0]
-                    rule = str((first.get("ctx") or {}).get("error", ""))
-                    detail = f"{variant.name}: {rule}" if rule else first["msg"]
-                    errors.append(FieldError(_variant_pointer(variant.id, "value"), detail))
+                problem = value_error(entry, value)
+                if problem:
+                    errors.append(FieldError(_variant_pointer(variant.id, "value"), f"{variant.name}: {problem}"))
                     continue
                 if override:
                     changes.append(variant.model_copy(update={"values": values, "version": variant.version + 1}))

@@ -15,6 +15,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
+from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
     Member,
@@ -31,6 +32,11 @@ from ...services.repositories import AlreadyExists, Repositories, StaleVersion, 
 @dataclass
 class _Rows:
     variant_values: dict[tuple[UUID, UUID, str], VariantValues] = field(default_factory=dict)
+    tiers: dict[tuple[UUID, UUID, str], TierRecord] = field(default_factory=dict)
+    status_policies: dict[tuple[UUID, UUID], StatusPolicyRecord] = field(default_factory=dict)
+    tier_changes: list[TierChange] = field(default_factory=list)
+    #: (Product, Tier) pairs an Organization uses; tests mark them until Organizations exist (OPE-41).
+    used_tiers: set[tuple[UUID, str]] = field(default_factory=set)
     catalog_changes: list[CatalogChange] = field(default_factory=list)
     catalog: dict[tuple[UUID, UUID, str, str], CatalogRecord] = field(default_factory=dict)
     workspaces: dict[UUID, Workspace] = field(default_factory=dict)
@@ -233,6 +239,15 @@ class InMemoryCatalogRepository:
             raise StaleVersion(variant.id)
         self.rows.variant_values[key] = variant
 
+    async def delete_variant(self, product_id: UUID, variant_id: str, *, expected_version: int) -> None:
+        if self.workspace_id is None:
+            raise StaleVersion(variant_id)
+        key = (self.workspace_id, product_id, variant_id)
+        current = self.rows.variant_values.get(key)
+        if current is None or current.version != expected_version:
+            raise StaleVersion(variant_id)
+        del self.rows.variant_values[key]
+
     async def audit(self, change: CatalogChange) -> None:
         ensure_bound_workspace(self.workspace_id, change.workspace_id)
         self.rows.catalog_changes.append(change)
@@ -260,6 +275,66 @@ class InMemoryCatalogRepository:
         self.rows.catalog[key] = record
 
 
+class InMemoryTiersRepository:
+    def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
+        self.rows, self.workspace_id = rows, workspace_id
+
+    def _visible(self, product_id: UUID) -> bool:
+        return self.workspace_id is not None and product_id in self.rows.products.get(self.workspace_id, {})
+
+    async def list(self, product_id: UUID) -> Sequence[TierRecord]:
+        if not self._visible(product_id):
+            return []
+        return sorted((t for (w, p, _), t in self.rows.tiers.items() if (w, p) == (self.workspace_id, product_id)), key=lambda t: t.id)
+
+    async def save(self, tier: TierRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, tier.workspace_id)
+        if not self._visible(tier.product_id):
+            raise LookupError("unknown Product")
+        key = (tier.workspace_id, tier.product_id, tier.id)
+        current = self.rows.tiers.get(key)
+        if current is None and expected_version == 0:
+            self.rows.tiers[key] = tier
+        elif current is not None and current.version == expected_version:
+            self.rows.tiers[key] = tier
+        elif current is not None and expected_version == 0:
+            raise AlreadyExists(tier.id)
+        else:
+            raise StaleVersion(tier.id)
+
+    async def delete(self, product_id: UUID, tier_id: str, *, expected_version: int) -> None:
+        if self.workspace_id is None:
+            raise StaleVersion(tier_id)
+        key = (self.workspace_id, product_id, tier_id)
+        current = self.rows.tiers.get(key)
+        if current is None or current.version != expected_version:
+            raise StaleVersion(tier_id)
+        del self.rows.tiers[key]
+
+    async def in_use(self, product_id: UUID, tier_id: str) -> bool:
+        return (product_id, tier_id) in self.rows.used_tiers
+
+    async def policy(self, product_id: UUID) -> StatusPolicyRecord | None:
+        if self.workspace_id is None or not self._visible(product_id):
+            return None
+        return self.rows.status_policies.get((self.workspace_id, product_id))
+
+    async def save_policy(self, policy: StatusPolicyRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, policy.workspace_id)
+        key = (policy.workspace_id, policy.product_id)
+        current = self.rows.status_policies.get(key)
+        if (current.version if current else 0) != expected_version:
+            raise StaleVersion(str(policy.product_id))
+        self.rows.status_policies[key] = policy
+
+    async def audit(self, change: TierChange) -> None:
+        ensure_bound_workspace(self.workspace_id, change.workspace_id)
+        self.rows.tier_changes.append(change)
+
+    async def changes(self, product_id: UUID) -> Sequence[TierChange]:
+        return [c for c in self.rows.tier_changes if (c.workspace_id, c.product_id) == (self.workspace_id, product_id)]
+
+
 class InMemoryStore:
     def __init__(self) -> None:
         self._committed = _Rows()
@@ -279,6 +354,7 @@ class InMemoryStore:
                 sessions=InMemorySessionsRepository(working),
                 sign_in_flows=InMemorySignInFlowsRepository(working),
                 catalog=InMemoryCatalogRepository(working, workspace_id),
+                tiers=InMemoryTiersRepository(working, workspace_id),
                 directory=InMemoryDirectoryRepository(working, account_id),
             )
             self._committed = working
@@ -286,6 +362,10 @@ class InMemoryStore:
     def mark_product_used(self, product_id: UUID) -> None:
         """Stand in for an Organization using the Product until Organizations exist (OPE-41)."""
         self._committed.used_products.add(product_id)
+
+    def mark_tier_used(self, product_id: UUID, tier_id: str) -> None:
+        """Stand in for an Organization on the Tier until Organizations exist (OPE-41)."""
+        self._committed.used_tiers.add((product_id, tier_id))
 
     async def ping(self) -> None:
         return None
