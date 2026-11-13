@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import Request
+from fastapi import Depends, Request
 
 from ...services.repositories import Repositories, Store
 
@@ -19,3 +20,9 @@ async def workspace_transaction(request: Request, workspace_id: UUID) -> AsyncIt
     store: Store = request.app.state.store
     async with store.transaction(workspace_id) as repositories:
         yield repositories
+
+
+#: The repositories of the request's Workspace transaction. Function scope makes FastAPI finish the
+#: transaction (COMMIT or ROLLBACK) before it sends the response, so a failed COMMIT becomes a
+#: problem response instead of a success the client cannot trust.
+WorkspaceTransaction = Annotated[Repositories, Depends(workspace_transaction, scope="function")]

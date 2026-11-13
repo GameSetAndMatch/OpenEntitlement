@@ -5,8 +5,9 @@ import asyncio
 
 from alembic import context
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
+from openentitlement_service.repositories.postgres import create_engine
 from openentitlement_service.repositories.postgres.tables import metadata
 
 config = context.config
@@ -19,7 +20,11 @@ def run(connection: Connection) -> None:
 
 
 async def main() -> None:
-    engine = create_async_engine(config.attributes["url"])
+    engine = create_engine(
+        config.attributes["url"],
+        transaction_pooler=config.attributes.get("transaction_pooler", False),
+        poolclass=NullPool,
+    )
     try:
         async with engine.connect() as connection:
             await connection.run_sync(run)

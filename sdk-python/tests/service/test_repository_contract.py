@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from openentitlement_service.services.models import Product, Workspace
-from openentitlement_service.services.repositories import Store
+from openentitlement_service.services.repositories import AlreadyExists, Store
 
 pytestmark = pytest.mark.anyio
 NOW = datetime(2026, 11, 12, 9, 30, tzinfo=UTC)
@@ -70,3 +70,17 @@ async def test_a_failed_transaction_leaves_nothing_behind(store: Store) -> None:
             raise RuntimeError("the operation failed after writing")
     async with store.transaction(ws.id) as repos:
         assert list(await repos.products.list()) == []
+
+
+async def test_a_product_key_is_unique_within_its_workspace(store: Store) -> None:
+    acme, globex = await given_workspace(store, "ACME"), await given_workspace(store, "Globex")
+    first = product(acme.id, "analytics")
+    async with store.transaction(acme.id) as repos:
+        await repos.products.add(first)
+    with pytest.raises(AlreadyExists):
+        async with store.transaction(acme.id) as repos:
+            await repos.products.add(product(acme.id, "analytics", "Analytics again"))
+    async with store.transaction(globex.id) as repos:
+        await repos.products.add(product(globex.id, "analytics"))
+    async with store.transaction(acme.id) as repos:
+        assert list(await repos.products.list()) == [first]

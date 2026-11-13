@@ -19,15 +19,16 @@ from alembic import command
 from alembic.config import Config
 
 MIGRATIONS = Path(__file__).with_name("migrations")
+TRUE = {"1", "true", "yes", "on"}
 
 
-def alembic_config(url: str) -> Config:
-    from . import asyncpg_url
-
+def alembic_config(url: str, *, transaction_pooler: bool = False) -> Config:
+    """Migrations connect with the same engine settings as requests, including the pooler switch."""
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS))
     config.set_main_option("path_separator", "os")
-    config.attributes["url"] = asyncpg_url(url)
+    config.attributes["url"] = url
+    config.attributes["transaction_pooler"] = transaction_pooler
     return config
 
 
@@ -53,9 +54,9 @@ def _run(fn: Callable[[], object]) -> None:
         raise errors[0]
 
 
-def migrate(url: str) -> None:
+def migrate(url: str, *, transaction_pooler: bool = False) -> None:
     """Apply every migration up to the latest one."""
-    _run(lambda: command.upgrade(alembic_config(url), "head"))
+    _run(lambda: command.upgrade(alembic_config(url, transaction_pooler=transaction_pooler), "head"))
 
 
 def check(url: str) -> None:
@@ -72,7 +73,7 @@ def _cli(argv: list[str]) -> None:
     url = os.environ["DATABASE_URL"]
     match argv:
         case ["upgrade"]:
-            migrate(url)
+            migrate(url, transaction_pooler=os.environ.get("OE_DATABASE_TRANSACTION_POOLER", "").lower() in TRUE)
         case ["check"]:
             check(url)
         case ["revision", message]:

@@ -25,6 +25,13 @@ def ensure_bound_workspace(bound: UUID, record_workspace: UUID) -> None:
         raise PermissionError("a transaction can only write its own Workspace")
 
 
+class AlreadyExists(Exception):
+    """A record with the same unique key already exists, for example a Product key in its Workspace.
+
+    The transaction that raised it is aborted. Operations translate it into a typed problem.
+    """
+
+
 class WorkspacesRepository(Protocol):
     async def add(self, workspace: Workspace) -> None: ...
 
@@ -34,7 +41,9 @@ class WorkspacesRepository(Protocol):
 
 
 class ProductsRepository(Protocol):
-    async def add(self, product: Product) -> None: ...
+    async def add(self, product: Product) -> None:
+        """Raise ``AlreadyExists`` when the Workspace already has a Product with this key."""
+        ...
 
     async def list(self) -> Sequence[Product]: ...
 

@@ -7,7 +7,7 @@ license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = [
   "openentitlement-sdk",
-  "fastapi>=0.115",
+  "fastapi>=0.121",
   "starlette>=0.40",
   "uvicorn>=0.30",
   "sqlalchemy[asyncio]>=2.0.36",

@@ -58,12 +58,12 @@ def build_app(settings: Settings, *, migrate_at_startup: bool = True) -> FastAPI
         return create_app(InMemoryStore(), console_dir=settings.console_dir)
 
     url = settings.database_url
-    engine = create_engine(url, transaction_pooler=settings.transaction_pooler)
+    engine = create_engine(url, transaction_pooler=settings.transaction_pooler, pool_pre_ping=True)
     store = PostgresStore(engine)
 
     async def startup() -> None:
         if migrate_at_startup:
-            migrate(url)
+            migrate(url, transaction_pooler=settings.transaction_pooler)
             if await store.role_bypasses_row_level_security():
                 logger.warning(
                     "The database role can bypass row-level security (superuser or BYPASSRLS). "

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from ...services.models import Product, Workspace
-from ...services.repositories import Repositories, ensure_bound_workspace
+from ...services.repositories import AlreadyExists, Repositories, ensure_bound_workspace
 
 
 @dataclass
@@ -29,6 +29,8 @@ class InMemoryWorkspacesRepository:
 
     async def add(self, workspace: Workspace) -> None:
         ensure_bound_workspace(self._workspace_id, workspace.id)
+        if workspace.id in self._rows.workspaces:
+            raise AlreadyExists(f"workspace {workspace.id}")
         self._rows.workspaces[workspace.id] = workspace
 
     async def get(self) -> Workspace | None:
@@ -41,6 +43,9 @@ class InMemoryProductsRepository:
 
     async def add(self, product: Product) -> None:
         ensure_bound_workspace(self._workspace_id, product.workspace_id)
+        existing = self._rows.products.get(self._workspace_id, {}).values()
+        if any(p.id == product.id or p.key == product.key for p in existing):
+            raise AlreadyExists(f"product {product.key!r}")
         self._rows.products.setdefault(self._workspace_id, {})[product.id] = product
 
     async def list(self) -> Sequence[Product]:

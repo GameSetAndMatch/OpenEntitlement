@@ -6,7 +6,7 @@ It has three layers, and dependencies point inward:
 
 | Package | Contents | May import |
 |---|---|---|
-| `openentitlement_service.interfaces` | The HTTP API (FastAPI): routes, the single Problem Details handler, the per-request Workspace transaction (`workspace_transaction`), the console's static files | the service layer |
+| `openentitlement_service.interfaces` | The HTTP API (FastAPI): routes, the single Problem Details handler, the per-request Workspace transaction (`WorkspaceTransaction`), the console's static files | the service layer |
 | `openentitlement_service.services` | Operations and rules, typed problems (`services/problems.py`), the records it works with and the repository protocols it needs (`services/repositories.py`) | Pydantic only: never FastAPI, FastMCP or SQLAlchemy |
 | `openentitlement_service.repositories` | `memory`: in-memory repositories for fast tests. `postgres`: SQLAlchemy Core tables, asyncpg, Alembic migrations, row-level security | the service layer |
 
@@ -26,7 +26,7 @@ OE_IN_MEMORY=true uv run openentitlement-service   # to try it out: data is lost
 |---|---|---|
 | `DATABASE_URL` | none | Postgres URL (`postgresql://…`). Migrations are applied at startup. Required unless `OE_IN_MEMORY` is set. |
 | `OE_IN_MEMORY` | `false` | `true` keeps data in memory, lost when the service stops. |
-| `OE_DATABASE_TRANSACTION_POOLER` | `false` | Set to `true` behind a transaction-mode pooler such as PgBouncer: turns off asyncpg's prepared-statement cache. |
+| `OE_DATABASE_TRANSACTION_POOLER` | `false` | Set to `true` behind a transaction-mode pooler such as PgBouncer: turns off asyncpg's prepared-statement cache, for requests and startup migrations alike. |
 | `PORT` | `8787` | Listening port. |
 | `OE_HOST` | `127.0.0.1` | Listening address. |
 | `OE_CONSOLE_DIR` | `console/web/dist` in a checkout, when built | The built React console (`npm run build` in `console/`). Without it, only the API is served. |
@@ -43,7 +43,7 @@ Every error is a typed exception in `services/problems.py` with a stable `type` 
 
 Each table is a SQLAlchemy Core `Table` in `repositories/postgres/tables.py`. Each record has its own `version` for optimistic concurrency.
 
-`Store.transaction(workspace_id)` opens one transaction bound to one Workspace; on the HTTP API the `workspace_transaction` dependency opens one per request, commits when the route returns and rolls back when it raises. On Postgres it switches to the `openentitlement_service` role (created by the first migration, never allowed to bypass row-level security) and sets `openentitlement.workspace_id`. Every Workspace table has a forced row-level security policy on that setting, so even a raw SQL query in the transaction sees and writes only that Workspace's rows.
+`Store.transaction(workspace_id)` opens one transaction bound to one Workspace; on the HTTP API a route takes `repos: WorkspaceTransaction` to get one per request. It commits when the route returns and rolls back when it raises, both before the response is sent, so a failed COMMIT becomes an `internal-error` problem rather than a success. A duplicate unique key raises `AlreadyExists` from either implementation. On Postgres it switches to the `openentitlement_service` role (created by the first migration, never allowed to bypass row-level security) and sets `openentitlement.workspace_id`. Every Workspace table has a forced row-level security policy on that setting, so even a raw SQL query in the transaction sees and writes only that Workspace's rows.
 
 Connect with a role that is **not** a superuser and has no `BYPASSRLS`: such a role could leave the `openentitlement_service` role with `RESET ROLE`. The service logs a warning at startup when it can. The connecting role must be allowed to create roles for the first migration (or an administrator creates `openentitlement_service` and grants it to that role beforehand).
 

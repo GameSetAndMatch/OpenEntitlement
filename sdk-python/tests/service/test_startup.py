@@ -69,3 +69,9 @@ def test_health_is_service_unavailable_when_the_database_is_gone() -> None:
         response = client.get("/healthz")
     assert response.status_code == 503
     assert response.json()["type"] == "https://openentitlement.dev/problems/service-unavailable"
+
+
+def test_startup_migrations_follow_the_transaction_pooler_setting(fresh_database_url: str) -> None:
+    settings = Settings(database_url=fresh_database_url, transaction_pooler=True)
+    with TestClient(build_app(settings)) as client:
+        assert client.get("/healthz").json() == {"status": "ok"}
