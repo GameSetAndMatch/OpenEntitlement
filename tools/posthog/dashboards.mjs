@@ -1,15 +1,20 @@
 #!/usr/bin/env node
 /**
  * Create or update OpenEntitlement's PostHog dashboards: the website acquisition funnel and the
- * console activation funnel, with supporting trends. Idempotent: dashboards and insights are
- * matched by name and updated in place.
+ * console activation funnel, with supporting trends. This file is the source of truth for the
+ * insights it names: dashboards and insights are matched by name, and only definitions that differ
+ * from PostHog are written, so a rerun leaves matching insights untouched.
  *
  *   POSTHOG_PERSONAL_API_KEY=phx_... node tools/posthog/dashboards.mjs
+ *   POSTHOG_PERSONAL_API_KEY=phx_... DIFF=1 node tools/posthog/dashboards.mjs   # report, write nothing
  *
  * Environment:
- *   POSTHOG_PERSONAL_API_KEY  required; a personal API key with dashboard and insight write scopes
+ *   POSTHOG_PERSONAL_API_KEY  a personal API key with dashboard and insight scopes (read for DIFF=1, write otherwise)
  *   POSTHOG_PROJECT_ID        default 724077
  *   POSTHOG_APP_HOST          default https://us.posthog.com
+ *   DIFF=1                    compare each definition with PostHog and print unchanged/changed/missing; writes nothing
+ *   SNAPSHOT=path.json        with DIFF=1, compare with a saved snapshot ({ insights: [{ dashboard, name, description, query }] })
+ *                             instead of the API; no key needed (see fixtures/)
  *   DRY_RUN=1                 print the definitions without calling the API
  */
 
@@ -17,15 +22,27 @@ const key = process.env.POSTHOG_PERSONAL_API_KEY;
 const project = process.env.POSTHOG_PROJECT_ID ?? "724077";
 const host = (process.env.POSTHOG_APP_HOST ?? "https://us.posthog.com").replace(/\/+$/, "");
 const dryRun = process.env.DRY_RUN === "1";
-if (!key && !dryRun) throw new Error("Set POSTHOG_PERSONAL_API_KEY (or DRY_RUN=1)");
+const diffOnly = process.env.DIFF === "1";
+const snapshot = process.env.SNAPSHOT;
+if (snapshot && !diffOnly) throw new Error("SNAPSHOT is only read with DIFF=1");
+if (!key && !dryRun && !snapshot) throw new Error("Set POSTHOG_PERSONAL_API_KEY (or DRY_RUN=1, or DIFF=1 with SNAPSHOT)");
 
 const range = { date_from: "-30d" };
 const event = (name, properties = [], extra = {}) => ({ kind: "EventsNode", event: name, name, properties, ...extra });
 const prop = (key, value, operator = "exact") => ({ key, value, operator, type: "event" });
 const viz = (source) => ({ kind: "InsightVizNode", source });
+// Funnels, retention and console errors leave out internal and test traffic: the project's test-account
+// filter (the "Internal / Test users" cohort, set by the website's ?oe_internal=1 link, plus local hosts).
+const excludeInternal = { filterTestAccounts: true };
 const funnel = (series, windowDays = 14) =>
-  viz({ kind: "FunnelsQuery", series, dateRange: range, funnelsFilter: { funnelVizType: "steps", funnelWindowInterval: windowDays, funnelWindowIntervalUnit: "day" } });
-const trend = (series, { breakdown, interval = "day", display } = {}) =>
+  viz({
+    kind: "FunnelsQuery",
+    series,
+    dateRange: range,
+    funnelsFilter: { funnelVizType: "steps", funnelWindowInterval: windowDays, funnelWindowIntervalUnit: "day" },
+    ...excludeInternal,
+  });
+const trend = (series, { breakdown, interval = "day", display, ...extra } = {}) =>
   viz({
     kind: "TrendsQuery",
     series,
@@ -33,6 +50,7 @@ const trend = (series, { breakdown, interval = "day", display } = {}) =>
     dateRange: range,
     ...(breakdown ? { breakdownFilter: { breakdown, breakdown_type: "event" } } : {}),
     ...(display ? { trendsFilter: { display } } : {}),
+    ...extra,
   });
 
 const dashboards = [
@@ -132,7 +150,8 @@ const dashboards = [
       },
       {
         name: "Workspace retention",
-        description: "Of Accounts that created a Workspace, how many keep changing it week after week.",
+        description:
+          "Of people who created a Workspace in a given week, the share who saved at least one change to any Workspace in each later week. Counts people (signed-in Accounts), not Workspaces.",
         query: viz({
           kind: "RetentionQuery",
           dateRange: { date_from: "-8w" },
@@ -142,15 +161,77 @@ const dashboards = [
             period: "Week",
             totalIntervals: 8,
           },
+          ...excludeInternal,
         }),
       },
       {
         name: "Console and service errors",
-        query: trend([event("$exception")], { breakdown: "service" }),
+        description: "Console browser errors and server exceptions, by service. Website errors are excluded; they have their own insight.",
+        // "is not" keeps server exceptions, which have no $host.
+        query: trend([event("$exception", [prop("$host", ["openentitlement.dev"], "is_not")])], { breakdown: "service", ...excludeInternal }),
       },
     ],
   },
 ];
+
+/**
+ * Defaults PostHog adds when it saves a query. A key PostHog holds but this file omits counts as a
+ * change, because a write replaces the whole query, unless it is one of these values. `undefined`
+ * accepts any value.
+ */
+const serverDefaults = {
+  version: undefined,
+  explicitDate: false,
+  excludeIncompletePeriods: false,
+  properties: [],
+  layout: "vertical",
+  exclusions: [],
+  showLegend: false,
+  legendPosition: "bottom",
+  funnelOrderType: "ordered",
+  showAnnotations: true,
+  showValuesOnSeries: false,
+  funnelStepReference: "total",
+  breakdownAttributionType: "first_touch",
+  hideIncompleteConversionWindowPeriods: false,
+  aggregationType: "count",
+  cohortLabelStartIndex: 0,
+  aggregationPropertyType: "event",
+};
+const isServerDefault = (key, value) =>
+  Object.hasOwn(serverDefaults, key) && (serverDefaults[key] === undefined || JSON.stringify(serverDefaults[key]) === JSON.stringify(value));
+
+/** Paths where `current` (PostHog) differs from `desired` (this file), ignoring PostHog's own defaults. */
+function differences(desired, current, path) {
+  if (Array.isArray(desired)) {
+    if (!Array.isArray(current) || current.length !== desired.length) return [path];
+    return desired.flatMap((item, i) => differences(item, current[i], `${path}[${i}]`));
+  }
+  if (desired && typeof desired === "object") {
+    if (!current || typeof current !== "object" || Array.isArray(current)) return [path];
+    const extra = Object.keys(current).filter((k) => !Object.hasOwn(desired, k) && !isServerDefault(k, current[k]));
+    return [...Object.keys(desired).flatMap((k) => differences(desired[k], current[k], `${path}.${k}`)), ...extra.map((k) => `${path}.${k}`)];
+  }
+  return Object.is(desired, current) ? [] : [path];
+}
+
+/** What would change if `insight` were written over `current`: field paths, or undefined when missing. */
+function insightChanges(insight, current) {
+  if (!current) return undefined;
+  return [
+    ...differences(insight.name, current.name, "name"),
+    ...differences(insight.description ?? "", current.description ?? "", "description"),
+    ...differences(insight.query, current.query, "query"),
+  ];
+}
+
+function report(dashboardName, insight, changes) {
+  const label = `${dashboardName} / ${insight.name}`;
+  if (!changes) return console.log(`missing    ${label}`), true;
+  if (changes.length) return console.log(`changed    ${label}  (${changes.join(", ")})`), true;
+  console.log(`unchanged  ${label}`);
+  return false;
+}
 
 async function api(method, path, body) {
   const response = await fetch(`${host}/api/projects/${project}${path}`, {
@@ -178,18 +259,40 @@ if (dryRun) {
   process.exit(0);
 }
 
+if (snapshot) {
+  const { readFileSync } = await import("node:fs");
+  const saved = JSON.parse(readFileSync(snapshot, "utf8")).insights;
+  for (const definition of dashboards)
+    for (const insight of definition.insights) {
+      const current = saved.find((i) => i.dashboard === definition.name && i.name === insight.name);
+      if (current) report(definition.name, insight, insightChanges(insight, current));
+      else console.log(`unknown    ${definition.name} / ${insight.name}  (not in snapshot)`);
+    }
+  process.exit(0);
+}
+
+let pending = 0;
 const existingDashboards = await all("/dashboards/?limit=100");
 for (const definition of dashboards) {
   let dashboard = existingDashboards.find((d) => d.name === definition.name && !d.deleted);
-  dashboard = dashboard
-    ? await api("PATCH", `/dashboards/${dashboard.id}/`, { description: definition.description })
-    : await api("POST", "/dashboards/", { name: definition.name, description: definition.description });
-  const existingInsights = await all(`/insights/?limit=100&dashboards=[${dashboard.id}]`);
-  for (const insight of definition.insights) {
-    const body = { name: insight.name, description: insight.description ?? "", query: insight.query, dashboards: [dashboard.id] };
-    const current = existingInsights.find((i) => i.name === insight.name && !i.deleted);
-    const saved = current ? await api("PATCH", `/insights/${current.id}/`, body) : await api("POST", "/insights/", body);
-    console.log(`${current ? "updated" : "created"}  ${definition.name} / ${saved.name}`);
+  if (diffOnly) {
+    if (!dashboard) console.log(`missing    ${definition.name}`);
+    else if ((dashboard.description ?? "") !== definition.description) console.log(`changed    ${definition.name}  (description)`);
+  } else if (!dashboard) {
+    dashboard = await api("POST", "/dashboards/", { name: definition.name, description: definition.description });
+  } else if ((dashboard.description ?? "") !== definition.description) {
+    dashboard = await api("PATCH", `/dashboards/${dashboard.id}/`, { description: definition.description });
   }
-  console.log(`dashboard: ${host}/project/${project}/dashboard/${dashboard.id}`);
+  const existingInsights = dashboard ? await all(`/insights/?limit=100&dashboards=[${dashboard.id}]`) : [];
+  for (const insight of definition.insights) {
+    const current = existingInsights.find((i) => i.name === insight.name && !i.deleted);
+    const changes = insightChanges(insight, current);
+    const differs = report(definition.name, insight, changes);
+    if (diffOnly || !differs) continue;
+    pending++;
+    const body = { name: insight.name, description: insight.description ?? "", query: insight.query, dashboards: [dashboard.id] };
+    await (current ? api("PATCH", `/insights/${current.id}/`, body) : api("POST", "/insights/", body));
+  }
+  if (dashboard) console.log(`dashboard: ${host}/project/${project}/dashboard/${dashboard.id}`);
 }
+if (!diffOnly) console.log(pending ? `wrote ${pending} insight(s)` : "no changes");

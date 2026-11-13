@@ -19,8 +19,26 @@ if (location.hostname === 'openentitlement.dev' || location.hostname.endsWith('.
     capture_dead_clicks: true,
     capture_performance: { web_vitals: true, network_timing: true },
     session_recording: { maskAllInputs: true },
+    // Runs before the first pageview, so that pageview already carries the cleaned address.
+    loaded: markInternalBrowser,
   });
   trackJourney();
+}
+
+/**
+ * Maintainers open any page with ?oe_internal=1 once per browser to leave the website numbers:
+ * it sets the `$internal_or_test_user` person property, which the project's test-account filter
+ * excludes. ?oe_internal=0 undoes it. Only that flag is stored, on this browser's anonymous ID;
+ * the parameter is then removed from the address bar so it is not shared by copying a link.
+ */
+function markInternalBrowser(ph: Pick<typeof posthog, 'setInternalOrTestUser' | 'setPersonProperties'>): void {
+  const url = new URL(location.href);
+  const value = url.searchParams.get('oe_internal');
+  if (value === null) return;
+  if (value === '1') ph.setInternalOrTestUser();
+  else if (value === '0') ph.setPersonProperties({ $internal_or_test_user: false });
+  url.searchParams.delete('oe_internal');
+  history.replaceState(history.state, '', url.pathname + url.search + url.hash);
 }
 
 /** Named steps for the acquisition funnel; pageviews and clicks are captured automatically. */
