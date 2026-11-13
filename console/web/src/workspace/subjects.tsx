@@ -80,7 +80,7 @@ export function EffectiveEntitlements({
                     </td>
                     <td>{display(d.value)}</td>
                     <td>
-                      {valueSource(w.data, d)}
+                      <span style={{ whiteSpace: "nowrap" }}>{valueSource(w.data, d)}</span>
                       <EnvironmentNotice
                         binding={d.environment}
                         frozen={d.frozen}
