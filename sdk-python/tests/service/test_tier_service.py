@@ -1,8 +1,8 @@
 """Tiers and Tier variants per Product (OPE-40), against both repository implementations."""
 import pytest
 from openentitlement.privileges import BooleanPrivilege, IntegerPrivilege, Visibility
-from openentitlement_service.repositories.memory import InMemoryStore
 from openentitlement_service.services.catalog import CatalogService, VariantValue
+from openentitlement_service.services.organizations import AssignmentInput, OrganizationService
 from openentitlement_service.services.problems import (
     AlreadyTaken,
     NotFound,
@@ -242,13 +242,14 @@ async def test_archived_tiers_keep_their_variants_restore_and_delete(store):
             await tiers.delete(opened, product, "pro", version=2)
 
 
-async def test_a_used_tier_cannot_be_deleted():
-    store = InMemoryStore()
+async def test_a_used_tier_cannot_be_deleted(store):
     service, owner, ws, product = await _setup(store)
     tiers = TierService()
     async with service.open(owner, ws) as opened:
         await tiers.create(opened, product, NewTier(id="pro", name="Pro"), _standard("pro"))
-    store.mark_tier_used(product, "pro")
+        await OrganizationService().create(
+            opened, id="acme", name="Acme", product_id=product, assignment=AssignmentInput(variant_id="pro_standard")
+        )
     with pytest.raises(TierInUse):
         async with service.open(owner, ws) as opened:
             await tiers.delete(opened, product, "pro", version=1)

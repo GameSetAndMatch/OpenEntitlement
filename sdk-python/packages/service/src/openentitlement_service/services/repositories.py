@@ -28,6 +28,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from .catalog import CatalogRecord, CatalogChange, VariantValues
+    from .organizations import AssignmentRecord, OrganizationChange, OrganizationRecord
     from .tiers import StatusPolicyRecord, TierChange, TierRecord
 
 
@@ -67,7 +68,7 @@ class TiersRepository(Protocol):
     async def delete(self, product_id: UUID, tier_id: str, *, expected_version: int) -> None: ...
 
     async def in_use(self, product_id: UUID, tier_id: str) -> bool:
-        """Whether an Organization uses one of the Tier's variants, which then cannot be deleted (ADR-0008)."""
+        """Whether an Organization has one of the Tier's variants, which then cannot be deleted (ADR-0008)."""
         ...
 
     async def policy(self, product_id: UUID) -> StatusPolicyRecord | None: ...
@@ -78,6 +79,39 @@ class TiersRepository(Protocol):
 
     async def changes(self, product_id: UUID) -> Sequence[TierChange]:
         """The Product's Tier audit entries, oldest first."""
+        ...
+
+
+class OrganizationsRepository(Protocol):
+    """The Workspace's Organizations and their Tier variant in each Product (``AssignmentRecord``)."""
+
+    async def list(self) -> Sequence[OrganizationRecord]: ...
+
+    async def get(self, organization_id: str) -> OrganizationRecord | None: ...
+
+    async def add(self, organization: OrganizationRecord) -> None:
+        """Raise ``AlreadyExists`` when the Workspace already has an Organization with this ID."""
+        ...
+
+    async def update(self, organization: OrganizationRecord, *, expected_version: int) -> None:
+        """Replace the Organization, raising ``StaleVersion`` unless it is still at ``expected_version``."""
+        ...
+
+    async def assignments(self, product_id: UUID | None = None) -> Sequence[AssignmentRecord]:
+        """The Organizations' Tier variants, in one Product or in every Product."""
+        ...
+
+    async def save_assignment(self, assignment: AssignmentRecord, *, expected_version: int) -> None:
+        """Insert (``expected_version`` 0) or replace, raising ``StaleVersion`` on another version.
+
+        One per Organization per Product: a second insert raises ``AlreadyExists``.
+        """
+        ...
+
+    async def audit(self, change: OrganizationChange) -> None: ...
+
+    async def changes(self) -> Sequence[OrganizationChange]:
+        """The Workspace's Organization audit entries, oldest first."""
         ...
 
 
@@ -140,7 +174,7 @@ class ProductsRepository(Protocol):
         ...
 
     async def in_use(self, product_id: UUID) -> bool:
-        """Whether an Organization uses the Product, which then cannot be deleted (ADR-0008)."""
+        """Whether an Organization has a Tier variant of the Product, which then cannot be deleted (ADR-0008)."""
         ...
 
 
@@ -215,6 +249,7 @@ class Repositories:
     sign_in_flows: SignInFlowsRepository
     catalog: CatalogRepository
     tiers: TiersRepository
+    organizations: OrganizationsRepository
     directory: DirectoryRepository
 
 

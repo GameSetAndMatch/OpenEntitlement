@@ -166,3 +166,40 @@ tier_changes = Table(
     Column("at", DateTime(timezone=True), nullable=False),
     Column("entry", JSON, nullable=False),
 )
+
+# The Workspace's Organizations (OPE-41): Workspace-wide, keyed by the ID applications send.
+organizations = Table(
+    "organizations", metadata,
+    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True),
+    Column("key", Text, primary_key=True),
+    Column("version", Integer, nullable=False),
+    Column("entry", JSON, nullable=False),
+)
+
+# An Organization's Tier variant in one Product, with its contract status and Organization terms.
+# One per Organization per Product. The variant reference keeps a used Tier from being deleted.
+organization_products = Table(
+    "organization_products", metadata,
+    Column("workspace_id", Uuid, nullable=False),
+    Column("product_id", Uuid, primary_key=True),
+    Column("organization_id", Text, primary_key=True),
+    Column("variant_id", Text, nullable=False),
+    Column("tier_id", Text, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("entry", JSON, nullable=False),
+    ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
+    ForeignKeyConstraint(
+        ["workspace_id", "organization_id"], ["organizations.workspace_id", "organizations.key"], ondelete="CASCADE"
+    ),
+    ForeignKeyConstraint(["product_id", "variant_id"], ["catalog_variant_values.product_id", "catalog_variant_values.key"]),
+)
+
+# Immutable audit facts about Organizations and their Tier variants.
+organization_changes = Table(
+    "organization_changes", metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("seq", BigInteger, Identity(), nullable=False),
+    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    Column("at", DateTime(timezone=True), nullable=False),
+    Column("entry", JSON, nullable=False),
+)

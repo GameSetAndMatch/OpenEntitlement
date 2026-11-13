@@ -154,8 +154,41 @@ and the same type and bound rules as Catalog defaults. A Read-only Privilege use
 default: a variant cannot set or change its value; a stored value is kept unchanged with no
 effect (the OPE-39 policy). Archived Tiers keep their variants, are never upgrade candidates
 (`services/tiers.upgrade_candidates`, spec §3.4) and cannot be a status-policy fallback; they can
-be restored. Until Organizations arrive (OPE-41), no Tier counts as used. Writes record the real
+be restored. A Tier that an Organization has cannot be deleted. Writes record the real
 Account, Product, target and before/after state (`tier_changes`); the filtered audit view is OPE-43.
 
 `npm run test:python-service` from `console` runs guided creation, trial and grace, grace days,
 the status policy and archive/restore in Chromium against the service.
+
+### Organizations (OPE-41)
+
+Under `/api/workspaces/{workspace_id}/organizations`:
+
+| Route | Does |
+|---|---|
+| `GET` | Every Organization's `id`, `name` and `version`, for every member. `products` lists its Tier variant only in the Products where the viewer has a Role: `variantId`, `status` (`active`, `past_due`, `ended`), `graceEndsAt`, `terms`, `version`, the variant in effect (`effectiveVariantId`, `grace`, `fallback`, `readOnly`) and every Privilege's resolved `values` with their `source` and glossary `sourceName` |
+| `POST` | `{id, name, assignment?: {productId, variantId, status, terms}, reason?}`: a Product's Manager or an Owner adds an Organization, optionally with its Tier variant in one Product, in one transaction |
+| `PATCH /{organization}` | `{name, version}`: rename. The ID, which applications send, never changes |
+| `PUT /{organization}/products/{product}` | `{variantId, status, terms, version, reason?}`: version `0` gives a first variant in the Product. That Product's Managers only |
+
+One Tier variant per Organization per Product, never a grace variant. Organization terms belong to
+the variant: a save that changes the variant stores the terms sent with it, so the previous ones
+are cleared. A `reason` (at most 2000 characters) is required exactly when the terms change,
+compared after validation. Terms use the Product's Privileges and the Catalog's type and bound
+rules; a Read-only Privilege keeps its Catalog default (a stored value may be resent unchanged).
+Past due starts the Tier's grace (its grace days, kept while the Organization stays past due on the
+same Tier) and needs a grace variant when the Tier has grace days. During grace the grace variant
+applies; afterwards, and once a contract ends, the Product's status policy keeps the values
+read-only or falls back to its variant, in both cases without the Organization terms when another
+variant applies. A variant of an archived Tier, or any variant of an archived Product, is never
+newly given; current Organizations keep theirs. These writes take the Product row lock, and a
+Catalog change that would make stored terms invalid is refused.
+
+Values are resolved by the SDK's `resolve_from_facts` (spec §3): each Tier variant is a plan, and
+Organization terms are Organization-scoped overrides of the variant in effect. Sources are
+`default` (Catalog default), `variant` (the variant's name), `organizationTerms`, `gracePeriod`
+and `environment`: a Boolean Privilege's environment prerequisite (`envOverride`) is read from the
+service's environment (`true`/`false`/`1`/`0`) and can only turn the value off (ADR-0004); an unset
+or invalid variable makes that value an `error`. Because resolution reads the variable it names,
+only a Platform administrator can set or change a Privilege's environment prerequisite.
+Personal terms and Grants for application users are OPE-60.

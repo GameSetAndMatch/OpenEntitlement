@@ -14,6 +14,61 @@ export function EffectiveEntitlements({
   organizationId: string;
   subjectId?: string;
 }) {
+  // On the Python service the SDK resolves every value; the console only shows them.
+  const resolved = w.organizationValues?.(organizationId);
+  if (resolved)
+    return (
+      <div className="overflow">
+        <table>
+          <thead>
+            <tr>
+              <th>Privilege</th>
+              <th>Effective value</th>
+              <th>Source</th>
+              <th>Access</th>
+            </tr>
+          </thead>
+          <tbody>
+            {w.data.privileges
+              .filter((p) => !p.hidden)
+              .map((p) => {
+                const d = resolved.values.find((v) => v.privilege === p.key);
+                return (
+                  <tr key={p.key}>
+                    <td>
+                      <strong>{p.name}</strong>
+                      <small>
+                        <code>{p.key}</code>
+                      </small>
+                    </td>
+                    {!d || d.source === "error" ? (
+                      <td colSpan={3}>
+                        <span role="alert" className="field-error">
+                          {d?.error ?? "No value"}. Review this Organization’s tier assignment.
+                        </span>
+                      </td>
+                    ) : (
+                      <>
+                        <td>
+                          {typeof d.value === "object"
+                            ? "∞"
+                            : typeof d.value === "boolean"
+                              ? d.value
+                                ? "Enabled"
+                                : "Disabled"
+                              : String(d.value)}
+                        </td>
+                        <td>{d.sourceName}</td>
+                        <td>{resolved.readOnly ? "Read-only" : "Standard"}</td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
+    );
   return (
     <div className="overflow">
       <table>

@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { request,setCsrf } from "./client.ts";
 import { identify, resetIdentity } from "../telemetry.ts";
-import {catalogData,catalogEntry,tiersData,tierRequest,tierSections,type ProductCatalog,type ProductTiers} from "./product-catalog.ts";
+import {catalogData,catalogEntry,tiersData,tierRequest,tierSections,organizationsData,organizationRequests,changesOrganizationTerms,resolvedValues,type ProductCatalog,type ProductTiers,type ProductOrganizations,type OrganizationProduct} from "./product-catalog.ts";
 import { Catalog } from "./catalog.tsx";
 import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
 import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
-import { changesContractTerms,type WorkspaceData } from "../../../server/workspace/model.ts";
+import { changesContractTerms,type WorkspaceData,type Organization } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
 import { ProductSelector, pickProduct, type ProductSummary } from "./product-selector.tsx";
 import { FormField } from "../form.tsx";
 import "./style.css";
 // The Python service lists visible Products and loads their Catalog separately.
-export interface Workspace {products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+export interface Workspace {/** On the Python service: each Organization's values in the selected Product, as the SDK resolved them. */organizationValues?:(organizationId:string)=>OrganizationProduct|undefined;products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
@@ -62,6 +62,10 @@ export function WorkspaceApp(){
   const [productTiers,setProductTiersState]=useState<{workspace:string;product:string;view:ProductTiers}>();
   const tiersRef=useRef(productTiers),tiersToken=useRef(0);
   const setProductTiers=(next:typeof productTiers)=>{tiersRef.current=next;setProductTiersState(next);};
+  // The Workspace's Organizations with their variant and resolved values in each visible Product.
+  const [organizations,setOrganizationsState]=useState<{workspace:string;view:ProductOrganizations}>();
+  const organizationsRef=useRef(organizations),organizationsToken=useRef(0);
+  const setOrganizations=(next:typeof organizations)=>{organizationsRef.current=next;setOrganizationsState(next);};
   const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false),[audit,setAudit]=useState<any[]>([]);
   const [invite,setInvite]=useState(()=>{const incoming=location.hash.startsWith("#invite=")?location.hash.slice(8):"";if(incoming){sessionStorage.setItem("oe.invite",incoming);history.replaceState(null,"","/app/");}return incoming||sessionStorage.getItem("oe.invite")||"";});
   const savingRef=useRef(false);
@@ -94,6 +98,9 @@ export function WorkspaceApp(){
   function refreshCatalog(workspaceId:string,productId:string){const token=++catalogToken.current;void request<ProductCatalog>(`/api/workspaces/${workspaceId}/products/${productId}/catalog`).then(view=>{if(token===catalogToken.current)setProductCatalog({workspace:workspaceId,product:productId,view});}).catch(e=>{if(token===catalogToken.current)setError(e.message);});}
   function refreshTiers(workspaceId:string,productId:string){const token=++tiersToken.current;return request<ProductTiers>(`/api/workspaces/${workspaceId}/products/${productId}/tiers`).then(view=>{if(token===tiersToken.current)setProductTiers({workspace:workspaceId,product:productId,view});}).catch(e=>{if(token===tiersToken.current)setError(e.message);});}
   useEffect(()=>{if(!workspace?.products||!product)return;setProductTiers(undefined);void refreshTiers(workspace.id,product);return()=>{tiersToken.current++;};},[workspace,product]);
+  function refreshOrganizations(workspaceId:string){const token=++organizationsToken.current;return request<ProductOrganizations>(`/api/workspaces/${workspaceId}/organizations`).then(view=>{if(token===organizationsToken.current)setOrganizations({workspace:workspaceId,view});}).catch(e=>{if(token===organizationsToken.current)setError(e.message);});}
+  // Values depend on the Catalog and Tiers too: read them again each time the page opens.
+  useEffect(()=>{if(!workspace?.products||page!=="Organizations")return;void refreshOrganizations(workspace.id);return()=>{organizationsToken.current++;};},[workspace,product,page]);
   useEffect(()=>{if(!workspace?.products||!product)return;const token=++catalogToken.current;setProductCatalog(undefined);void request<ProductCatalog>(`/api/workspaces/${workspace.id}/products/${product}/catalog`).then(view=>{if(token===catalogToken.current)setProductCatalog({workspace:workspace.id,product,view});}).catch(e=>{if(token===catalogToken.current)setError(e.message);});return()=>{catalogToken.current++;};},[workspace,product]);
   const save:Save=async(section,entry,title,method="PUT")=>{
     const workspace=workspaceRef.current;
@@ -118,6 +125,16 @@ export function WorkspaceApp(){
       else if(token===tiersToken.current)setProductTiers({workspace:workspace.id,product,view});
       refreshCatalog(workspace.id,product);toast("Changes saved");return true;
     }
+    if(workspace.products&&section==='organizations'){
+      const current=organizationsRef.current;
+      if(!current||current.workspace!==workspace.id||!product)return false;
+      const organization=entry as Organization;
+      let reason:string|null="";if(changesOrganizationTerms(current.view,organization,product)){reason=await ask(title);if(!reason)return false;}
+      const base=`/api/workspaces/${workspace.id}`;let view:ProductOrganizations|undefined;
+      try{for(const r of organizationRequests(base,organization,current.view,product,reason||undefined))view=await request<ProductOrganizations>(r.path,r.method,r.body);}
+      finally{if(view)setOrganizations({workspace:workspace.id,view});else void refreshOrganizations(workspace.id);}
+      toast("Changes saved");return true;
+    }
     let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
     catch(e){if(generation===pageGeneration.current)failed(e);return false;}finally{savingRef.current=false;setBusy(false);}
   };
@@ -131,6 +148,8 @@ export function WorkspaceApp(){
   const catalogWorkspace=workspace&&currentCatalog?{...workspace,role:selectedProduct?.role??workspace.role,data:catalogData(currentCatalog),catalogVersions:currentCatalog.versions,catalogVariants:currentCatalog.variants}:undefined;
   const currentTiers=workspace&&productTiers?.workspace===workspace.id&&productTiers.product===product?productTiers.view:undefined;
   const tiersWorkspace=catalogWorkspace&&currentCatalog&&currentTiers?{...catalogWorkspace,data:tiersData(currentCatalog,currentTiers)}:undefined;
+  const currentOrganizations=workspace&&organizations?.workspace===workspace.id?organizations.view:undefined;
+  const organizationsWorkspace=tiersWorkspace&&currentOrganizations?{...tiersWorkspace,data:{...tiersWorkspace.data,organizations:organizationsData(currentOrganizations,product)},organizationValues:(id:string)=>resolvedValues(currentOrganizations,id,product)}:undefined;
   const catalogEditable=selectedProduct?.role==='Manager'||selectedProduct?.role==='Owner'||selectedProduct?.role==='Platform administrator';
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
   // API keys are an Owner's page; anyone else lands on Members instead.
@@ -152,7 +171,8 @@ export function WorkspaceApp(){
       {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
       {workspace.products&&shown.name==='Privilege Catalog'&&(catalogWorkspace?<Catalog key={workspace.id+product} workspace={catalogWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Catalog…</p>)}
       {workspace.products&&shown.name==='Tiers'&&(tiersWorkspace?<Tiers key={workspace.id+product} workspace={tiersWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Tiers…</p>)}
-      {workspace.data===undefined&&shown.name!=='Privilege Catalog'&&shown.name!=='Tiers'&&<p className="notice">This page is not available on this service yet.</p>}
+      {workspace.products&&shown.name==='Organizations'&&(organizationsWorkspace?<Organizations key={workspace.id+product} workspace={organizationsWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Organizations…</p>)}
+      {workspace.data===undefined&&!['Privilege Catalog','Tiers','Organizations'].includes(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
       {workspace.data!==undefined&&<>
       {shown.name==="Privilege Catalog"&&!workspace.products&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}

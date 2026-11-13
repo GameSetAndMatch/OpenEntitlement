@@ -25,6 +25,7 @@ from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
+from ...services.organizations import AssignmentRecord, OrganizationChange, OrganizationRecord
 from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
@@ -42,6 +43,7 @@ from .migrate import migrate
 from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
 from .tables import catalog_variant_values, catalog_changes, catalog_groups, catalog_tags, catalog_privileges
 from .tables import status_policies, tier_changes, tiers
+from .tables import organization_changes, organization_products, organizations
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
 
 
@@ -142,8 +144,10 @@ class PostgresProductsRepository:
             raise StaleVersion(f"product {product_id}")
 
     async def in_use(self, product_id: UUID) -> bool:
-        # Organizations and their Tier variants arrive with OPE-41; until then no Organization uses a Product.
-        return False
+        query = select(organization_products.c.organization_id).where(
+            organization_products.c.workspace_id == self._workspace_id, organization_products.c.product_id == product_id
+        )
+        return (await self.connection.execute(query.limit(1))).first() is not None
 
 
 class PostgresMembersRepository:
@@ -375,8 +379,11 @@ class PostgresTiersRepository:
             raise StaleVersion(tier_id)
 
     async def in_use(self, product_id: UUID, tier_id: str) -> bool:
-        # Organizations and their Tier variants arrive with OPE-41; until then no Organization uses a Tier.
-        return False
+        table = organization_products
+        query = select(table.c.organization_id).where(
+            table.c.workspace_id == self.workspace_id, table.c.product_id == product_id, table.c.tier_id == tier_id
+        )
+        return (await self.connection.execute(query.limit(1))).first() is not None
 
     async def policy(self, product_id: UUID) -> StatusPolicyRecord | None:
         query = select(status_policies.c.entry).where(
@@ -420,6 +427,97 @@ class PostgresTiersRepository:
         return [TierChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
 
 
+class PostgresOrganizationsRepository:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self.workspace_id = connection, workspace_id
+
+    async def list(self) -> Sequence[OrganizationRecord]:
+        query = select(organizations.c.entry).where(organizations.c.workspace_id == self.workspace_id).order_by(organizations.c.key)
+        return [OrganizationRecord.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
+
+    async def get(self, organization_id: str) -> OrganizationRecord | None:
+        query = select(organizations.c.entry).where(
+            organizations.c.workspace_id == self.workspace_id, organizations.c.key == organization_id
+        )
+        row = (await self.connection.execute(query)).scalars().first()
+        return OrganizationRecord.model_validate(row) if row else None
+
+    async def add(self, organization: OrganizationRecord) -> None:
+        ensure_bound_workspace(self.workspace_id, organization.workspace_id)
+        values = dict(
+            workspace_id=organization.workspace_id,
+            key=organization.id,
+            version=organization.version,
+            entry=organization.model_dump(mode="json"),
+        )
+        await _insert(self.connection, organizations.insert().values(**values))
+
+    async def update(self, organization: OrganizationRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, organization.workspace_id)
+        statement = (
+            organizations.update()
+            .where(
+                organizations.c.workspace_id == self.workspace_id,
+                organizations.c.key == organization.id,
+                organizations.c.version == expected_version,
+            )
+            .values(version=organization.version, entry=organization.model_dump(mode="json"))
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(organization.id)
+
+    async def assignments(self, product_id: UUID | None = None) -> Sequence[AssignmentRecord]:
+        table = organization_products
+        query = select(table.c.entry).where(table.c.workspace_id == self.workspace_id)
+        if product_id is not None:
+            query = query.where(table.c.product_id == product_id)
+        query = query.order_by(cast(table.c.product_id, Text), table.c.organization_id)
+        return [AssignmentRecord.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
+
+    async def save_assignment(self, assignment: AssignmentRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, assignment.workspace_id)
+        table = organization_products
+        values = dict(
+            variant_id=assignment.variant_id,
+            tier_id=assignment.tier_id,
+            version=assignment.version,
+            entry=assignment.model_dump(mode="json"),
+        )
+        if expected_version == 0:
+            keys = dict(
+                workspace_id=assignment.workspace_id,
+                product_id=assignment.product_id,
+                organization_id=assignment.organization_id,
+            )
+            await _insert(self.connection, table.insert().values(**keys, **values))
+            return
+        statement = (
+            table.update()
+            .where(
+                table.c.workspace_id == self.workspace_id,
+                table.c.product_id == assignment.product_id,
+                table.c.organization_id == assignment.organization_id,
+                table.c.version == expected_version,
+            )
+            .values(**values)
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(assignment.organization_id)
+
+    async def audit(self, change: OrganizationChange) -> None:
+        ensure_bound_workspace(self.workspace_id, change.workspace_id)
+        values = dict(id=change.id, workspace_id=change.workspace_id, at=change.at, entry=change.model_dump(mode="json"))
+        await self.connection.execute(organization_changes.insert().values(**values))
+
+    async def changes(self) -> Sequence[OrganizationChange]:
+        query = (
+            select(organization_changes.c.entry)
+            .where(organization_changes.c.workspace_id == self.workspace_id)
+            .order_by(organization_changes.c.seq)
+        )
+        return [OrganizationChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
+
+
 @dataclass(frozen=True)
 class PostgresRepositories(Repositories):
     """The repositories of one transaction, plus that transaction's connection."""
@@ -455,6 +553,7 @@ class PostgresStore:
                 sign_in_flows=PostgresSignInFlowsRepository(connection),
                 catalog=PostgresCatalogRepository(connection, workspace_id),
                 tiers=PostgresTiersRepository(connection, workspace_id),
+                organizations=PostgresOrganizationsRepository(connection, workspace_id),
                 directory=PostgresDirectoryRepository(connection, account_id),
                 connection=connection,
             )

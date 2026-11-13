@@ -143,6 +143,53 @@ try{
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
  assert.deepEqual((await (await page.request.get(catalogPath)).json()).variants.map(v=>v.tierId),['pro','pro','pro']);
 
+ // Organizations: Workspace-wide, with one Tier variant per Product and Organization terms that need a reason.
+ const organizationsPath=app+`/api/workspaces/${workspaceId}/organizations`;
+ async function reason(){const dialog=page.getByRole('dialog');await dialog.getByRole('textbox').fill('Signed contract');await dialog.getByRole('button',{name:'Confirm',exact:true}).click();await dialog.waitFor({state:'hidden'});}
+ const saveOrganization=page.getByRole('button',{name:'Save organization',exact:true});
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();
+ await page.getByRole('heading',{name:'Add your first customer',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Add organization',exact:true}).click();await assertFormLayout(page);
+ await page.getByLabel('Name',{exact:true}).fill('Acme');assert.equal(await page.getByLabel('ID',{exact:true}).inputValue(),'acme');
+ assert.deepEqual(await page.getByLabel('Tier variant').locator('option').allInnerTexts(),['Pro standard','Pro trial'],'Grace variants are not given');
+ await page.getByLabel('Override seats').check();await page.getByLabel('seats',{exact:true}).fill('25');
+ await saveOrganization.click();await reason();await saveOrganization.waitFor({state:'hidden'});
+ const acmeCard=page.locator('.workspace-card').filter({hasText:'Acme'});await acmeCard.getByText('Pro standard · Active').waitFor();
+ await acmeCard.click();
+ // The SDK resolved the values; each names its source in glossary terms.
+ assert.match(await page.getByRole('row').filter({hasText:'Seats'}).innerText(),/25\s+Organization terms\s+Standard/);
+ let organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
+ assert.deepEqual(organizationsView.map(o=>[o.id,o.products[0].variantId,o.products[0].terms]),[['acme','pro_standard',{seats:25}]]);
+ // Changing the variant clears the terms; switching back before saving keeps them.
+ await page.getByRole('button',{name:'Edit organization',exact:true}).click();
+ await page.getByLabel('Tier variant').selectOption({label:'Pro trial'});assert.equal(await page.getByLabel('Override seats').isChecked(),false);
+ await page.getByLabel('Tier variant').selectOption({label:'Pro standard'});assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'25');
+ // A contract status change alone saves without a reason.
+ await page.getByLabel('Contract status').selectOption('ended');
+ await saveOrganization.click();await saveOrganization.waitFor({state:'hidden'});assert.equal(await page.getByRole('dialog').count(),0);
+ await acmeCard.getByText('Pro standard · Ended').waitFor();
+ // The ended contract falls back to Pro standard (the status policy), without the Organization terms.
+ assert.match(await page.getByRole('row').filter({hasText:'Seats'}).innerText(),/20\s+Pro standard\s+Standard/);
+ // The Tier is in use: it cannot be deleted.
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();await page.getByRole('button',{name:'Delete tier',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
+ await page.getByRole('alert').filter({hasText:'Customers use this Tier'}).waitFor();
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ // Once Pro is archived, Acme keeps Pro standard, and no other Pro variant is offered.
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();await page.getByRole('button',{name:'Archive tier',exact:true}).click();
+ await proPanel.getByText(/^Archived/).waitFor();
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();await acmeCard.click();
+ await page.getByRole('button',{name:'Edit organization',exact:true}).click();
+ assert.deepEqual(await page.getByLabel('Tier variant').locator('option').allInnerTexts(),['Pro standard']);
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();
+ await proPanel.getByRole('button',{name:'Edit tier',exact:true}).click();await page.getByRole('button',{name:'Restore tier',exact:true}).click();
+ await proPanel.getByText(/^Archived/).waitFor({state:'hidden'});
+ organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
+ assert.deepEqual(organizationsView[0].products[0].values.find(v=>v.privilege==='seats'),{privilege:'seats',value:20,source:'variant',sourceName:'Pro standard',error:null});
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+
  // The console reopens the last Workspace; the switcher lists it.
  await page.reload();const switcher=page.getByRole('button',{name:'Workspace: Acme product',exact:true});await switcher.waitFor();
  await switcher.click();const menu=page.getByRole('menu',{name:'Workspaces'});assert.equal(await menu.getByRole('menuitemradio',{name:/Acme product/}).getAttribute('aria-checked'),'true');await page.keyboard.press('Escape');

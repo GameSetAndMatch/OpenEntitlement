@@ -11,7 +11,7 @@ from openentitlement.privileges import Group, Tag, Privilege, TypedPrivilege, Pr
 from pydantic import Field, StrictBool, StrictInt, StrictStr, ValidationError, model_validator
 
 from .access import Permission
-from .problems import FieldError, NotFound, RevisionConflict, ValidationFailed, escape_pointer_token, input_pointer
+from .problems import FieldError, NotFound, PermissionDenied, RevisionConflict, ValidationFailed, escape_pointer_token, input_pointer
 from .repositories import AlreadyExists, StaleVersion
 from .workspaces import OpenWorkspace
 
@@ -253,6 +253,13 @@ class CatalogService:
         current = next((r for r in records if (r.kind, r.key) == (kind, key)), None)
         if (current.version if current else 0) != version:
             raise RevisionConflict(kind=kind, id=key)
+        # Resolution reads the variable an environment prerequisite names: only the install's operator binds one.
+        binding = getattr(entry, "env_override", None)
+        if binding != (getattr(current.entry, "env_override", None) if current else None) and not ws.actor.account.platform_admin:
+            raise PermissionDenied(
+                "Only a Platform administrator can change a Privilege's environment prerequisite.",
+                permission="catalog:environment",
+            )
         record = CatalogRecord(
             workspace_id=ws.actor.workspace_id,
             product_id=product_id,
@@ -305,6 +312,15 @@ class CatalogService:
                     continue
                 if override:
                     changes.append(variant.model_copy(update={"values": values, "version": variant.version + 1}))
+            if not read_only:
+                # Organization terms must stay valid; a Read-only Privilege's stored terms have no effect.
+                names = {o.id: o.name for o in await ws.repos.organizations.list()}
+                for assignment in await ws.repos.organizations.assignments(product_id):
+                    term = assignment.terms.get(key)
+                    problem = value_error(entry, term) if term is not None else None
+                    if problem:
+                        organization = names.get(assignment.organization_id, assignment.organization_id)
+                        errors.append(FieldError("/entry", f"{organization}'s Organization terms would become invalid: {problem}"))
             if errors:
                 raise ValidationFailed(errors)
         for changed in changes:

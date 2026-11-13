@@ -15,6 +15,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
+from ...services.organizations import AssignmentRecord, OrganizationChange, OrganizationRecord
 from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
@@ -35,8 +36,10 @@ class _Rows:
     tiers: dict[tuple[UUID, UUID, str], TierRecord] = field(default_factory=dict)
     status_policies: dict[tuple[UUID, UUID], StatusPolicyRecord] = field(default_factory=dict)
     tier_changes: list[TierChange] = field(default_factory=list)
-    #: (Product, Tier) pairs an Organization uses; tests mark them until Organizations exist (OPE-41).
-    used_tiers: set[tuple[UUID, str]] = field(default_factory=set)
+    organizations: dict[tuple[UUID, str], OrganizationRecord] = field(default_factory=dict)
+    #: (Workspace, Product, Organization) → the Organization's Tier variant in that Product.
+    assignments: dict[tuple[UUID, UUID, str], AssignmentRecord] = field(default_factory=dict)
+    organization_changes: list[OrganizationChange] = field(default_factory=list)
     catalog_changes: list[CatalogChange] = field(default_factory=list)
     catalog: dict[tuple[UUID, UUID, str, str], CatalogRecord] = field(default_factory=dict)
     workspaces: dict[UUID, Workspace] = field(default_factory=dict)
@@ -47,8 +50,6 @@ class _Rows:
     accounts: dict[UUID, Account] = field(default_factory=dict)
     sessions: dict[str, Session] = field(default_factory=dict)
     sign_in_flows: dict[str, SignInFlow] = field(default_factory=dict)
-    #: Products an Organization uses. Organizations arrive with OPE-41; tests may mark a Product used.
-    used_products: set[UUID] = field(default_factory=set)
 
 
 class InMemoryWorkspacesRepository:
@@ -112,7 +113,7 @@ class InMemoryProductsRepository:
             del roles[key]
 
     async def in_use(self, product_id: UUID) -> bool:
-        return product_id in self._own() and product_id in self._rows.used_products
+        return any(k[:2] == (self._workspace_id, product_id) for k in self._rows.assignments)
 
 
 class InMemoryMembersRepository:
@@ -312,7 +313,11 @@ class InMemoryTiersRepository:
         del self.rows.tiers[key]
 
     async def in_use(self, product_id: UUID, tier_id: str) -> bool:
-        return (product_id, tier_id) in self.rows.used_tiers
+        return any(
+            a.tier_id == tier_id
+            for (w, p, _), a in self.rows.assignments.items()
+            if (w, p) == (self.workspace_id, product_id)
+        )
 
     async def policy(self, product_id: UUID) -> StatusPolicyRecord | None:
         if self.workspace_id is None or not self._visible(product_id):
@@ -335,6 +340,63 @@ class InMemoryTiersRepository:
         return [c for c in self.rows.tier_changes if (c.workspace_id, c.product_id) == (self.workspace_id, product_id)]
 
 
+class InMemoryOrganizationsRepository:
+    def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
+        self.rows, self.workspace_id = rows, workspace_id
+
+    async def list(self) -> Sequence[OrganizationRecord]:
+        return sorted((o for (w, _), o in self.rows.organizations.items() if w == self.workspace_id), key=lambda o: o.id)
+
+    async def get(self, organization_id: str) -> OrganizationRecord | None:
+        if self.workspace_id is None:
+            return None
+        return self.rows.organizations.get((self.workspace_id, organization_id))
+
+    async def add(self, organization: OrganizationRecord) -> None:
+        ensure_bound_workspace(self.workspace_id, organization.workspace_id)
+        key = (organization.workspace_id, organization.id)
+        if key in self.rows.organizations:
+            raise AlreadyExists(organization.id)
+        self.rows.organizations[key] = organization
+
+    async def update(self, organization: OrganizationRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, organization.workspace_id)
+        key = (organization.workspace_id, organization.id)
+        current = self.rows.organizations.get(key)
+        if current is None or current.version != expected_version:
+            raise StaleVersion(organization.id)
+        self.rows.organizations[key] = organization
+
+    async def assignments(self, product_id: UUID | None = None) -> Sequence[AssignmentRecord]:
+        found = (
+            a
+            for (w, p, _), a in self.rows.assignments.items()
+            if w == self.workspace_id and (product_id is None or p == product_id)
+        )
+        return sorted(found, key=lambda a: (str(a.product_id), a.organization_id))
+
+    async def save_assignment(self, assignment: AssignmentRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, assignment.workspace_id)
+        if assignment.product_id not in self.rows.products.get(assignment.workspace_id, {}):
+            raise LookupError("unknown Product")
+        if (assignment.workspace_id, assignment.organization_id) not in self.rows.organizations:
+            raise LookupError("unknown Organization")
+        key = (assignment.workspace_id, assignment.product_id, assignment.organization_id)
+        current = self.rows.assignments.get(key)
+        if current is not None and expected_version == 0:
+            raise AlreadyExists(assignment.organization_id)
+        if (current.version if current else 0) != expected_version:
+            raise StaleVersion(assignment.organization_id)
+        self.rows.assignments[key] = assignment
+
+    async def audit(self, change: OrganizationChange) -> None:
+        ensure_bound_workspace(self.workspace_id, change.workspace_id)
+        self.rows.organization_changes.append(change)
+
+    async def changes(self) -> Sequence[OrganizationChange]:
+        return [c for c in self.rows.organization_changes if c.workspace_id == self.workspace_id]
+
+
 class InMemoryStore:
     def __init__(self) -> None:
         self._committed = _Rows()
@@ -355,17 +417,10 @@ class InMemoryStore:
                 sign_in_flows=InMemorySignInFlowsRepository(working),
                 catalog=InMemoryCatalogRepository(working, workspace_id),
                 tiers=InMemoryTiersRepository(working, workspace_id),
+                organizations=InMemoryOrganizationsRepository(working, workspace_id),
                 directory=InMemoryDirectoryRepository(working, account_id),
             )
             self._committed = working
-
-    def mark_product_used(self, product_id: UUID) -> None:
-        """Stand in for an Organization using the Product until Organizations exist (OPE-41)."""
-        self._committed.used_products.add(product_id)
-
-    def mark_tier_used(self, product_id: UUID, tier_id: str) -> None:
-        """Stand in for an Organization on the Tier until Organizations exist (OPE-41)."""
-        self._committed.used_tiers.add((product_id, tier_id))
 
     async def ping(self) -> None:
         return None
