@@ -67,7 +67,7 @@ Primary users:
 | Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 🚧 Products, per-Product roles and Product archiving on `service/python` (OPE-38), per-Product Catalog (OPE-39), Tiers and Tier archiving (OPE-40), Organizations with one Tier variant per Product (OPE-41), Cloud limits (OPE-44) · accepted (ADR-0008) | OPE-38 |
 | Tier minimums: a Tier sets the lowest value of an integer Privilege, checked when Organization terms are saved, an Organization is given the Tier, and the minimum changes; standard variant and Organization terms only; a raise above existing terms is refused and lists those Organizations; authoring only, no protocol change | 📋 accepted (ADR-0011); Python service only, after OPE-45 | `ADR-0011.md`, OPE-62 |
 | Minimum commitments: recorded on an Organization's contract and displayed only; charging out of scope | 📋 accepted (ADR-0011); Python service only, after OPE-45 | `ADR-0011.md`, OPE-62 |
-| Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 📋 accepted (ADR-0007) | — |
+| Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 🚧 on `service/python` | OPE-43; Product-projected snapshots and paginated console read side |
 | Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, glossary names for value sources, standard user form | 📋 | — |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |

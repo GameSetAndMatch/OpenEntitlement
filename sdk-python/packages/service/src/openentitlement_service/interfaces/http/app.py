@@ -20,6 +20,7 @@ from ...services.evaluation import EvaluationService
 from ...services.members import MemberService
 from ...services.workspaces import Deployment, WorkspaceService, utcnow
 from . import api_keys, auth, problems, workspaces, catalog, members, oerep, tiers, organizations
+from . import audit
 from .oidc import OidcClient
 
 
@@ -63,6 +64,7 @@ def create_app(
     app.include_router(tiers.router)
     app.include_router(organizations.router)
     app.include_router(members.router)
+    app.include_router(audit.router)
     app.include_router(api_keys.router)
     app.include_router(oerep.router)
 

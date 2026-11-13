@@ -252,4 +252,3 @@ class EvaluationService:
                 clock=self.clock,
                 users_allowed=user_entitlements(self.deployment, workspace),
             )
-

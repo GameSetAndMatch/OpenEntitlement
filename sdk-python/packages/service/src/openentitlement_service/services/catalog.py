@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Sequence
 from typing import Literal, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from openentitlement.model import OpenEntitlementModel
 from openentitlement.privileges import Group, Identifier, IntegerPrivilege, Privilege, PrivilegeCatalog, Tag, TypedPrivilege, Unlimited, Visibility
-from pydantic import Field, StrictBool, StrictInt, StrictStr, ValidationError, model_validator
+from pydantic import Field, JsonValue, StrictBool, StrictInt, StrictStr, TypeAdapter, ValidationError, model_validator
 
+from . import audit
 from .access import Permission
+from .audit import AuditAction, TargetKind
 from .problems import FieldError, NotFound, PermissionDenied, RevisionConflict, ValidationFailed, escape_pointer_token, input_pointer
 from .repositories import AlreadyExists, StaleVersion
 from .workspaces import OpenWorkspace
@@ -70,32 +72,32 @@ class VariantValues(OpenEntitlementModel):
     values: dict[str, CatalogValue]
 
 
-class CatalogChange(OpenEntitlementModel):
-    id: UUID
-    workspace_id: UUID
-    product_id: UUID
-    actor_id: UUID
-    actor_email: str
-    at: datetime
-    kind: CatalogKind
-    key: str
-    title: str
-    before: CatalogEntry | None
-    after: CatalogEntry
-    variant_before: tuple[VariantValues, ...] = ()
-    variant_after: tuple[VariantValues, ...] = ()
+#: How an entry names each kind of Catalog record.
+_TARGET_KINDS: dict[CatalogKind, TargetKind] = {
+    "groups": TargetKind.GROUP,
+    "tags": TargetKind.TAG,
+    "privileges": TargetKind.PRIVILEGE,
+}
 
-    @model_validator(mode="before")
-    @classmethod
-    def typed_entries(cls, value: object) -> object:
-        # Groups and Tags share a shape, so stored entries are typed by their kind.
-        if isinstance(value, dict) and "kind" in value:
-            data = dict(value)
-            for member in ("before", "after"):
-                if isinstance(data.get(member), dict):
-                    data[member] = typed_entry(data["kind"], data[member])
-            return data
-        return value
+
+def _variant_value_changes(
+    key: str, before: Sequence[VariantValues], after: Sequence[VariantValues]
+) -> list[audit.AuditChange]:
+    """A Privilege's value in each Tier variant that this save changed, named by the variant."""
+    old = {v.id: v.values.get(key) for v in before}
+    return [
+        change
+        for variant in after
+        for change in audit.diff(
+            {"values": {variant.id: _json(old.get(variant.id))}},
+            {"values": {variant.id: _json(variant.values.get(key))}},
+            titles={variant.id: variant.name},
+        )
+    ]
+
+
+def _json(value: object) -> JsonValue:
+    return cast(JsonValue, TypeAdapter(CatalogValue | None).dump_python(cast(CatalogValue | None, value), mode="json"))
 
 
 class CatalogView(OpenEntitlementModel):
@@ -342,21 +344,18 @@ class CatalogService:
             await ws.repos.catalog.save(record, expected_version=version)
         except (StaleVersion, AlreadyExists) as exc:
             raise RevisionConflict(kind=kind, id=key) from exc
-        await ws.repos.catalog.audit(
-            CatalogChange(
-                id=uuid4(),
-                workspace_id=ws.actor.workspace_id,
-                product_id=product_id,
-                actor_id=ws.actor.account.id,
-                actor_email=ws.actor.account.email,
-                at=ws.now,
-                kind=kind,
-                key=key,
-                title=entry.title,
-                before=current.entry if current else None,
-                after=entry,
-                variant_before=tuple(variants),
-                variant_after=tuple(await ws.repos.catalog.variants(product_id)),
-            )
+        after_variants = await ws.repos.catalog.variants(product_id)
+        await audit.record(
+            ws,
+            action=AuditAction.CHANGED if current else AuditAction.CREATED,
+            target_kind=_TARGET_KINDS[kind],
+            target_id=key,
+            target_name=current.entry.title if current else entry.title,
+            product_id=product_id,
+            changes=[
+                *audit.diff(current.entry.model_dump(mode="json", by_alias=True) if current else None,
+                            entry.model_dump(mode="json", by_alias=True)),
+                *_variant_value_changes(key, variants, after_variants),
+            ],
         )
         return await self._view(ws, product_id)

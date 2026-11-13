@@ -174,7 +174,8 @@ async def _state(store, workspace_id, product):
     async with store.transaction(workspace_id) as repos:
         variants = [(v.id, v.version, v.values) for v in await repos.catalog.variants(product)]
         records = {(r.kind, r.key): r.version for r in await repos.catalog.list(product)}
-        return variants, records, list(await repos.catalog.changes(product))
+        entries = [e for _, e in reversed(await repos.audit.list(managed=None, limit=200))]
+        return variants, records, [e for e in entries if e.product_id == product]
 
 
 def _pointers(problem):
@@ -316,15 +317,21 @@ async def test_catalog_audit_records_the_actor_product_target_and_before_after(s
     _, _, changes = await _state(store, ws, product)
     assert len(changes) == 2
     for change in changes:
-        assert (change.workspace_id, change.product_id) == (ws, product)
+        assert (change.workspace_id, change.product_id, change.product_name) == (ws, product, "Acme")
         assert (change.actor_id, change.actor_email) == (owner.id, owner.email)
-        assert (change.kind, change.key) == ("privileges", "seats")
+        assert (change.target_kind, change.target_id) == ("Privilege", "seats")
     created, edited = changes
-    assert (created.before, created.after, created.title) == (None, seats, "Seats")
-    assert [(v.id, v.version, v.values) for v in created.variant_before] == [("basic", 1, {}), ("pro", 1, {})]
-    assert [(v.id, v.version, v.values) for v in created.variant_after] == [
-        ("basic", 2, {"seats": 3}),
-        ("pro", 2, {"seats": 7}),
+    assert (created.action, created.target_name) == ("created", "Seats")
+    assert [(c.field, c.title, c.before, c.after) for c in created.changes] == [
+        ("title", None, None, "Seats"),
+        ("visibility", None, None, "editable"),
+        ("type", None, None, "integer"),
+        ("minimum", None, None, 0),
+        ("maximum", None, None, 10),
+        ("unlimited", None, None, False),
+        ("values.basic", "Basic", None, 3),
+        ("values.pro", "Pro", None, 7),
     ]
-    assert (edited.before, edited.after, edited.title) == (seats, renamed, "Seat limit")
-    assert edited.variant_before == edited.variant_after == created.variant_after
+    # Named as it was before the change; only what changed is listed.
+    assert (edited.action, edited.target_name) == ("changed", "Seats")
+    assert [(c.field, c.before, c.after) for c in edited.changes] == [("title", "Seats", "Seat limit")]

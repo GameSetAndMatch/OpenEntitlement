@@ -33,7 +33,9 @@ from .problems import (
 )
 from .repositories import Store
 from .sign_in import digest, new_secret
-from .workspaces import OpenWorkspace, audit_settings, utcnow
+from . import audit
+from .audit import Aspect, AuditAction, TargetKind
+from .workspaces import OpenWorkspace, utcnow
 
 INVITATION_LIFETIME = timedelta(days=7)
 MAX_EMAIL = 320
@@ -161,14 +163,15 @@ class MemberService:
             expires_at=ws.now + INVITATION_LIFETIME,
         )
         await ws.repos.invitations.add(invitation, now=ws.now)
-        await audit_settings(
+        await audit.record(
             ws,
-            action="invitation.created",
-            target_kind="Invitation",
+            action=AuditAction.INVITED,
+            target_kind=TargetKind.MEMBER,
             target_id=str(invitation.id),
             target_name=email,
             product_id=product_id,
-            after=role.value,
+            owners_only=invitation.owner,
+            changes=audit.diff(None, {"role": role.value}),
         )
         return InvitationLink(
             token=token, email=email, role=role, product_id=product_id, expires_at=invitation.expires_at
@@ -220,14 +223,15 @@ class MemberService:
                 role = highest(current.values())
             if not unchanged:
                 ws = OpenWorkspace(repos=repos, actor=Actor(account=account, workspace_id=workspace_id), now=now)
-                await audit_settings(
+                await audit.record(
                     ws,
-                    action="member.joined",
-                    target_kind="Member",
+                    action=AuditAction.JOINED,
+                    target_kind=TargetKind.MEMBER,
                     target_id=str(account.id),
                     target_name=account.email,
                     product_id=invitation.product_id,
-                    after=role,
+                    owners_only=role == OWNER,
+                    changes=audit.diff(None, {"role": role}),
                 )
         return Joined(workspace_id=workspace_id, already_member=unchanged, role=role)
 
@@ -300,12 +304,13 @@ class MemberService:
         if actor.administers_workspace:
             if member.owner:
                 await self._keep_another_owner(ws, member)
-            before = await self._role(ws, member, None)
+            if member.owner:
+                removed = audit.diff({"role": OWNER}, None)
+            else:
+                roles = await ws.repos.members.product_roles(account_id)
+                removed = await self._role_changes(ws, {r.product_id: r.role.value for r in roles})
             await ws.repos.members.remove(account_id)
-            await audit_settings(
-                ws, action="member.removed", target_kind="Member", target_id=str(account_id), target_name=email,
-                before=before,
-            )
+            await self._audit_removal(ws, account_id, email, removed, owners_only=member.owner)
             return
         if member.owner:
             raise PermissionDenied(
@@ -319,12 +324,34 @@ class MemberService:
         for role in roles:
             if role.product_id in managed:
                 await ws.repos.members.remove_product_role(role.product_id, account_id)
-                await audit_settings(
-                    ws, action="member.removed", target_kind="Member", target_id=str(account_id), target_name=email,
-                    product_id=role.product_id, before=role.role.value,
-                )
         if len(managed) == len(roles):
             await ws.repos.members.remove(account_id)
+        removed = await self._role_changes(ws, {r.product_id: r.role.value for r in roles if r.product_id in managed})
+        await self._audit_removal(ws, account_id, email, removed, owners_only=False)
+
+    async def _role_changes(self, ws: OpenWorkspace, roles: dict[UUID, str]) -> list[audit.AuditChange]:
+        """A member's removed Role in each Product: each read only by that Product's Managers (ADR-0007)."""
+        names = await audit.product_names(ws)
+        return [
+            change
+            for product_id, role in sorted(roles.items(), key=lambda item: names.get(item[0], ""))
+            for change in audit.diff(
+                {"role": role}, None, product_id=product_id, product_name=names.get(product_id)
+            )
+        ]
+
+    async def _audit_removal(
+        self, ws: OpenWorkspace, account_id: UUID, email: str, removed: list[audit.AuditChange], *, owners_only: bool
+    ) -> None:
+        await audit.record(
+            ws,
+            action=AuditAction.REMOVED,
+            target_kind=TargetKind.MEMBER,
+            target_id=str(account_id),
+            target_name=email,
+            owners_only=owners_only,
+            changes=removed,
+        )
 
     async def _member(self, ws: OpenWorkspace, account_id: UUID) -> Member:
         member = await ws.repos.members.get(account_id)
@@ -358,13 +385,15 @@ class MemberService:
     async def _audit_role(
         self, ws: OpenWorkspace, member: Member, product_id: UUID | None, *, before: str | None, after: str | None
     ) -> None:
-        await audit_settings(
+        owners_only = OWNER in (before, after)
+        await audit.record(
             ws,
-            action="member.role_changed",
-            target_kind="Member",
+            action=AuditAction.CHANGED,
+            target_kind=TargetKind.MEMBER,
             target_id=str(member.account_id),
             target_name=await self._email_of(ws, member),
-            product_id=None if OWNER in (before, after) else product_id,
-            before=before,
-            after=after,
+            aspect=Aspect.ROLE,
+            product_id=None if owners_only else product_id,
+            owners_only=owners_only,
+            changes=audit.diff({"role": before}, {"role": after}),
         )

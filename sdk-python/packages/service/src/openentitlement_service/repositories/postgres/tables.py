@@ -7,6 +7,7 @@ its own ``version`` for optimistic concurrency (ADR-0009).
 from __future__ import annotations
 
 from sqlalchemy import (
+    Index,
     BigInteger,
     Boolean,
     Identity,
@@ -23,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 
 metadata = MetaData(
     naming_convention={
@@ -137,14 +139,6 @@ catalog_groups = catalog_table("catalog_groups")
 catalog_tags = catalog_table("catalog_tags")
 catalog_privileges = catalog_table("catalog_privileges")
 
-# Immutable write-side audit facts; OPE-43 supplies the permission-filtered read side.
-catalog_changes = Table(
-    "catalog_changes", metadata,
-    Column("id", Uuid, primary_key=True),
-    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
-    Column("entry", JSON, nullable=False),
-)
-
 # A single-use invitation link, stored by hash. An Owner invitation has no Product; a Manager or
 # User invitation names one, and is deleted with it.
 invitations = Table(
@@ -167,17 +161,6 @@ invitations = Table(
     ),
 )
 
-# Immutable audit facts about members, invitations and the Cloud service tier (ADR-0007).
-settings_changes = Table(
-    "settings_changes", metadata,
-    Column("id", Uuid, primary_key=True),
-    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
-    # Write order, so changes made in one transaction (at the same time) read back in order.
-    Column("seq", BigInteger, Identity(always=True), nullable=False),
-    Column("at", DateTime(timezone=True), nullable=False),
-    Column("entry", JSON, nullable=False),
-)
-
 # A Product's Tiers (OPE-40). Their variants are rows of ``catalog_variant_values``.
 tiers = catalog_table("tiers")
 
@@ -189,18 +172,6 @@ status_policies = Table(
     Column("version", Integer, nullable=False),
     Column("entry", JSON, nullable=False),
     ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
-)
-
-# Immutable audit facts about Tiers, Tier variants and the status policy.
-tier_changes = Table(
-    "tier_changes", metadata,
-    Column("id", Uuid, primary_key=True),
-    # Insertion order: changes made in one transaction share their time.
-    Column("seq", BigInteger, Identity(), nullable=False),
-    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
-    Column("product_id", Uuid, nullable=False),
-    Column("at", DateTime(timezone=True), nullable=False),
-    Column("entry", JSON, nullable=False),
 )
 
 # The Workspace's Organizations (OPE-41): Workspace-wide, keyed by the ID applications send.
@@ -244,14 +215,22 @@ application_users = Table(
     ForeignKeyConstraint(["workspace_id", "organization_id"], ["organizations.workspace_id", "organizations.key"], ondelete="CASCADE"),
 )
 
-# Immutable audit facts about Organizations, their Tier variants and application users.
-organization_changes = Table(
-    "organization_changes", metadata,
+
+# The Audit log (ADR-0007): immutable entries, read newest first. ``owners_only``, ``shared`` and
+# ``products`` repeat what the entry says about who may read it, so a Manager's page is filtered in SQL.
+# ``products`` has no foreign key: an entry about a deleted Product still reads correctly.
+audit_entries = Table(
+    "audit_entries", metadata,
     Column("id", Uuid, primary_key=True),
-    Column("seq", BigInteger, Identity(), nullable=False),
     Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    # Write order, so changes made in one transaction (at the same time) read back in order.
+    Column("seq", BigInteger, Identity(always=True), nullable=False),
     Column("at", DateTime(timezone=True), nullable=False),
+    Column("owners_only", Boolean, nullable=False),
+    Column("shared", Boolean, nullable=False),
+    Column("products", ARRAY(Uuid), nullable=False),
     Column("entry", JSON, nullable=False),
+    Index("ix_audit_entries_workspace_id_seq", "workspace_id", "seq"),
 )
 
 # A Product's API keys (OPE-42). Only the SHA-256 of each secret is stored; revoking deletes the row.

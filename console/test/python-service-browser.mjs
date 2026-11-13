@@ -199,6 +199,12 @@ try{
  // Cloud Pro allows one Product; the Platform administrator moves the Workspace to Enterprise in Settings › Service.
  const tooMany=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});
  assert.equal(tooMany.status(),409);assert.equal((await tooMany.json()).type,'https://openentitlement.dev/problems/product-limit');
+ // The real audit API supplies readable snapshots and expandable before/after values.
+ await page.goto(app+'/app/#settings/audit-log');
+ await page.getByRole('heading',{name:'Audit log',exact:true,level:1}).waitFor();
+ await page.locator('article details summary').first().click();
+ await page.locator('article details[open] dd').first().waitFor();
+ assert.match(await page.locator('article').first().innerText(), /@/);
  await page.goto(app+'/app/#settings/service');await page.getByRole('heading',{name:'Service',exact:true,level:1}).waitFor();
  const tier=page.getByLabel('Cloud service tier');assert.equal(await tier.inputValue(),'pro');
  await tier.selectOption('enterprise');await page.getByRole('button',{name:'Save Cloud service tier',exact:true}).click();

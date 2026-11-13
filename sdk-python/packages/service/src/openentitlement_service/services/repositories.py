@@ -21,7 +21,6 @@ from .models import (
     Product,
     ProductMembership,
     Session,
-    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -30,9 +29,10 @@ from .models import (
 
 if TYPE_CHECKING:
     from .api_keys import ApiKey
-    from .catalog import CatalogRecord, CatalogChange, VariantValues
-    from .organizations import ApplicationUserRecord, AssignmentRecord, OrganizationChange, OrganizationRecord
-    from .tiers import StatusPolicyRecord, TierChange, TierRecord
+    from .audit import AuditEntry
+    from .catalog import CatalogRecord, VariantValues
+    from .organizations import ApplicationUserRecord, AssignmentRecord, OrganizationRecord
+    from .tiers import StatusPolicyRecord, TierRecord
 
 
 class CatalogRepository(Protocol):
@@ -42,12 +42,6 @@ class CatalogRepository(Protocol):
 
     async def delete_variant(self, product_id: UUID, variant_id: str, *, expected_version: int) -> None:
         """Delete the variant, raising ``StaleVersion`` unless it is still at ``expected_version``."""
-        ...
-
-    async def audit(self, change: CatalogChange) -> None: ...
-
-    async def changes(self, product_id: UUID) -> Sequence[CatalogChange]:
-        """The Product's Catalog audit entries, oldest first."""
         ...
 
     async def lock(self, product_id: UUID) -> None:
@@ -78,11 +72,6 @@ class TiersRepository(Protocol):
 
     async def save_policy(self, policy: StatusPolicyRecord, *, expected_version: int) -> None: ...
 
-    async def audit(self, change: TierChange) -> None: ...
-
-    async def changes(self, product_id: UUID) -> Sequence[TierChange]:
-        """The Product's Tier audit entries, oldest first."""
-        ...
 
 
 class OrganizationsRepository(Protocol):
@@ -133,12 +122,6 @@ class OrganizationsRepository(Protocol):
 
     async def delete_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
         """Delete the record, raising ``StaleVersion`` unless it is still at ``expected_version``."""
-        ...
-
-    async def audit(self, change: OrganizationChange) -> None: ...
-
-    async def changes(self) -> Sequence[OrganizationChange]:
-        """The Workspace's Organization audit entries, oldest first."""
         ...
 
 
@@ -277,11 +260,19 @@ class InvitationsRepository(Protocol):
         ...
 
 
-class SettingsChangesRepository(Protocol):
-    async def add(self, change: SettingsChange) -> None: ...
+class AuditRepository(Protocol):
+    """The Workspace's Audit log (ADR-0007). Entries are only ever added."""
 
-    async def list(self) -> Sequence[SettingsChange]:
-        """The Workspace's settings audit facts, oldest first."""
+    async def add(self, entry: AuditEntry) -> None: ...
+
+    async def list(
+        self, *, managed: frozenset[UUID] | None, limit: int, before: int | None = None
+    ) -> Sequence[tuple[int, AuditEntry]]:
+        """Up to ``limit`` entries, newest first, each with its position in write order.
+
+        Only those a Manager of ``managed`` may read (``AuditEntry.visible_to``), or every entry when
+        ``managed`` is ``None``; and only those written before position ``before``, when given.
+        """
         ...
 
 
@@ -345,7 +336,7 @@ class Repositories:
     organizations: OrganizationsRepository
     directory: DirectoryRepository
     invitations: InvitationsRepository
-    settings_changes: SettingsChangesRepository
+    audit: AuditRepository
     api_keys: ApiKeysRepository
 
 

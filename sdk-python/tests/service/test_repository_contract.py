@@ -15,11 +15,11 @@ from openentitlement_service.services.models import (
     ProductRole,
     ServiceTier,
     Session,
-    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
 )
+from openentitlement_service.services.audit import AuditAction, AuditChange, AuditEntry, TargetKind
 from openentitlement_service.services.repositories import AlreadyExists, StaleVersion, Store
 
 pytestmark = pytest.mark.anyio
@@ -391,23 +391,57 @@ async def test_the_service_tier_changes_by_version(store: Store) -> None:
         assert await repos.workspaces.get() == enterprise
 
 
-async def test_settings_changes_read_back_in_write_order_within_their_workspace(store: Store) -> None:
+async def test_audit_entries_read_back_newest_first_within_their_workspace(store: Store) -> None:
     acme, globex = await given_workspace(store, "ACME"), await given_workspace(store, "Globex")
     alice = await given_account(store, "alice")
 
-    def change(ws: Workspace, action: str) -> SettingsChange:
-        return SettingsChange(
-            id=uuid4(), workspace_id=ws.id, actor_id=alice.id, actor_email=alice.email, at=NOW, action=action,
-            target_kind="Member", target_id=str(alice.id), target_name=alice.email, before="User", after="Manager",
+    def entry(ws: Workspace, name: str) -> AuditEntry:
+        return AuditEntry(
+            id=uuid4(), workspace_id=ws.id, actor_id=alice.id, actor_email=alice.email, at=NOW,
+            action=AuditAction.CHANGED, target_kind=TargetKind.ORGANIZATION, target_id=name, target_name=name,
+            changes=(AuditChange(field="name", before="old", after=name),),
         )
 
-    written = [change(acme, f"step-{i}") for i in range(5)]
+    written = [entry(acme, f"step-{i}") for i in range(5)]
     async with store.transaction(acme.id) as repos:
-        for c in written:
-            await repos.settings_changes.add(c)
+        for e in written:
+            await repos.audit.add(e)
     async with store.transaction(globex.id) as repos:
-        await repos.settings_changes.add(change(globex, "elsewhere"))
+        await repos.audit.add(entry(globex, "elsewhere"))
         with pytest.raises(PermissionError):
-            await repos.settings_changes.add(change(acme, "forged"))
+            await repos.audit.add(entry(acme, "forged"))
     async with store.transaction(acme.id) as repos:
-        assert list(await repos.settings_changes.list()) == written
+        page = list(await repos.audit.list(managed=None, limit=3))
+        assert [e for _, e in page] == written[:1:-1]
+        rest = await repos.audit.list(managed=None, limit=10, before=page[-1][0])
+        assert [e for _, e in rest] == written[1::-1]
+
+
+async def test_audit_entries_are_filtered_for_a_manager_like_the_service_does(store: Store) -> None:
+    acme = await given_workspace(store, "ACME")
+    alice = await given_account(store, "alice")
+    analytics, storage = uuid4(), uuid4()
+
+    def entry(name: str, **scope: object) -> AuditEntry:
+        return AuditEntry.model_validate(
+            dict(
+                id=uuid4(), workspace_id=acme.id, actor_id=alice.id, actor_email=alice.email, at=NOW,
+                action=AuditAction.CHANGED, target_kind=TargetKind.ORGANIZATION, target_id=name, target_name=name,
+            )
+            | scope
+        )
+
+    written = [
+        entry("products", owners_only=True),
+        entry("analytics", product_id=analytics),
+        entry("storage", product_id=storage),
+        entry("shared"),
+        entry("storage roles", changes=[AuditChange(field="role", before="User", product_id=storage)]),
+        entry("both", changes=[AuditChange(field="name"), AuditChange(field="role", product_id=storage)]),
+    ]
+    async with store.transaction(acme.id) as repos:
+        for e in written:
+            await repos.audit.add(e)
+        seen = [e.target_name for _, e in await repos.audit.list(managed=frozenset({analytics}), limit=10)]
+        assert seen == ["both", "shared", "analytics"]
+        assert seen == [e.target_name for e in reversed(written) if e.visible_to(frozenset({analytics}))]
