@@ -132,6 +132,8 @@ export function organization(data: WorkspaceData, input: unknown, now = new Date
   }
   return result;
 }
+/** The layer that supplied a value before any Grant was added; an environment prerequisite never changes it. */
+export type ValueSource = "DEFAULT" | "VARIANT" | "CONTRACT" | "SUBJECT" | "GRACE";
 export function resolve(data: WorkspaceData, orgId: string, key: string, now = new Date(), environment:EnvironmentOverrides = {}, subjectId?: string) {
   const org = data.organizations.find(o => o.id === orgId), def = data.privileges.find(p => p.key === key);
   if (!org || !def) throw new WorkspaceError("Organization or privilege not found", 404);
@@ -162,7 +164,8 @@ export function resolve(data: WorkspaceData, orgId: string, key: string, now = n
     const error=valueError(def,effective);if(error)throw new WorkspaceError(error,422);
   }
   if(effective===undefined)throw new WorkspaceError(`${key}: variant has no value`,422);
-  return { privilege: key, environment:binding, frozen, value:binding?(defaultFrozen?def.default:effective)===true&&binding.value:defaultFrozen?def.default:effective, subjectId, subjectState:scoped?(subjectActive?"active":scoped.variantId!==org.variantId?"stale":"suspended"):"inherited", grantApplied:!frozen&&typeof effective==="number"?grant:0, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":grant&&typeof effective==="number"?"SUBJECT_GRANT":subjectTerm?"SUBJECT":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
+  const source:ValueSource=defaultFrozen?"DEFAULT":grace?"GRACE":subjectTerm?"SUBJECT":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT";
+  return { privilege: key, environment:binding, frozen, value:binding?(defaultFrozen?def.default:effective)===true&&binding.value:defaultFrozen?def.default:effective, subjectId, subjectState:scoped?(subjectActive?"active":scoped.variantId!==org.variantId?"stale":"suspended"):"inherited", grantApplied:!frozen&&typeof effective==="number"?grant:0, source, reason:binding?"ENVIRONMENT":frozen?"FROZEN":grace?"GRACE":grant&&typeof effective==="number"?"SUBJECT_GRANT":subjectTerm?"SUBJECT":contract?"CONTRACT":explicit?"VARIANT":"DEFAULT", variantId:assigned.id, readOnly, status:org.status,fallback,grace };
 }
 export function catalogEnvironment(data:WorkspaceData,env:NodeJS.ProcessEnv):EnvironmentOverrides {
  const result:EnvironmentOverrides={};

@@ -59,7 +59,8 @@ Primary users:
 | Workspace API keys and evaluation endpoint | ✅ preview | #22 |
 | Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 📋 accepted (ADR-0008) | — |
 | Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 📋 accepted (ADR-0007) | — |
-| Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, glossary names for value sources, standard user form | 📋 | — |
+| Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, standard user form | 📋 | — |
+| Where each value comes from, in glossary terms: Catalog default, the Tier variant's name, Organization terms, Personal terms or Grace period, with a one-line sum when a Grant adds to it ("Personal terms 50 + Grant 5") | ✅ preview | OPE-55; `console/web/src/workspace/subjects.tsx` |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |
 | YAML import with diff preview and audited apply | 📋 | — |
