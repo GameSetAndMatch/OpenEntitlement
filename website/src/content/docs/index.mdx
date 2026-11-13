@@ -27,15 +27,18 @@ import ProductScenes from '../../components/ProductScenes';
 
 <h2 id="ask">One question from your application.</h2>
 
-<p>Ask for a value, and why. The same contract in Python and TypeScript.</p>
+<p>Ask for a value, and why. The same contract in TypeScript and Python.</p>
 
-```python
-client = create_client(RemoteProvider("http://localhost:8787"), catalog)
-client.get_limit("seat_max", {"organization_id": "acme"})           # 250
-client.get_details("seat_max", {"organization_id": "acme"}).reason  # OVERRIDE
+```ts
+for (const organizationId of ['hooli', 'acme']) {
+  const details = await client.getDetails('seat_max', { organizationId });
+  console.log(organizationId, details.value, details.reason);
+}
+// hooli 3 PLAN
+// acme 250 OVERRIDE
 ```
 
-<p class="landing-code-more"><a href="/docs/python/">See the complete setup</a></p>
+<p class="landing-code-more"><a href="/docs/quickstart/" data-ph-cta="code_quickstart">Run it in the quickstart</a></p>
 
 </section>
 

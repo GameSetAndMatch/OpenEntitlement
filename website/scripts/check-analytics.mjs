@@ -89,6 +89,21 @@ try {
     assert.deepEqual(internalFlags(events), []);
     await context.close();
   }
+  // Copying a code block is recorded once, with the page, the block's language and its first line.
+  {
+    const {context, page, events} = await site(browser, 'openentitlement.dev');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], {origin: 'https://openentitlement.dev'});
+    await page.goto('https://openentitlement.dev/docs/quickstart/');
+    await until(() => events.some((e) => e.event === '$pageview'), 'a pageview');
+    await page.locator('.expressive-code .copy button').first().click();
+    await until(() => events.some((e) => e.event === 'docs_code_copied'), 'the copy event');
+    const copied = events.filter((e) => e.event === 'docs_code_copied');
+    assert.equal(copied.length, 1);
+    assert.equal(copied[0].properties.path, '/docs/quickstart/');
+    assert.equal(copied[0].properties.language, 'sh');
+    assert.match(copied[0].properties.first_line, /^\S/);
+    await context.close();
+  }
   // Any other host (a local preview, CI, a self-hosted copy of the docs) sends nothing, even with the link.
   {
     const {context, page, requests} = await site(browser, 'docs.example.test');
@@ -97,5 +112,5 @@ try {
     assert.equal(requests(), 0);
     await context.close();
   }
-  console.log('Website analytics: ?oe_internal=1 marks the browser internal once and is removed from the address bar; =0 clears it; other hosts send nothing.');
+  console.log('Website analytics: ?oe_internal=1 marks the browser internal once and is removed from the address bar; =0 clears it; copying a code block sends docs_code_copied; other hosts send nothing.');
 } finally { await browser.close(); }

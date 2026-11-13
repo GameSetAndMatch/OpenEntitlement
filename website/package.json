@@ -8,7 +8,8 @@
     "check": "node scripts/prepare-docs.mjs && astro check",
     "test:diagrams": "node scripts/check-diagrams.mjs",
     "test:demo": "node scripts/check-demo.mjs",
-    "test:analytics": "node scripts/check-analytics.mjs"
+    "test:analytics": "node scripts/check-analytics.mjs",
+    "test:quickstart": "node scripts/check-quickstart.mjs"
   },
   "dependencies": {
     "@astrojs/check": "0.9.12",
