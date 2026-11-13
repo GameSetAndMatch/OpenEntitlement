@@ -15,7 +15,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
   const sectionGeneration=useRef(0);
   // Leaving a section discards what was typed in it (the console asked first), and a secret is shown once.
-  // The page is keyed by Product, so changing Product starts it afresh.
+  // The page is keyed by Product, so changing Product starts it afresh; its drafts ask before they are discarded.
   useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");setSecret("");},[section]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");

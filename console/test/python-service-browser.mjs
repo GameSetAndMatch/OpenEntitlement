@@ -307,6 +307,16 @@ await page.getByRole('heading',{name:'Define your first privilege',exact:true}).
  await page.getByRole('dialog').filter({hasText:'Discard your changes?'}).getByRole('button',{name:'Discard',exact:true}).click();
  const storageKeys=page.getByRole('region',{name:'API keys for Storage'});await storageKeys.waitFor();assert.equal(await storageKeys.getByLabel('Key name').inputValue(),'');
  await selector.selectOption({label:'Acme product'});await keys.waitFor();
+ // An invitation draft on Members asks before a Product switch discards it.
+ await page.getByRole('link',{name:'Members',exact:true}).click();await page.getByLabel('Email address').fill('draft@example.test');
+ const sidebarProduct=page.getByRole('combobox',{name:'Product',exact:true});
+ await sidebarProduct.selectOption({label:'Storage'});
+ const discardInvite=page.getByRole('dialog').filter({hasText:'Discard your changes?'});
+ await discardInvite.getByRole('button',{name:'Keep editing',exact:true}).click();await discardInvite.waitFor({state:'hidden'});
+ assert.equal(await sidebarProduct.locator('option:checked').innerText(),'Acme product');assert.equal(await page.getByLabel('Email address').inputValue(),'draft@example.test');
+ await sidebarProduct.selectOption({label:'Storage'});await discardInvite.getByRole('button',{name:'Discard',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
+ assert.equal(await page.getByLabel('Email address').inputValue(),'');await sidebarProduct.selectOption({label:'Acme product'});
  await page.getByRole('link',{name:'Back to workspace',exact:false}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
  // A change without the CSRF token is refused as a Problem Details response.
