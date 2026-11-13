@@ -161,3 +161,5 @@
 .tier-next-list li > div { flex: 1 1 240px; display: grid; gap: 2px; }
 .tier-next-list small { color: var(--muted); font-size: 13px; }
 @media (max-width: 640px) { .tier-review td:last-child { white-space: normal; } }
+.tier-availability p { margin: 0; color: var(--muted); font-size: 14px; }
+.tier-availability-actions { display: flex; flex-wrap: wrap; gap: 8px; }

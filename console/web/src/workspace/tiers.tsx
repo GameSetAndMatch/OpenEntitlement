@@ -7,6 +7,9 @@ import {StatusPolicy} from "./status-policy.tsx";
 import {identifierFromTitle} from "./identifier.ts";
 import {TierCreate} from "./tier-create.tsx";
 import {uniqueIdentifier,variantName} from "./identifier.ts";
+import {TierAvailability} from "./tier-availability.tsx";
+import type {TierRow} from "./product-catalog.ts";
+import {useConfirm} from "../ui.tsx";
 
 const purpose=(kind:Variant["kind"])=>kind==="grace"?"Grace period":kind==="trial"?"Trial":"Standard";
 
@@ -19,7 +22,9 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
   // The "is ready" step replaces the form; move focus to it when it appears and when a variant form returns to it.
   const nextHeading=useRef<HTMLHeadingElement>(null);
   useEffect(()=>{if(created&&!variant)nextHeading.current?.focus();},[created,variant]);
-  const tiers=w.data.tiers.slice().sort((a,b)=>a.rank-b.rank);
+  const tiers=(w.data.tiers as TierRow[]).slice().sort((a,b)=>a.rank-b.rank);
+  // Archiving belongs to Products' Tiers on the Python service (ADR-0008).
+  const lifecycle=w.products!==undefined,confirm=useConfirm();
   if(!w.data.privileges.length)return <section className="panel empty-workspace"><h2>Define your privileges first</h2><p>Your Privilege Catalog supplies the defaults each tier inherits.</p><a className="btn primary" href="#catalog">Go to the Privilege Catalog</a></section>;
 
   // A new tier only needs a name. It ranks above the existing tiers; rank and grace are edited later, when they matter.
@@ -33,6 +38,11 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
   const hasGrace=(id:string)=>w.data.variants.some(v=>v.tierId===id&&v.kind==="grace");
   // Grace days matter once the tier has a grace variant. A stored value stays visible (and editable back to 0) even without one.
   const showGrace=(id:string)=>hasGrace(id)||(w.data.tiers.find(t=>t.id===id)?.gracePeriodDays??0)>0;
+  async function changeAvailability(section:"tier-archive"|"tier-restore"|"tier-delete",t:Tier){
+    if(section==="tier-delete"&&!await confirm(`Delete ${t.name}?`,"Its variants are deleted with it. A Tier that Organizations use can only be archived."))return;
+    const title=section==="tier-archive"?"Archive tier":section==="tier-restore"?"Restore tier":"Delete tier";
+    if(await save(section,{id:t.id},title))setTier(undefined);
+  }
   const tierForm=tier&&canEdit&&<form className="panel form" onSubmit={e=>{e.preventDefault();void save("tiers",tier,editingTier?"Update tier":"Create tier").then(ok=>{if(ok)setTier(undefined);});}}>
     <div className="form-header"><h2>{editingTier?`Edit ${tier.name}`:"Create a tier"}</h2><p>A tier is an offer such as Basic, Pro or Enterprise. Its variants hold the values.</p></div>
     <fieldset className="form-section"><legend>Tier</legend>
@@ -43,6 +53,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
         {editingTier&&showGrace(tier.id)&&<FormField label="Past-due grace period" hint={hasGrace(tier.id)?"Days a past-due Organization keeps this tier's grace values.":"Add a grace variant to this tier to use these days. Until then, past-due Organizations on this tier cannot be saved; set 0 to restrict them right away."}><input type="number" required min={0} max={365} step={1} value={tier.gracePeriodDays} onChange={e=>setTier({...tier,gracePeriodDays:Number(e.target.value)})}/></FormField>}
       </div>
     </fieldset>
+    {editingTier&&lifecycle&&(()=>{const stored=tiers.find(t=>t.id===tier.id);return stored&&<TierAvailability tier={stored} busy={busy} onArchive={()=>void changeAvailability("tier-archive",stored)} onRestore={()=>void changeAvailability("tier-restore",stored)} onDelete={()=>void changeAvailability("tier-delete",stored)}/>;})()}
     <div className="form-actions"><button type="button" className="btn" onClick={()=>setTier(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save tier</button></div>
   </form>;
 
@@ -73,7 +84,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
     {tierForm}{variantForm}
     {!tiers.length&&!open&&<section className="panel empty-workspace"><h2>Create your first tier</h2><p>Tiers such as Basic, Pro and Enterprise share the same catalog. Each tier holds one or more variants with its values.</p>{canEdit&&<button className="btn primary" onClick={newTier}>Create tier</button>}</section>}
     {!open&&tiers.map(t=><section className="panel tier-panel" key={t.id}>
-      <div className="section-title"><div><h2>{t.name}</h2>{showGrace(t.id)&&<p>{t.gracePeriodDays} days of past-due grace{!hasGrace(t.id)&&" · add a grace variant to use them"}</p>}</div>{canEdit&&<button className="btn" onClick={()=>editTier(t)}>Edit tier</button>}</div>
+      <div className="section-title"><div><h2>{t.name}</h2>{t.archivedAt&&<p>Archived · current Organizations keep it; new ones can't get it</p>}{showGrace(t.id)&&<p>{t.gracePeriodDays} days of past-due grace{!hasGrace(t.id)&&" · add a grace variant to use them"}</p>}</div>{canEdit&&<button className="btn" onClick={()=>editTier(t)}>Edit tier</button>}</div>
       {w.data.variants.filter(v=>v.tierId===t.id).map(v=><div className="variant-row" key={v.id}><div><strong>{v.name}</strong><small>{purpose(v.kind)} · {Object.keys(v.values).length} explicit values</small></div>{canEdit&&<button className="btn" onClick={()=>editVariant(v)}>Edit {v.name}</button>}</div>)}
       {!w.data.variants.some(v=>v.tierId===t.id)&&<p className="empty-note">Add a variant before assigning this tier to an Organization.</p>}
       {canEdit&&freeKinds(t).length>0&&<div className="panel-footer"><button className="btn-link" onClick={()=>newVariant(t)} aria-label={`Add a variant to ${t.name}`}>+ Add variant</button></div>}

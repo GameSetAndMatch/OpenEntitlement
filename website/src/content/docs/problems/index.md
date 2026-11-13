@@ -39,6 +39,7 @@ The Python service returns these types. It is in development on the `service/pyt
 | [`already-exists`](/problems/already-exists/) | 409 | Another record already uses this unique key. |
 | [`revision-conflict`](/problems/revision-conflict/) | 409 | The record changed since it was read. |
 | [`product-in-use`](/problems/product-in-use/) | 409 | Customers use the Product, so it can only be archived. |
+| [`tier-in-use`](/problems/tier-in-use/) | 409 | Organizations or the status policy use the Tier, so it can only be archived. |
 | [`last-product`](/problems/last-product/) | 409 | A Workspace keeps at least one Product. |
 | [`internal-error`](/problems/internal-error/) | 500 | The service failed unexpectedly. |
 | [`service-unavailable`](/problems/service-unavailable/) | 503 | The service cannot reach its database, or sign-in is not configured. |

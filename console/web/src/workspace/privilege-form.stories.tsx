@@ -138,7 +138,7 @@ export const ReadOnlyWithoutDefault:Story={args:{initial:{...seats,visibility:'r
  done(canvasElement);
 }};
 
-export const RequiredVariantValues:Story={args:{initial:{key:'seats',title:'Seats',description:'',type:'integer',visibility:'editable',tags:[]},variants:[{id:'standard',name:'Pro standard',version:3,values:{}},{id:'trial',name:'Pro trial',version:1,values:{}}]},play:async({canvasElement,args})=>{
+export const RequiredVariantValues:Story={args:{initial:{key:'seats',title:'Seats',description:'',type:'integer',visibility:'editable',tags:[]},variants:[{id:'standard',tierId:'pro',kind:'standard',name:'Pro standard',version:3,values:{}},{id:'trial',tierId:'pro',kind:'trial',name:'Pro trial',version:1,values:{}}]},play:async({canvasElement,args})=>{
  const canvas=within(canvasElement);
  await userEvent.type(canvas.getByRole('spinbutton',{name:/seats in Pro standard/}),'20');
  await userEvent.type(canvas.getByRole('spinbutton',{name:/seats in Pro trial/}),'5');
