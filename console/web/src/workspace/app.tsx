@@ -37,8 +37,6 @@ const settingsPages=[
   {name:"Audit log",hash:"settings/audit-log",about:"Every change records who made it. Changes to contract terms also record why."},
 ];
 const allPages=[...pages,...settingsPages];
-// The pages the Python service serves so far; the others arrive with their tickets.
-const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","API keys","Service","Configuration","Audit log"]);
 // Links from before Settings had its own sidebar.
 const legacy:Record<string,string>={settings:"Members",configuration:"Configuration",audit:"Audit log"};
 // The last workspace this browser used. A convenience only: the list from the server decides access.
@@ -223,7 +221,6 @@ export function WorkspaceApp(){
       {workspace.products&&shown.name==='Organizations'&&(organizationsWorkspace?<Organizations key={workspace.id+product} workspace={organizationsWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Organizations…</p>)}
       {workspace.products&&shown.name==='Configuration'&&(organizationsWorkspace&&selectedProduct?<WorkspaceConfiguration key={workspace.id+product} workspace={organizationsWorkspace} product={selectedProduct}/>:<p role="status">Loading configuration…</p>)}
       {workspace.data===undefined&&(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} product={selectedProduct} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
-      {workspace.data===undefined&&!PYTHON_PAGES.has(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
       {shown.name==="Audit log"&&workspace&&canAudit&&<AuditLog key={workspace.id} workspaceId={workspace.id} language={session.account?.language??session.language??'en'}/>}
       {workspace.data!==undefined&&<>
       {shown.name==="Privilege Catalog"&&!workspace.products&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
