@@ -131,6 +131,23 @@ async def test_a_reason_is_required_whenever_personal_terms_or_grants_change(use
     assert [(c.field, c.title, c.before, c.after) for c in changes[2].changes] == [("grants.seats", "Seats", None, 5)]
 
 
+async def test_only_the_products_manager_or_an_owner_removes_users_and_is_the_audit_actor(users: Users) -> None:
+    await users.save(grants={"seats": 5}, reason="Goodwill")
+    # Another Product's Manager and the Product's Users cannot remove the record (ADR-0010 Q13).
+    for who in ("user", "storage_manager", "member"):
+        with pytest.raises((PermissionDenied, NotFound)):
+            await users.remove(who, version=1, reason="Pilot over")
+    assert (await users.get()) is not None
+    await users.remove("manager", version=1, reason="Pilot over")
+    assert await users.get() is None
+    async with users.scene.open("owner") as ws:
+        _, removed = (await ws.repos.audit.list(managed=None, limit=1))[0]
+    assert (removed.target_kind, removed.action, removed.actor_id, removed.actor_email, removed.reason) == (
+        "Application user", "removed", users.scene.people["manager"].id, users.scene.people["manager"].email, "Pilot over"
+    )
+    assert removed.product_id == users.scene.analytics
+
+
 async def test_subject_ids_are_what_the_application_sends(users: Users) -> None:
     for subject in ("", " idp|alice", "idp|alice ", "idp\nalice", "x" * 201):
         with pytest.raises(ValidationFailed) as problem:

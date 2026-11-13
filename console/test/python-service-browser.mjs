@@ -232,8 +232,13 @@ try{
  assert.match(await aliceSeats.innerText(),/45\s+Personal terms 40 \+ Grant 5/);
  organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
  assert.deepEqual(organizationsView[0].products[0].users.map(u=>[u.subjectId,u.variantId,u.terms,u.grants,u.state]),[['idp|alice','pro_standard',{seats:40},{seats:5},'active']]);
+ // The removal reason travels in the body, never in the address (ADR-0010 Q13).
+ const removal=page.waitForRequest(r=>r.method()==='DELETE'&&r.url().includes('/users/'));
  await page.getByRole('button',{name:'Remove user exceptions',exact:true}).click();await reason();
+ const removed=await removal;assert.doesNotMatch(removed.url(),/reason|Signed/);assert.deepEqual(removed.postDataJSON(),{reason:'Signed contract'});
  await page.getByText('No personal exceptions. Every user inherits the Organization’s values.').waitFor();
+ const removalEntry=(await (await page.request.get(app+`/api/workspaces/${workspaceId}/audit`)).json()).entries[0];
+ assert.deepEqual([removalEntry.targetKind,removalEntry.targetId,removalEntry.action,removalEntry.actorEmail,removalEntry.reason],['Application user','acme/idp|alice','removed','admin@example.test','Signed contract']);
  assert.deepEqual((await (await page.request.get(organizationsPath)).json()).organizations[0].products[0].users,[]);
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
