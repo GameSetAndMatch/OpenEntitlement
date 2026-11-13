@@ -7,7 +7,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | Term | Definition |
 |---|---|
 | **Privilege** | One typed entitlement value: a boolean permission, integer allowance or string-enum choice. |
-| **Product** | Something a Workspace sells to Organizations, with its own Privilege Catalog and Tiers. Preferred over project. |
+| **Product** | A commercial offering within a Workspace, with its own Privilege Catalog, Tiers and Tier variants. Preferred over project. |
 | **Privilege Catalog** | The definitions, defaults and metadata of one Product's Privileges. Preferred over Feature Catalog for the authoring surface. |
 | **Group** | A hierarchical container for Privileges. A Privilege can belong to at most one Group. |
 | **Tag** | A reusable label independent of Group hierarchy. A Privilege may have several Tags. |
