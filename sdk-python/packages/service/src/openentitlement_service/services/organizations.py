@@ -27,7 +27,7 @@ from uuid import UUID, uuid4
 
 from openentitlement.catalog import PrivilegeDefinition, ValueType
 from openentitlement.details import EvaluationContext, Reason
-from openentitlement.facts import Assignment, Grant, Override, Plan, Scope
+from openentitlement.facts import Assignment, FactSource, Grant, Override, Plan, Scope
 from openentitlement.model import OpenEntitlementModel
 from openentitlement.privileges import (
     BooleanPrivilege,
@@ -211,7 +211,7 @@ class OrganizationChange(OpenEntitlementModel):
 # Resolution through the SDK engine.
 
 
-def _sdk_value(value: Any) -> Any:
+def sdk_value(value: Any) -> Any:
     return UNLIMITED if isinstance(value, Unlimited) else value
 
 
@@ -224,7 +224,7 @@ def _catalog_value(value: Any) -> CatalogValue | None:
 
 def definition(privilege: TypedPrivilege) -> PrivilegeDefinition:
     """The SDK's evaluation view of a Catalog Privilege."""
-    default = _sdk_value(getattr(privilege, "default", None))
+    default = sdk_value(getattr(privilege, "default", None))
     if isinstance(privilege, BooleanPrivilege):
         return PrivilegeDefinition(key=privilege.key, value_type=ValueType.BOOLEAN, default=default)
     if isinstance(privilege, IntegerPrivilege):
@@ -251,13 +251,14 @@ class _Facts:
 
     organization_id: str
     variants: Mapping[str, VariantValues]
-    plan_id: str
+    #: The variant in effect, or None for an Organization without a Tier in the Product (RFC-0005).
+    plan_id: str | None
     terms: Mapping[str, CatalogValue]
     read_only: frozenset[str]
     user: ApplicationUserRecord | None = None
 
     def assignment(self, organization_id: str) -> Assignment | None:
-        return Assignment(organization_id=organization_id, plan_id=self.plan_id)
+        return None if self.plan_id is None else Assignment(organization_id=organization_id, plan_id=self.plan_id)
 
     def plan(self, plan_id: str) -> Plan | None:
         variant = self.variants.get(plan_id)
@@ -270,19 +271,19 @@ class _Facts:
         variant = self.variants.get(plan_id)
         if privilege in self.read_only or variant is None or privilege not in variant.values:
             return False, None
-        return True, _sdk_value(variant.values[privilege])
+        return True, sdk_value(variant.values[privilege])
 
     def overrides(self, organization_id: str, privilege: str) -> Sequence[Override]:
         if privilege in self.read_only:
             return []
         found = []
-        if privilege in self.terms:
+        if privilege in self.terms and self.plan_id is not None:
             found.append(
                 Override(
                     id=f"{ORGANIZATION_TERMS}:{privilege}",
                     scope=Scope(organization_id=organization_id),
                     privilege=privilege,
-                    value=_sdk_value(self.terms[privilege]),
+                    value=sdk_value(self.terms[privilege]),
                     plan_family=self.plan_id,
                     reason="Organization terms",
                 )
@@ -294,7 +295,7 @@ class _Facts:
                     id=f"{PERSONAL_TERMS}:{privilege}",
                     scope=Scope(organization_id=organization_id, subject_id=user.subject_id),
                     privilege=privilege,
-                    value=_sdk_value(user.terms[privilege]),
+                    value=sdk_value(user.terms[privilege]),
                     plan_family=user.variant_id,
                     reason="Personal terms",
                 )
@@ -389,22 +390,40 @@ def _amount(value: Any) -> str:
     return "unlimited" if is_unlimited(value) else str(value)
 
 
+def fact_source(
+    organization_id: str,
+    assignment: AssignmentRecord | None,
+    facts: ProductFacts,
+    now: datetime,
+    user: ApplicationUserRecord | None = None,
+) -> tuple[InEffect | None, FactSource]:
+    """The facts the SDK engine resolves the Organization (or one of its users) from, and the variant in effect.
+
+    Without a Tier variant in the Product, the Organization has no plan: values start from the
+    Catalog defaults, and a user's Grants still add to them (RFC-0005).
+    """
+    effect = in_effect(assignment, facts, now) if assignment is not None else None
+    # Organization terms belong to the assigned variant: a grace or fallback variant replaces them.
+    # It suspends the user's Personal terms and Grants too (ADR-0005).
+    applies = assignment is None or effect is None or _exceptions_apply(assignment, effect)
+    source = _Facts(
+        organization_id=organization_id,
+        variants=facts.variants,
+        plan_id=effect.variant_id if effect else None,
+        terms=assignment.terms if assignment is not None and applies else {},
+        read_only=frozenset(p.key for p in facts.privileges if p.visibility is Visibility.READ_ONLY),
+        user=user if applies else None,
+    )
+    return effect, source
+
+
 def resolve(
     assignment: AssignmentRecord, facts: ProductFacts, now: datetime, user: ApplicationUserRecord | None = None
 ) -> tuple[InEffect, tuple[ResolvedValue, ...]]:
     """Every Privilege of the Product for the Organization, or one of its application users, resolved by the SDK engine."""
-    effect = in_effect(assignment, facts, now)
-    # Organization terms belong to the assigned variant: a grace or fallback variant replaces them.
-    # It suspends the user's Personal terms and Grants too (ADR-0005).
-    applies = _exceptions_apply(assignment, effect)
-    source = _Facts(
-        organization_id=assignment.organization_id,
-        variants=facts.variants,
-        plan_id=effect.variant_id,
-        terms=assignment.terms if applies else {},
-        read_only=frozenset(p.key for p in facts.privileges if p.visibility is Visibility.READ_ONLY),
-        user=user if applies else None,
-    )
+    found, source = fact_source(assignment.organization_id, assignment, facts, now, user)
+    assert found is not None, "an assigned Organization has a variant in effect"
+    effect = found
     context = EvaluationContext(
         organization_id=assignment.organization_id, subject_id=user.subject_id if user else None, now=now
     )

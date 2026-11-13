@@ -76,8 +76,7 @@ async def problem_handler(request: Request, exc: Exception) -> JSONResponse:
         "instance": request.url.path,
         **problem.params,
     }
-    headers = {"Allow": ", ".join(problem.params["allowed"])} if isinstance(problem, MethodNotAllowed) else None
-    return JSONResponse(body, status_code=problem.status, media_type=PROBLEM_JSON, headers=headers)
+    return JSONResponse(body, status_code=problem.status, media_type=PROBLEM_JSON, headers=problem.headers)
 
 
 def install(app: FastAPI) -> None:

@@ -256,3 +256,17 @@ organization_changes = Table(
     Column("at", DateTime(timezone=True), nullable=False),
     Column("entry", JSON, nullable=False),
 )
+
+# A Product's API keys (OPE-42). Only the SHA-256 of each secret is stored; revoking deletes the row.
+api_keys = Table(
+    "api_keys", metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, nullable=False),
+    Column("product_id", Uuid, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("token_hash", Text, nullable=False, unique=True),
+    Column("hint", Text, nullable=False),
+    Column("created_by", Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
+)
