@@ -8,6 +8,10 @@ Implement Linear ticket `<ticket>` for OpenEntitlement as one pull request into 
 
 Read first: the ticket, the spec (its Linear project's description), AGENTS.md, GLOSSARY.md and the decision records the ticket cites. The test seams the spec lists are already approved; build tests only at those seams.
 
+**Question handoff (at any step):** If a question blocks the ticket and the ticket/spec/decision records do not answer it, report it to the conductor and finish this run instead of waiting for the person. Include the ticket reference, a concise question and recommendation, what work depends on the answer, completed work, branch/PR/head if any, and checks run or still owed. Do not invent a product decision or mark the ticket Done. The conductor records the question on the Linear issue, parks the ticket, dispatches other unblocked work within the two-agent limit, and asks the person one numbered batch at a checkpoint or when the unblocked frontier is empty. Answers are recorded and unpark the affected tickets; resume from preserved work and complete every remaining review/check gate.
+
+This handoff applies in OpenAI and Anthropic runners using the active session's reporting tools. It is the exception to the completion requirement in step 7 and the PR-only final line below: if no PR exists, finish with `Parked <ticket>: <question>; recommendation <recommendation>; work <branch/head and remaining steps>`.
+
 1. Base your worktree on `origin/<base>`, resetting onto it if needed.
 2. Build it test-first with the `tdd` skill: one red test, then the code that turns it green, one vertical slice at a time. Typecheck and run single test files as you go, and the full suite at the end. Matt Pocock's `implement` skill describes this loop; follow its steps directly.
 3. Review your own diff with the `code-review` skill (Spec and Standards) and fix what it finds.
