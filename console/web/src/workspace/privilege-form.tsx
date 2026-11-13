@@ -1,3 +1,5 @@
+import type {CatalogVariant,VariantInputs} from './product-catalog.ts';
+import type {Value} from '../../../server/workspace/model.ts';
 import {useState} from 'react';
 import {Field} from './fields.tsx';
 import {TagPicker} from './tag-picker.tsx';
@@ -19,11 +21,12 @@ function cleaned(draft:Privilege):Privilege{
  return {...draft,enum:choices,...(Object.hasOwn(draft,'default')?{default:choices.includes(draft.default??'')?draft.default:choices[0]}:{})};
 }
 
-export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environment,envEditable,busy,onSave,onCreateTag,onCreateGroup,onCancel}:{
- initial:Privilege;editing:boolean;groups:Group[];takenGroupIds?:readonly string[];tags:Tag[];environment?:Workspace['environment'];envEditable:boolean;busy:boolean;
- onSave:(privilege:Privilege)=>Promise<boolean>;onCreateTag:(tag:Tag)=>Promise<boolean>;onCreateGroup:(group:Group)=>Promise<boolean>;onCancel:()=>void;
+export function PrivilegeForm({initial,editing,variants=[],groups,takenGroupIds,tags,environment,envEditable,busy,onSave,onCreateTag,onCreateGroup,onCancel}:{
+ variants?:CatalogVariant[];initial:Privilege;editing:boolean;groups:Group[];takenGroupIds?:readonly string[];tags:Tag[];environment?:Workspace['environment'];envEditable:boolean;busy:boolean;
+ onSave:(privilege:Privilege,variantValues?:VariantInputs)=>Promise<boolean>;onCreateTag:(tag:Tag)=>Promise<boolean>;onCreateGroup:(group:Group)=>Promise<boolean>;onCancel:()=>void;
 }){
  const [draft,setDraft]=useState<Privilege>(initial),[keyEdited,setKeyEdited]=useState(false);
+ const [variantValues,setVariantValues]=useState<Record<string,Value|undefined>>({});
  const saved=cleaned(draft),binding=environment?.[draft.key];
  const requireValue=!Object.hasOwn(draft,'default');
  function changeType(type:Privilege['type']){
@@ -45,7 +48,7 @@ export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environ
   next.default=next.type==='boolean'?false:next.type==='integer'?next.minimum??0:cleanChoices(next.enum)[0]??'';
   setDraft(next as Privilege);
  }
- return <form className="panel form privilege-form" onSubmit={e=>{e.preventDefault();if(defaultError){e.currentTarget.querySelector<HTMLInputElement>('[data-require-value]')?.focus();return;}void onSave(saved);}}>
+ return <form className="panel form privilege-form" onSubmit={e=>{e.preventDefault();if(defaultError){e.currentTarget.querySelector<HTMLInputElement>('[data-require-value]')?.focus();return;}if(requireValue&&variants.length)void onSave(saved,Object.fromEntries(variants.map(v=>[v.id,{version:v.version,value:variantValues[v.id]??v.values[saved.key]}])) as VariantInputs);else void onSave(saved);}}>
   <div className="form-header">
    <h2>{editing?`Edit ${initial.title}`:'Define a Privilege'}</h2>
    <p>A Privilege is one thing your product allows or limits, such as a feature or a quota.</p>
@@ -101,6 +104,7 @@ export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environ
    </div>}
   </fieldset>
 
+  {requireValue&&variants.length>0&&<fieldset className="form-section"><legend>Tier variant values</legend><p className="section-hint">Set a value for each existing variant. These values and the Privilege save together.</p>{variants.map(v=><FormField key={v.id} label={v.name}><Field def={{...storedDefinition(saved),key:`${saved.key} in ${v.name}`} as unknown as StoredPrivilege} value={variantValues[v.id]??v.values[saved.key]} onChange={value=>setVariantValues({...variantValues,[v.id]:value})}/></FormField>)}</fieldset>}
   <fieldset className="form-section">
    <legend>Organize <span className="optional">Optional</span></legend>
    <p className="section-hint">Helps people find this Privilege in the console. It does not change how it evaluates.</p>

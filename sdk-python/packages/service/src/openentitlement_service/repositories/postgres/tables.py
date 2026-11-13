@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy import (
     Boolean,
+    JSON,
     CheckConstraint,
     Column,
     DateTime,
@@ -110,4 +111,31 @@ product_roles = Table(
         ["workspace_id", "account_id"], ["members.workspace_id", "members.account_id"], ondelete="CASCADE"
     ),
     CheckConstraint("role in ('Manager', 'User')", name="role"),
+)
+
+# One table per Catalog record kind. The canonical Pydantic payload is stored as JSON;
+# identity, Product scope and concurrency are ordinary relational columns.
+def catalog_table(name: str) -> Table:
+    return Table(
+        name, metadata,
+        Column("workspace_id", Uuid, nullable=False),
+        Column("product_id", Uuid, primary_key=True),
+        Column("key", Text, primary_key=True),
+        Column("version", Integer, nullable=False),
+        Column("entry", JSON, nullable=False),
+        ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
+    )
+
+catalog_variant_values = catalog_table("catalog_variant_values")
+
+catalog_groups = catalog_table("catalog_groups")
+catalog_tags = catalog_table("catalog_tags")
+catalog_privileges = catalog_table("catalog_privileges")
+
+# Immutable write-side audit facts; OPE-43 supplies the permission-filtered read side.
+catalog_changes = Table(
+    "catalog_changes", metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    Column("entry", JSON, nullable=False),
 )

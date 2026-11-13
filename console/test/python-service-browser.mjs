@@ -42,6 +42,55 @@ try{
  assert.deepEqual(workspace.products.map(p=>[p.key,p.name,p.role]),[['acme_product','Acme product','Owner']]);
  assert.equal(await page.getByRole('combobox',{name:'Product'}).count(),0,'One Product: no selector');
 
+ // Catalog: inline nested Groups, a Tag, strict integer values, and a record edit.
+ await page.getByRole('button',{name:'Define privilege',exact:true}).click();
+ await page.getByLabel('Title',{exact:true}).fill('Seats');
+ await page.getByLabel('Value type').selectOption('integer');
+ await page.getByLabel('seats',{exact:true}).fill('5');
+ await page.locator('details.group-picker > summary').click();
+ await page.getByRole('button',{name:'+ New group',exact:true}).click();
+ await page.getByLabel('Name of the new group').fill('Product');
+ await page.getByLabel('Name of the new group').press('Enter');
+ await page.locator('details.group-picker > summary',{hasText:'Product'}).waitFor();
+ await page.locator('details.group-picker > summary').click();
+ await page.getByRole('button',{name:'New group inside Product',exact:true}).click();
+ await page.getByLabel('Name of the new group inside Product').fill('Limits');
+ await page.getByLabel('Name of the new group inside Product').press('Enter');
+ await page.locator('details.group-picker > summary',{hasText:'Product › Limits'}).waitFor();
+ await page.getByText('Add tags',{exact:true}).click();
+ await page.getByLabel('Find or add a tag').fill('Enterprise');
+ await page.getByRole('button',{name:'Add “Enterprise”',exact:true}).click();
+ await page.getByRole('button',{name:'Remove tag Enterprise',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Save privilege',exact:true}).click();
+ await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+ await page.reload();await page.getByRole('button',{name:'Edit Seats',exact:true}).click();
+ await page.getByLabel('seats',{exact:true}).fill('10');
+ await page.getByRole('button',{name:'Save changes',exact:true}).click();
+ await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+ const catalogPath=app+`/api/workspaces/${workspaceId}/products/${workspace.products[0].id}/catalog`;
+ const catalog=(await (await page.request.get(catalogPath)).json());
+ assert.equal(catalog.catalog.privileges[0].default,10);
+ assert.equal(catalog.catalog.privileges[0].groupId,'limits');
+ assert.deepEqual(catalog.catalog.privileges[0].tags,['enterprise']);
+ assert.equal(catalog.catalog.groups.find(g=>g.id==='limits').parentId,'product');
+ assert.equal(catalog.catalog.tags[0].id,'enterprise');assert.equal(catalog.versions.privileges.seats,2);
+
+ // Inline metadata saves must not replace the version of an open Privilege draft.
+ await page.getByRole('button',{name:'Edit Seats',exact:true}).click();
+ const concurrent=await page.request.put(catalogPath,{headers:await csrfHeaders(page),data:{kind:'privileges',entry:{...catalog.catalog.privileges[0],default:11},version:2}});
+ assert.equal(concurrent.status(),200);
+ await page.getByText('Add tags',{exact:true}).click();
+ await page.getByLabel('Find or add a tag').fill('Concurrent test');
+ await page.getByRole('button',{name:'Add “Concurrent test”',exact:true}).click();
+ await page.getByRole('button',{name:'Remove tag Concurrent test',exact:true}).waitFor();
+ await page.getByLabel('seats',{exact:true}).fill('12');
+ await page.getByRole('button',{name:'Save changes',exact:true}).click();
+ await page.getByRole('alert').filter({hasText:'changed elsewhere'}).waitFor();
+ assert.equal((await (await page.request.get(catalogPath)).json()).catalog.privileges[0].default,11);
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.getByRole('button',{name:'Refresh workspace',exact:true}).click();
+ await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
+
  // The console reopens the last Workspace; the switcher lists it.
  await page.reload();const switcher=page.getByRole('button',{name:'Workspace: Acme product',exact:true});await switcher.waitFor();
  await switcher.click();const menu=page.getByRole('menu',{name:'Workspaces'});assert.equal(await menu.getByRole('menuitemradio',{name:/Acme product/}).getAttribute('aria-checked'),'true');await page.keyboard.press('Escape');
@@ -50,7 +99,7 @@ try{
  const created=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});assert.equal(created.status(),201);
  await page.reload();const selector=page.getByRole('combobox',{name:'Product'});await selector.waitFor();
  assert.deepEqual(await selector.locator('option').allInnerTexts(),['Acme product','Storage']);
- await selector.selectOption({label:'Storage'});await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
+ await selector.selectOption({label:'Storage'});await page.getByRole('heading',{name:'Define your first privilege',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Edit Seats',exact:true}).count(),0);await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
 
  // A change without the CSRF token is refused as a Problem Details response.
  const refused=await page.request.post(app+'/api/workspaces',{headers:{origin:app},data:{name:'No token'}});assert.equal(refused.status(),403);assert.equal((await refused.json()).type,'https://openentitlement.dev/problems/csrf-rejected');

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request,setCsrf } from "./client.ts";
 import { identify, resetIdentity } from "../telemetry.ts";
+import {catalogData,catalogEntry,type ProductCatalog} from "./product-catalog.ts";
 import { Catalog } from "./catalog.tsx";
 import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
@@ -11,8 +12,8 @@ import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
 import { ProductSelector, pickProduct, type ProductSummary } from "./product-selector.tsx";
 import { FormField } from "../form.tsx";
 import "./style.css";
-// The Python service sends the Products the member can see; Catalog data per Product arrives with later tickets.
-export interface Workspace {products?:ProductSummary[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+// The Python service lists visible Products and loads their Catalog separately.
+export interface Workspace {products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
@@ -52,9 +53,11 @@ export function WorkspaceApp(){
   const loadFailed=useRef(false);
   // Only the newest load of the selected workspace may report its result; switching workspace or retrying again supersedes it.
   const loadToken=useRef(0);
-  const failed=(e:unknown)=>{const {message,status}=e as {message:string;status?:number};setError(message,status===409&&message===STALE_REVISION);};
+  const failed=(e:unknown)=>{const {message,status,type}=e as {message:string;status?:number;type?:string};setError(message,status===409&&(message===STALE_REVISION||type?.endsWith("/revision-conflict")===true));};
   const [list,setList]=useState<Array<{id:string;name:string;role:string}>>([]),[selected,setSelected]=useState(""),[workspace,setWorkspace]=useState<Workspace>(),[page,setPage]=useState(currentPage);
   const [product,setProduct]=useState("");
+  const [productCatalog,setProductCatalog]=useState<{workspace:string;product:string;view:ProductCatalog}>();
+  const catalogToken=useRef(0);
   const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false),[audit,setAudit]=useState<any[]>([]);
   const [invite,setInvite]=useState(()=>{const incoming=location.hash.startsWith("#invite=")?location.hash.slice(8):"";if(incoming){sessionStorage.setItem("oe.invite",incoming);history.replaceState(null,"","/app/");}return incoming||sessionStorage.getItem("oe.invite")||"";});
   const savingRef=useRef(false);
@@ -83,12 +86,20 @@ export function WorkspaceApp(){
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(workspace?.products)setProduct(pickProduct(workspace.products,rememberedProduct(workspace.id)));},[workspace]);
   useEffect(()=>{if(page!=="Audit log"||!workspace||workspace.data===undefined)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[page,workspace]);
+  useEffect(()=>{if(!workspace?.products||!product)return;const token=++catalogToken.current;setProductCatalog(undefined);void request<ProductCatalog>(`/api/workspaces/${workspace.id}/products/${product}/catalog`).then(view=>{if(token===catalogToken.current)setProductCatalog({workspace:workspace.id,product,view});}).catch(e=>{if(token===catalogToken.current)setError(e.message);});return()=>{catalogToken.current++;};},[workspace,product]);
   const save:Save=async(section,entry,title,method="PUT")=>{
     const workspace=workspaceRef.current;
     if(!workspace||savingRef.current)return false;savingRef.current=true;
     const generation=pageGeneration.current;
     setBusy(true);setError("");
-    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
+    try{
+    if(workspace.products&&['catalog','groups','tags'].includes(section)){
+      if(!productCatalog||productCatalog.workspace!==workspace.id||productCatalog.product!==product)return false;
+      const {entry:canonical,kind,key,variantValues,expectedVersion}=catalogEntry(section,entry),token=catalogToken.current;
+      const view=await request<ProductCatalog>(`/api/workspaces/${workspace.id}/products/${product}/catalog`,'PUT',{kind,entry:canonical,variantValues,version:expectedVersion??productCatalog.view.versions[kind]?.[key]??0});
+      if(token===catalogToken.current)setProductCatalog({workspace:workspace.id,product,view});toast("Changes saved");return true;
+    }
+    let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
     catch(e){if(generation===pageGeneration.current)failed(e);return false;}finally{savingRef.current=false;setBusy(false);}
   };
   async function create(){setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name});await loadList();setSelected(value.id);setCreating(false);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
@@ -96,6 +107,10 @@ export function WorkspaceApp(){
   if(!ready)return <main className="sign-in"><p role="status">Loading…</p></main>;
   if(!session)return <main className="sign-in"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="48" height="48"/></picture><h1>Sign in to OpenEntitlement</h1><p>Manage your privileges, tiers, and customer access in one workspace.</p>{error.message&&<p role="alert" className="notice error">{error.message}</p>}<a className="btn primary" href="/auth/login">Sign in</a></main>;
   const current=list.find(w=>w.id===selected);
+  const selectedProduct=workspace?.products?.find(p=>p.id===product);
+  const currentCatalog=workspace&&productCatalog?.workspace===workspace.id&&productCatalog.product===product?productCatalog.view:undefined;
+  const catalogWorkspace=workspace&&currentCatalog?{...workspace,role:selectedProduct?.role??workspace.role,data:catalogData(currentCatalog),catalogVersions:currentCatalog.versions,catalogVariants:currentCatalog.variants}:undefined;
+  const catalogEditable=selectedProduct?.role==='Manager'||selectedProduct?.role==='Owner'||selectedProduct?.role==='Platform administrator';
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
   // API keys are an Owner's page; anyone else lands on Members instead.
   const visibleSettings=settingsPages.filter(p=>p.name!=="API keys"||canEdit);
@@ -114,9 +129,10 @@ export function WorkspaceApp(){
       {(creating||!selected)&&<form className="panel workspace-create" onSubmit={e=>{e.preventDefault();void create();}}><h1>Create a workspace</h1><p>A workspace holds one product’s privileges, tiers and Organizations. To join an existing one, open the invitation link its Owner sent you.</p><FormField label="Workspace name"><input required autoFocus={creating} maxLength={200} value={name} onChange={e=>setName(e.target.value)} /></FormField><div className="form-actions">{selected&&<button type="button" className="btn" onClick={()=>{setCreating(false);requestAnimationFrame(()=>document.querySelector<HTMLElement>(".workspace-trigger")?.focus());}}>Cancel</button>}<button className="btn primary" disabled={busy}>{busy?"Creating…":"Create workspace"}</button></div></form>}
       {selected&&!creating&&!workspace&&!error.message&&<p role="status" className="notice">Loading workspace…</p>}
       {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
-      {workspace.data===undefined&&<p className="notice">This page is not available on this service yet.</p>}
+      {workspace.products&&shown.name==='Privilege Catalog'&&(catalogWorkspace?<Catalog key={workspace.id+product} workspace={catalogWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Catalog…</p>)}
+      {workspace.data===undefined&&shown.name!=='Privilege Catalog'&&<p className="notice">This page is not available on this service yet.</p>}
       {workspace.data!==undefined&&<>
-      {shown.name==="Privilege Catalog"&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
+      {shown.name==="Privilege Catalog"&&!workspace.products&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}

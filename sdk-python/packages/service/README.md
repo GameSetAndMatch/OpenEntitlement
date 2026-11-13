@@ -100,3 +100,35 @@ uv run mypy --strict packages/service/src
 ```
 
 Without `OE_PG_DSN`, the Postgres tests are skipped. The tests sit at the seams of ADR-0009: the HTTP API as a black box, and a repository contract suite that runs against both the in-memory and the Postgres implementations.
+
+
+### Product Catalog (OPE-39)
+
+`GET /api/workspaces/{workspace_id}/products/{product_id}/catalog` returns the canonical
+`catalog`, per-kind `versions`, and Catalog-facing `variants` (values and versions).
+`PUT` at the same address accepts `{kind, entry, version, variantValues?}`. `kind` is
+`groups`, `tags` or `privileges`; `entry` is the SDK's camelCase Group, Tag or typed Privilege.
+Use version `0` to create, or the record's last-read version to edit. A stale save returns
+`revision-conflict` with the record kind and ID. Different records have independent versions.
+
+The console Catalog uses the selected Product and its Role. Managers edit their Product;
+Users read it; Owners administer every Product. Validation uses the SDK Catalog models,
+including acyclic Group references, unique Tags, typed defaults and restrictive boolean
+prerequisites. Catalog saves ask for no contract-term reason. `validation-failed` errors
+point at the submitted JSON (`/entry/default`, `/entry/parentId`, `/entry/tags/1`,
+`/variantValues/{variant_id}/value`), never at SDK union or discriminator branch names.
+
+A required Privilege can supply `variantValues: {variant_id: {version, value}}` in the same
+save. All existing variants must have valid values; a missing value or stale variant rolls
+back the entire save. A Read-only Privilege uses its Catalog default (RFC-0002): its
+variant values are neither validated nor accepted in `variantValues`, and stored ones are kept
+unchanged with no effect. They are validated again if the Privilege becomes editable. Clearing
+them, with a console confirmation, is the separate OPE-54 policy. `catalog_variant_values` is the Catalog-facing value storage seam for
+OPE-40's Tier lifecycle, which must take the same Product lock before creating/changing
+variants. No Tier creation API is introduced here. Write audit facts include the real Account,
+Product, target name, before/after definition and variant values; the repositories read them back
+per Product (`changes`); the filtered audit view is OPE-43.
+
+Run `uv run pytest -q tests/service/test_catalog_service.py tests/service/test_http_catalog.py`
+from `sdk-python` for the shared memory/Postgres behavior tests. Set `OE_PG_DSN` for Postgres.
+`npm run test:python-service` from `console` exercises real sign-in and the Catalog in Chromium.
