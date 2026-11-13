@@ -4,7 +4,7 @@ Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills/tree/4a
 
 Sources: `skills/engineering/code-review`, `skills/engineering/domain-modeling`, `skills/engineering/grill-with-docs`, and `skills/productivity/grilling`. `implement-train` adapts `skills/engineering/implement-spec` (integration branch, task-graph frontier, one implementer per ticket) to this project: one pull request and thread per ticket, a Codex review before every merge, and Linear as the tracker. It points at the upstream `tdd`, `implement`, `pr` and `retro` skills by name instead of copying them. The setup skill informed repository layout; no automatic issue creation, label changes, plugins, hooks or accounts were configured.
 
-Changes: known decisions replace repeated interviews; existing root ADR/glossary layout is retained; Spec and Standards are still separate; delegation and authorization follow the active session; provider-specific Skill-tool calls were replaced with direct Markdown workflows.
+Changes: OPE-57 adds ticket-level parking, numbered question batches and resumption after answers while preserving the two-agent limit and merge gates; known decisions replace repeated interviews; existing root ADR/glossary layout is retained; Spec and Standards are still separate; delegation and authorization follow the active session; provider-specific Skill-tool calls were replaced with direct Markdown workflows.
 
 AGENTS.md is the shared entry point for Anthropic and OpenAI agents. Each skill is ordinary SKILL.md with name/description frontmatter. Native skill-menu discovery depends on the runner's supported project locations; agents can always read these paths through AGENTS.md. No duplicate CLAUDE.md or model-specific workflow copy is required.
 

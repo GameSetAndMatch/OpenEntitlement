@@ -106,6 +106,12 @@ Primary users:
 | GitHub organization `open-entitlement`, avatar, repository links | ✅ | #29 |
 | Trusted publishers on PyPI and npm moved to the `open-entitlement` owner | 👤 | `docs/maintainers/` |
 
+### Contributor workflow
+
+| Capability | Status | Where |
+|---|---|---|
+| Train parks tickets with unanswered questions, batches questions with recommendations, continues independent work and resumes after answers | ✅ documented workflow | OPE-57; `.agents/skills/implement-train/SKILL.md`, `.agents/skills/implement-train/BRIEF.md` |
+
 ## Open owner actions
 
 1. On PyPI and npm, change the trusted publisher owner from `GameSetAndMatch` to `open-entitlement` before the next release.
