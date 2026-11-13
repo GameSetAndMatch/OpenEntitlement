@@ -1,9 +1,37 @@
 import { useState } from "react";
 import type { Workspace, Save } from "./app.tsx";
-import { resolve, type Value } from "../../../server/workspace/model.ts";
+import { resolve, type Value, type WorkspaceData } from "../../../server/workspace/model.ts";
 import { ValuesEditor, Field } from "./fields.tsx";
 import { EnvironmentNotice } from "../ui.tsx";
 import { FormField } from "../form.tsx";
+
+const display = (value: Value | undefined) =>
+  typeof value === "object"
+    ? "∞"
+    : typeof value === "boolean"
+      ? value
+        ? "Enabled"
+        : "Disabled"
+      : String(value);
+
+/** Where a value comes from, in glossary terms. A Grant shows the one-line sum it adds to. */
+function valueSource(
+  data: WorkspaceData,
+  d: Pick<ReturnType<typeof resolve>, "source" | "variantId" | "value" | "grantApplied">,
+) {
+  const name =
+    d.source === "VARIANT"
+      ? (data.variants.find((v) => v.id === d.variantId)?.name ?? "Tier variant")
+      : {
+          DEFAULT: "Catalog default",
+          CONTRACT: "Organization terms",
+          SUBJECT: "Personal terms",
+          GRACE: "Grace period",
+        }[d.source];
+  return d.grantApplied && typeof d.value === "number"
+    ? `${name} ${d.value - d.grantApplied} + Grant ${d.grantApplied}`
+    : name;
+}
 
 export function EffectiveEntitlements({
   workspace: w,
@@ -50,17 +78,9 @@ export function EffectiveEntitlements({
                         <code>{p.key}</code>
                       </small>
                     </td>
+                    <td>{display(d.value)}</td>
                     <td>
-                      {typeof d.value === "object"
-                        ? "∞"
-                        : typeof d.value === "boolean"
-                          ? d.value
-                            ? "Enabled"
-                            : "Disabled"
-                          : String(d.value)}
-                    </td>
-                    <td>
-                      {d.reason}
+                      {valueSource(w.data, d)}
                       <EnvironmentNotice
                         binding={d.environment}
                         frozen={d.frozen}
