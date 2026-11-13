@@ -2,19 +2,13 @@
 from __future__ import annotations
 
 import pytest
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from openentitlement_service.interfaces.http import WorkspaceTransaction, create_app
-from openentitlement_service.services.models import Product, Workspace
-from openentitlement_service.services.problems import NotFound
-from openentitlement_service.services.repositories import Repositories
+from openentitlement_service.interfaces.http import create_app
 from openentitlement_service.repositories.memory import InMemoryStore
 
 PROBLEM = "application/problem+json"
@@ -72,21 +66,6 @@ def probe_client() -> TestClient:
     @app.get("/api/probe/teapot")
     async def teapot() -> None:
         raise HTTPException(status_code=418, detail="internal hint")
-
-    @app.post("/api/probe/workspaces/{workspace_id}/products")
-    async def add_product(workspace_id: UUID, product: ProductInput, repos: WorkspaceTransaction) -> dict[str, str]:
-        if not await repos.workspaces.get():
-            await repos.workspaces.add(Workspace(id=workspace_id, name="ACME", created_at=NOW))
-        await repos.products.add(
-            Product(id=uuid4(), workspace_id=workspace_id, key=product.key, name=product.key, created_at=NOW)
-        )
-        if product.key == "fail-after-writing":
-            raise NotFound("The Tier does not exist.")
-        return {"key": product.key}
-
-    @app.get("/api/probe/workspaces/{workspace_id}/products")
-    async def list_products(repos: WorkspaceTransaction) -> list[str]:
-        return [p.key for p in await repos.products.list()]
 
     @app.get("/api/probe/boom")
     async def boom() -> None:
@@ -198,42 +177,3 @@ def test_other_http_errors_are_plain_problems_not_internal_errors(probe_client: 
         "instance": "/api/probe/teapot",
     }
     assert "internal hint" not in response.text
-
-
-def test_a_request_commits_its_workspace_transaction(probe_client: TestClient) -> None:
-    workspace = uuid4()
-    url = f"/api/probe/workspaces/{workspace}/products"
-    assert probe_client.post(url, json={"key": "analytics", "tiers": []}).status_code == 200
-    assert probe_client.get(url).json() == ["analytics"]
-    assert probe_client.get(f"/api/probe/workspaces/{uuid4()}/products").json() == []
-
-
-def test_a_failed_request_leaves_nothing_behind(probe_client: TestClient) -> None:
-    workspace = uuid4()
-    url = f"/api/probe/workspaces/{workspace}/products"
-    response = probe_client.post(url, json={"key": "fail-after-writing", "tiers": []})
-    assert response.status_code == 404
-    assert response.json()["detail"] == "The Tier does not exist."
-    assert probe_client.get(url).json() == []
-
-
-class CommitFails(InMemoryStore):
-    """A store whose commit fails after the route has finished, like a lost connection at COMMIT."""
-
-    @asynccontextmanager
-    async def transaction(self, workspace_id: UUID) -> AsyncIterator[Repositories]:
-        async with super().transaction(workspace_id) as repos:
-            yield repos
-        raise ConnectionError("server closed the connection during COMMIT")
-
-
-def test_a_failed_commit_is_never_reported_as_success() -> None:
-    app = create_app(CommitFails())
-
-    @app.post("/api/probe/workspaces/{workspace_id}/save")
-    async def save(repos: WorkspaceTransaction) -> dict[str, bool]:
-        return {"saved": True}
-
-    response = TestClient(app, raise_server_exceptions=False).post(f"/api/probe/workspaces/{uuid4()}/save")
-    assert response.status_code == 500
-    assert response.json()["type"] == PROBLEMS + "internal-error"

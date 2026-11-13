@@ -62,7 +62,7 @@ def _sync_dsn(url: str) -> str:
 def clean_postgres_url(migrated_postgres_url: str) -> str:
     """The migrated database, emptied for this test."""
     with psycopg.connect(_sync_dsn(migrated_postgres_url), autocommit=True) as admin:
-        admin.execute("truncate products, workspaces cascade")
+        admin.execute("truncate product_roles, members, products, workspaces, sessions, sign_in_flows, accounts cascade")
     return migrated_postgres_url
 
 

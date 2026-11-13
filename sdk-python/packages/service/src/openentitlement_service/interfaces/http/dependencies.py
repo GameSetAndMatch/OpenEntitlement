@@ -1,4 +1,4 @@
-"""FastAPI dependencies shared by the routes."""
+"""FastAPI dependencies shared by the routes: the signed-in Account and its Workspace transaction."""
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -7,22 +7,32 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 
-from ...services.repositories import Repositories, Store
+from ...services.workspaces import OpenWorkspace, WorkspaceService
+from .auth import CurrentAccount
 
 
-async def workspace_transaction(request: Request, workspace_id: UUID) -> AsyncIterator[Repositories]:
-    """One transaction for the whole request, bound to its Workspace.
+def workspace_service(request: Request) -> WorkspaceService:
+    service: WorkspaceService = request.app.state.workspaces
+    return service
 
-    It commits when the route returns and rolls back when it raises, before the response is sent.
-    Until sign-in exists (OPE-38), the Workspace comes from the route's ``workspace_id``
-    parameter; sign-in will resolve it from the caller and check their membership first.
+
+Workspaces = Annotated[WorkspaceService, Depends(workspace_service)]
+
+
+async def workspace_access(
+    workspace_id: UUID, signed: CurrentAccount, service: Workspaces
+) -> AsyncIterator[OpenWorkspace]:
+    """One transaction for the whole request, bound to the Workspace in the path, as the signed-in Account.
+
+    A non-member gets ``not-found``. Each operation then checks the Account's Role for what it does.
+    The transaction commits when the route returns and rolls back when it raises, before the
+    response is sent.
     """
-    store: Store = request.app.state.store
-    async with store.transaction(workspace_id) as repositories:
-        yield repositories
+    async with service.open(signed.account, workspace_id) as workspace:
+        yield workspace
 
 
-#: The repositories of the request's Workspace transaction. Function scope makes FastAPI finish the
-#: transaction (COMMIT or ROLLBACK) before it sends the response, so a failed COMMIT becomes a
-#: problem response instead of a success the client cannot trust.
-WorkspaceTransaction = Annotated[Repositories, Depends(workspace_transaction, scope="function")]
+#: The request's Workspace transaction and Actor. Function scope makes FastAPI finish the transaction
+#: (COMMIT or ROLLBACK) before it sends the response, so a failed COMMIT becomes a problem response
+#: instead of a success the client cannot trust.
+WorkspaceAccess = Annotated[OpenWorkspace, Depends(workspace_access, scope="function")]
