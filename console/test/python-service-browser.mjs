@@ -1,4 +1,4 @@
-/** The console against the Python service: real OIDC sign-in, Workspace creation, switcher, Product selector, Settings (Members, invitations, Cloud service tier), sign-out. */
+/** The console against the Python service: real OIDC sign-in, Workspace creation, switcher, Product selector, Catalog, Tiers, Organizations, application users, Settings (Members, invitations, Cloud service tier), sign-out. */
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
@@ -158,6 +158,8 @@ try{
  await acmeCard.click();
  // The SDK resolved the values; each names its source in glossary terms.
  assert.match(await page.getByRole('row').filter({hasText:'Seats'}).innerText(),/25\s+Organization terms\s+Standard/);
+ // Cloud Pro has Organization entitlements only: no application users.
+ await page.getByText('User entitlements require Cloud Enterprise.',{exact:false}).waitFor();assert.equal(await page.getByRole('button',{name:'Add user',exact:true}).count(),0);
  let organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
  assert.deepEqual(organizationsView.map(o=>[o.id,o.products[0].variantId,o.products[0].terms]),[['acme','pro_standard',{seats:25}]]);
  // Changing the variant clears the terms; switching back before saving keeps them.
@@ -204,6 +206,30 @@ try{
  assert.equal(await page.getByLabel('Cloud service tier').inputValue(),'enterprise');
  assert.equal((await (await page.request.get(app+`/api/workspaces/${workspaceId}`)).json()).hosting.tier,'enterprise');
  await page.getByRole('link',{name:'Back to workspace'}).click();await page.getByRole('heading',{name:'Privilege Catalog',exact:true,level:1}).waitFor();
+
+ // Application users on Cloud Enterprise: Personal terms and Grants, resolved by the SDK, each change with a reason.
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();await acmeCard.click();
+ await page.getByRole('button',{name:'Edit organization',exact:true}).click();await page.getByLabel('Contract status').selectOption('active');
+ await saveOrganization.click();await saveOrganization.waitFor({state:'hidden'});await acmeCard.getByText('Pro standard · Active').waitFor();
+ const saveUser=page.getByRole('button',{name:'Save user entitlements',exact:true});
+ await page.getByRole('button',{name:'Add user',exact:true}).click();await assertFormLayout(page);
+ await page.getByLabel('User display name').fill('Alice');await page.getByLabel('Subject ID').fill('idp|alice');
+ await page.getByLabel('Grant seats',{exact:true}).check();await page.getByLabel('grant_seats',{exact:true}).fill('5');
+ await saveUser.click();await reason();await saveUser.waitFor({state:'hidden'});
+ await page.locator('.workspace-card').filter({hasText:'Alice'}).click();
+ const aliceSeats=page.getByRole('row').filter({hasText:'Seats'}).filter({hasText:'+ Grant 5'});
+ assert.match(await aliceSeats.innerText(),/30\s+Organization terms 25 \+ Grant 5/);
+ await page.getByRole('button',{name:'Edit user entitlements',exact:true}).click();
+ await page.getByLabel('Override seats',{exact:true}).check();await page.getByLabel('seats',{exact:true}).fill('40');
+ await saveUser.click();await reason();await saveUser.waitFor({state:'hidden'});
+ await page.locator('.workspace-card').filter({hasText:'Alice'}).click();
+ assert.match(await aliceSeats.innerText(),/45\s+Personal terms 40 \+ Grant 5/);
+ organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
+ assert.deepEqual(organizationsView[0].products[0].users.map(u=>[u.subjectId,u.variantId,u.terms,u.grants,u.state]),[['idp|alice','pro_standard',{seats:40},{seats:5},'active']]);
+ await page.getByRole('button',{name:'Remove user exceptions',exact:true}).click();await reason();
+ await page.getByText('No personal exceptions. Every user inherits the Organization’s values.').waitFor();
+ assert.deepEqual((await (await page.request.get(organizationsPath)).json()).organizations[0].products[0].users,[]);
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
  // A second Product shows the selector; the choice is remembered per Workspace.
  const created=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});assert.equal(created.status(),201);

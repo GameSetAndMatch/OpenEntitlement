@@ -23,7 +23,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Grace period** | A bounded period of defined rights after a qualifying contract-status change. |
 | **Status policy** | What a Product's Organizations get once their past-due grace period ends or their contract ends: their values read-only, or a fallback Tier variant of the same Product. |
 | **Organization** | An entitled customer managed within a Workspace. Distinct from the Workspace, Account and technical Tenant. |
-| **Application user** | An Organization-scoped Subject whose entitlement values may inherit or have personal terms/grants. Not a console Account or membership Role. |
+| **Application user** | An Organization-scoped Subject, identified by the Subject ID the application sends, whose entitlement values may inherit or have personal terms/grants. Not a console Account or membership Role. |
 | **Organization terms** | An Organization's own values that replace its Tier variant's values; they belong to that variant. Preferred over own terms. |
 | **Personal terms** | An Application user's own values that replace their Organization's values; they belong to the assigned Tier variant. Preferred over user terms. |
 | **Cloud service tier** | OpenEntitlement hosted capabilities (Pro or Enterprise), set by a Platform administrator; distinct from customer-defined Tiers. Cloud Pro allows one Product, Enterprise any number. |
