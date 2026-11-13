@@ -45,5 +45,6 @@ The Python service returns these types. It is in development on the `service/pyt
 | [`last-product`](/problems/last-product/) | 409 | A Workspace keeps at least one Product. |
 | [`last-owner`](/problems/last-owner/) | 409 | A Workspace keeps at least one Owner. |
 | [`product-limit`](/problems/product-limit/) | 409 | Cloud Pro allows one Product. |
+| [`user-entitlements-unavailable`](/problems/user-entitlements-unavailable/) | 403 | Personal terms and Grants for application users need Cloud Enterprise. |
 | [`internal-error`](/problems/internal-error/) | 500 | The service failed unexpectedly. |
 | [`service-unavailable`](/problems/service-unavailable/) | 503 | The service cannot reach its database, or sign-in is not configured. |

@@ -25,7 +25,7 @@ from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
-from ...services.organizations import AssignmentRecord, OrganizationChange, OrganizationRecord
+from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationChange, OrganizationRecord
 from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
@@ -45,7 +45,7 @@ from .migrate import migrate
 from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
 from .tables import catalog_variant_values, catalog_changes, catalog_groups, catalog_tags, catalog_privileges
 from .tables import status_policies, tier_changes, tiers
-from .tables import organization_changes, organization_products, organizations
+from .tables import application_users, organization_changes, organization_products, organizations
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
 from .tables import invitations, settings_changes
 
@@ -602,6 +602,47 @@ class PostgresOrganizationsRepository:
         )
         if (await self.connection.execute(statement)).rowcount != 1:
             raise StaleVersion(assignment.organization_id)
+
+    async def users(self, product_id: UUID | None = None) -> Sequence[ApplicationUserRecord]:
+        table = application_users
+        query = select(table.c.entry).where(table.c.workspace_id == self.workspace_id)
+        if product_id is not None:
+            query = query.where(table.c.product_id == product_id)
+        query = query.order_by(cast(table.c.product_id, Text), table.c.organization_id, table.c.subject_id)
+        return [ApplicationUserRecord.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
+
+    def _user_row(self, user: ApplicationUserRecord) -> Any:
+        table = application_users
+        return (
+            table.c.workspace_id == self.workspace_id,
+            table.c.product_id == user.product_id,
+            table.c.organization_id == user.organization_id,
+            table.c.subject_id == user.subject_id,
+        )
+
+    async def save_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, user.workspace_id)
+        table = application_users
+        values = dict(version=user.version, entry=user.model_dump(mode="json"))
+        if expected_version == 0:
+            keys = dict(
+                workspace_id=user.workspace_id,
+                product_id=user.product_id,
+                organization_id=user.organization_id,
+                subject_id=user.subject_id,
+            )
+            await _insert(self.connection, table.insert().values(**keys, **values))
+            return
+        statement = table.update().where(*self._user_row(user), table.c.version == expected_version).values(**values)
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(user.subject_id)
+
+    async def delete_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, user.workspace_id)
+        table = application_users
+        statement = table.delete().where(*self._user_row(user), table.c.version == expected_version)
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(user.subject_id)
 
     async def audit(self, change: OrganizationChange) -> None:
         ensure_bound_workspace(self.workspace_id, change.workspace_id)

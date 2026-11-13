@@ -1,8 +1,13 @@
-"""Organizations on the HTTP API (OPE-41): creation with a Tier variant, terms with reasons, resolved values."""
+"""Organizations on the HTTP API (OPE-41): creation with a Tier variant, terms with reasons, resolved values.
+
+Also their application users' Personal terms and Grants (OPE-60).
+"""
 import asyncio
+from urllib.parse import quote
 
 import pytest
 from openentitlement_service.repositories.postgres import PostgresStore
+from openentitlement_service.services.workspaces import Deployment
 from test_http_tiers import _client, _pointers, _privilege
 
 pytestmark = pytest.mark.anyio
@@ -113,3 +118,50 @@ async def test_terms_and_a_catalog_change_never_both_commit_invalid(postgres_sto
                 version = (await client.get(f"{product}/catalog")).json()["versions"]["privileges"]["seats"]
                 await _privilege(client, product, seats | {"maximum": 1000}, version=version)
 
+
+async def test_application_users_over_http(store):
+    async with _client(store) as (client, product):
+        await _offer(client, product)
+        product_id = product.rsplit("/", 1)[1]
+        organizations = product.split("/products/")[0] + "/organizations"
+        body = {"id": "acme", "name": "Acme", "assignment": {"productId": product_id, "variantId": "pro_standard"}}
+        assert (await client.post(organizations, json=body)).status_code == 201
+        # The Subject ID is percent-encoded in the address, as the application sends it.
+        alice = f"{organizations}/acme/products/{product_id}/users/{quote('tenant/42|alice', safe='')}"
+        saved = {"name": "Alice", "terms": {"seats": 40}, "grants": {"seats": 5}, "version": 0}
+        missing = await client.put(alice, json=saved)
+        assert missing.status_code == 400 and _pointers(missing) == ["/reason"]
+        invalid = await client.put(alice, json=saved | {"grants": {"seats": 1.5, "sso": 1}, "reason": "Pilot"})
+        assert invalid.status_code == 400 and _pointers(invalid) == ["/grants/seats"]
+        invalid = await client.put(alice, json=saved | {"grants": {"sso": 1}, "reason": "Pilot"})
+        assert invalid.status_code == 400 and _pointers(invalid) == ["/grants/sso"]
+        spaced = await client.put(f"{organizations}/acme/products/{product_id}/users/%20alice", json={"name": "A", "version": 0})
+        assert spaced.status_code == 400 and _pointers(spaced) == ["/subjectId"]
+        created = await client.put(alice, json=saved | {"reason": "Pilot"})
+        assert created.status_code == 200
+        user = created.json()["organizations"][0]["products"][0]["users"][0]
+        assert (user["subjectId"], user["variantId"], user["state"], user["grants"], user["version"]) == (
+            "tenant/42|alice", "pro_standard", "active", {"seats": 5}, 1
+        )
+        assert user["values"][0] == {
+            "privilege": "seats", "value": 45, "source": "grant", "sourceName": "Personal terms 40 + Grant 5", "error": None
+        }
+        stale = await client.put(alice, json=saved | {"reason": "Pilot"})
+        assert stale.status_code == 409 and stale.json()["type"].endswith("/revision-conflict")
+        removed = await client.delete(alice, params={"version": 1})
+        assert removed.status_code == 400 and _pointers(removed) == ["/reason"]
+        removed = await client.delete(alice, params={"version": 1, "reason": "Pilot over"})
+        assert removed.status_code == 200 and removed.json()["organizations"][0]["products"][0]["users"] == []
+
+
+async def test_cloud_pro_has_no_application_users(store):
+    async with _client(store, deployment=Deployment.SAAS) as (client, product):
+        await _offer(client, product)
+        product_id = product.rsplit("/", 1)[1]
+        organizations = product.split("/products/")[0] + "/organizations"
+        body = {"id": "acme", "name": "Acme", "assignment": {"productId": product_id, "variantId": "pro_standard"}}
+        assert (await client.post(organizations, json=body)).status_code == 201
+        refused = await client.put(f"{organizations}/acme/products/{product_id}/users/alice", json={"name": "Alice", "version": 0})
+        assert refused.status_code == 403
+        assert refused.json()["type"] == "https://openentitlement.dev/problems/user-entitlements-unavailable"
+        assert refused.json()["serviceTier"] == "pro"

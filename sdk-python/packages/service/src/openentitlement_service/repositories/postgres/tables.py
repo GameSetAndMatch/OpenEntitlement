@@ -230,7 +230,24 @@ organization_products = Table(
     ForeignKeyConstraint(["product_id", "variant_id"], ["catalog_variant_values.product_id", "catalog_variant_values.key"]),
 )
 
-# Immutable audit facts about Organizations and their Tier variants.
+# An application user's Personal terms and Grants in one Product (OPE-60). The Organization must have
+# a Tier variant there; the record goes with it. The variant the terms belong to is in ``entry``.
+application_users = Table(
+    "application_users", metadata,
+    Column("workspace_id", Uuid, nullable=False),
+    Column("product_id", Uuid, primary_key=True),
+    Column("organization_id", Text, primary_key=True),
+    Column("subject_id", Text, primary_key=True),
+    Column("version", Integer, nullable=False),
+    Column("entry", JSON, nullable=False),
+    ForeignKeyConstraint(
+        ["product_id", "organization_id"],
+        ["organization_products.product_id", "organization_products.organization_id"],
+        ondelete="CASCADE",
+    ),
+)
+
+# Immutable audit facts about Organizations, their Tier variants and application users.
 organization_changes = Table(
     "organization_changes", metadata,
     Column("id", Uuid, primary_key=True),

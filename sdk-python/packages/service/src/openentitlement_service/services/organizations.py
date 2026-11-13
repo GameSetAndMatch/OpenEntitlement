@@ -1,4 +1,4 @@
-"""Organizations, their Tier variant per Product and Organization terms (ADR-0008, OPE-41).
+"""Organizations, their Tier variant per Product, Organization terms and application users (ADR-0008, OPE-41, OPE-60).
 
 An Organization is one customer of the Workspace: every member sees its name. For each Product it
 buys it has one Tier variant, a contract status and Organization terms that belong to that
@@ -7,7 +7,12 @@ applications cannot disagree: the contract status first picks the variant in eff
 grace variant while past-due grace lasts, then the Product's status policy), then
 ``resolve_from_facts`` resolves every Privilege from that variant and the Organization terms.
 
-Writes to an Organization's variant in a Product take the Product lock that Catalog and Tier
+An application user is an Organization-scoped Subject, identified by the Subject ID the
+application sends (ADR-0005). In each Product it may have Personal terms, which replace the
+Organization's values and belong to the Organization's variant when they were saved, and Grants,
+which add to the resolved value. They reach the engine as subject-scoped overrides and grants.
+
+Writes to an Organization's variant or its application users in a Product take the Product lock that Catalog and Tier
 writes take, so a Catalog change can never invalidate terms saved concurrently, and a Tier cannot
 be deleted while an Organization is being given one of its variants.
 """
@@ -36,17 +41,27 @@ from openentitlement.privileges import (
 )
 from openentitlement.resolver import resolve_from_facts
 from openentitlement.values import UNLIMITED, is_unlimited
-from pydantic import Field, JsonValue, TypeAdapter, ValidationError
+from pydantic import Field, JsonValue, StrictInt, TypeAdapter, ValidationError
 
 from .access import Permission
 from .catalog import CatalogValue, VariantValues, value_error
-from .problems import AlreadyTaken, FieldError, NotFound, RevisionConflict, ValidationFailed, escape_pointer_token
+from .problems import (
+    AlreadyTaken,
+    FieldError,
+    NotFound,
+    RevisionConflict,
+    UserEntitlementsUnavailable,
+    ValidationFailed,
+    escape_pointer_token,
+)
 from .repositories import AlreadyExists, StaleVersion
 from .tiers import DEFAULT_POLICY, StatusPolicy, TierRecord
-from .workspaces import OpenWorkspace
+from .workspaces import Deployment, OpenWorkspace, user_entitlements
 
 ContractStatus = Literal["active", "past_due", "ended"]
 MAX_REASON = 2000
+MAX_SUBJECT = 200
+UserState = Literal["active", "stale", "suspended"]
 
 
 class OrganizationRecord(OpenEntitlementModel):
@@ -76,13 +91,42 @@ class AssignmentRecord(OpenEntitlementModel):
     version: int = Field(ge=1, strict=True)
 
 
+class ApplicationUserRecord(OpenEntitlementModel):
+    """An application user's Personal terms and Grants in one Product (GLOSSARY: Application user).
+
+    Not a console Account or member: the application identifies it by ``subject_id`` together
+    with its Organization's ID.
+    """
+
+    workspace_id: UUID
+    product_id: UUID
+    organization_id: Identifier
+    subject_id: str
+    name: str
+    #: The Organization's variant when the Personal terms were saved: they belong to it (ADR-0005).
+    variant_id: Identifier
+    #: Values that replace the Organization's for this user.
+    terms: dict[str, CatalogValue] = Field(default_factory=dict)
+    #: Positive whole-number allowances added to integer Privileges' resolved values.
+    grants: dict[str, StrictInt] = Field(default_factory=dict)
+    version: int = Field(ge=1, strict=True)
+
+
+class ApplicationUserInput(OpenEntitlementModel):
+    name: str
+    terms: dict[str, CatalogValue] = Field(default_factory=dict)
+    grants: dict[str, StrictInt] = Field(default_factory=dict)
+
+
 class AssignmentInput(OpenEntitlementModel):
     variant_id: Identifier
     status: ContractStatus = "active"
     terms: dict[str, CatalogValue] = Field(default_factory=dict)
 
 
-ValueSource = Literal["default", "variant", "organizationTerms", "gracePeriod", "environment", "error"]
+ValueSource = Literal[
+    "default", "variant", "organizationTerms", "personalTerms", "grant", "gracePeriod", "environment", "error"
+]
 
 
 class ResolvedValue(OpenEntitlementModel):
@@ -91,9 +135,24 @@ class ResolvedValue(OpenEntitlementModel):
     privilege: str
     value: CatalogValue | None
     source: ValueSource
-    #: "Catalog default", the variant's name, "Organization terms", "Grace period" or the environment prerequisite.
+    #: "Catalog default", the variant's name, "Organization terms", "Personal terms", "Grace period",
+    #: the environment prerequisite, or a value with its Grants, such as "Personal terms 40 + Grant 5".
     source_name: str
     error: str | None = None
+
+
+class ApplicationUserView(OpenEntitlementModel):
+    subject_id: str
+    name: str
+    variant_id: str
+    terms: dict[str, CatalogValue]
+    grants: dict[str, int]
+    version: int
+    #: ``stale``: the Organization has another variant, so the Personal terms are inactive (Grants
+    #: still apply). ``suspended``: grace or a fallback variant suspends both.
+    state: UserState
+    #: The user's values, as the SDK resolved them. Empty where user-level entitlements are unavailable.
+    values: tuple[ResolvedValue, ...]
 
 
 class AssignmentView(OpenEntitlementModel):
@@ -111,6 +170,8 @@ class AssignmentView(OpenEntitlementModel):
     #: The status policy keeps the values read-only.
     read_only: bool
     values: tuple[ResolvedValue, ...]
+    #: Application users with Personal terms or Grants in this Product.
+    users: tuple[ApplicationUserView, ...] = ()
 
 
 class OrganizationView(OpenEntitlementModel):
@@ -135,12 +196,15 @@ class OrganizationChange(OpenEntitlementModel):
     actor_id: UUID
     actor_email: str
     at: datetime
-    target: Literal["organization", "assignment"]
+    target: Literal["organization", "assignment", "applicationUser"]
+    #: The Organization's ID.
     key: str
-    action: Literal["created", "changed"]
+    #: The application user's Subject ID, for an ``applicationUser`` change.
+    subject_id: str | None = None
+    action: Literal["created", "changed", "removed"]
     before: dict[str, JsonValue] | None
     after: dict[str, JsonValue] | None
-    #: Why Organization terms changed; required exactly then.
+    #: Why Organization terms, Personal terms or Grants changed; required exactly then.
     reason: str | None = None
 
 
@@ -170,13 +234,19 @@ def definition(privilege: TypedPrivilege) -> PrivilegeDefinition:
     return PrivilegeDefinition(key=privilege.key, value_type=ValueType.ENUM, default=default, options=privilege.enum)
 
 
+ORGANIZATION_TERMS = "organization-terms"
+PERSONAL_TERMS = "personal-terms"
+
+
 @dataclass(frozen=True)
 class _Facts:
     """One Organization's facts in one Product, as the SDK's ``FactSource`` reads them.
 
     Each Tier variant is a plan of its own family, and Organization terms are Organization-scoped
-    overrides of the variant in effect. A Read-only Privilege has neither: it uses its Catalog
-    default (RFC-0002).
+    overrides of the variant in effect. An application user's Personal terms are subject-scoped
+    overrides of the variant they were saved on, so the engine keeps them inactive (stale) on any
+    other, and its Grants are subject-scoped grants. A Read-only Privilege has none of them: it
+    uses its Catalog default (RFC-0002).
     """
 
     organization_id: str
@@ -184,6 +254,7 @@ class _Facts:
     plan_id: str
     terms: Mapping[str, CatalogValue]
     read_only: frozenset[str]
+    user: ApplicationUserRecord | None = None
 
     def assignment(self, organization_id: str) -> Assignment | None:
         return Assignment(organization_id=organization_id, plan_id=self.plan_id)
@@ -202,21 +273,47 @@ class _Facts:
         return True, _sdk_value(variant.values[privilege])
 
     def overrides(self, organization_id: str, privilege: str) -> Sequence[Override]:
-        if privilege in self.read_only or privilege not in self.terms:
+        if privilege in self.read_only:
             return []
-        return [
-            Override(
-                id=f"organization-terms:{privilege}",
-                scope=Scope(organization_id=organization_id),
-                privilege=privilege,
-                value=_sdk_value(self.terms[privilege]),
-                plan_family=self.plan_id,
-                reason="Organization terms",
+        found = []
+        if privilege in self.terms:
+            found.append(
+                Override(
+                    id=f"{ORGANIZATION_TERMS}:{privilege}",
+                    scope=Scope(organization_id=organization_id),
+                    privilege=privilege,
+                    value=_sdk_value(self.terms[privilege]),
+                    plan_family=self.plan_id,
+                    reason="Organization terms",
+                )
             )
-        ]
+        user = self.user
+        if user is not None and privilege in user.terms:
+            found.append(
+                Override(
+                    id=f"{PERSONAL_TERMS}:{privilege}",
+                    scope=Scope(organization_id=organization_id, subject_id=user.subject_id),
+                    privilege=privilege,
+                    value=_sdk_value(user.terms[privilege]),
+                    plan_family=user.variant_id,
+                    reason="Personal terms",
+                )
+            )
+        return found
 
     def grants(self, organization_id: str, privilege: str) -> Sequence[Grant]:
-        return []
+        user = self.user
+        if privilege in self.read_only or user is None or privilege not in user.grants:
+            return []
+        return [
+            Grant(
+                id=f"grant:{privilege}",
+                scope=Scope(organization_id=organization_id, subject_id=user.subject_id),
+                privilege=privilege,
+                amount=user.grants[privilege],
+                reason="Grant",
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -277,19 +374,40 @@ def in_effect(assignment: AssignmentRecord, facts: ProductFacts, now: datetime) 
     return InEffect(assignment.variant_id, read_only=True)
 
 
-def resolve(assignment: AssignmentRecord, facts: ProductFacts, now: datetime) -> tuple[InEffect, tuple[ResolvedValue, ...]]:
-    """Every Privilege of the Product for the Organization, resolved by the SDK engine."""
+def _exceptions_apply(assignment: AssignmentRecord, effect: InEffect) -> bool:
+    """Whether Organization terms, Personal terms and Grants apply: a grace or fallback variant suspends them."""
+    return effect.variant_id == assignment.variant_id and not effect.fallback
+
+
+def user_state(assignment: AssignmentRecord, user: ApplicationUserRecord, facts: ProductFacts, now: datetime) -> UserState:
+    if not _exceptions_apply(assignment, in_effect(assignment, facts, now)):
+        return "suspended"
+    return "active" if user.variant_id == assignment.variant_id else "stale"
+
+
+def _amount(value: Any) -> str:
+    return "unlimited" if is_unlimited(value) else str(value)
+
+
+def resolve(
+    assignment: AssignmentRecord, facts: ProductFacts, now: datetime, user: ApplicationUserRecord | None = None
+) -> tuple[InEffect, tuple[ResolvedValue, ...]]:
+    """Every Privilege of the Product for the Organization, or one of its application users, resolved by the SDK engine."""
     effect = in_effect(assignment, facts, now)
     # Organization terms belong to the assigned variant: a grace or fallback variant replaces them.
-    applies = effect.variant_id == assignment.variant_id and not effect.fallback
+    # It suspends the user's Personal terms and Grants too (ADR-0005).
+    applies = _exceptions_apply(assignment, effect)
     source = _Facts(
         organization_id=assignment.organization_id,
         variants=facts.variants,
         plan_id=effect.variant_id,
         terms=assignment.terms if applies else {},
         read_only=frozenset(p.key for p in facts.privileges if p.visibility is Visibility.READ_ONLY),
+        user=user if applies else None,
     )
-    context = EvaluationContext(organization_id=assignment.organization_id, now=now)
+    context = EvaluationContext(
+        organization_id=assignment.organization_id, subject_id=user.subject_id if user else None, now=now
+    )
     variant = facts.variants.get(effect.variant_id)
     values = []
     for privilege in facts.privileges:
@@ -319,14 +437,20 @@ def resolve(assignment: AssignmentRecord, facts: ProductFacts, now: datetime) ->
                 )
             )
             continue
-        if details.reason is Reason.OVERRIDE:
+        # Where the value before Grants comes from.
+        if details.override_id is not None and details.override_id.startswith(PERSONAL_TERMS):
+            kind, name = "personalTerms", "Personal terms"
+        elif details.override_id is not None:
             kind, name = "organizationTerms", "Organization terms"
-        elif details.reason is Reason.PLAN and effect.grace:
+        elif details.has_plan_value and effect.grace:
             kind, name = "gracePeriod", "Grace period"
-        elif details.reason is Reason.PLAN:
+        elif details.has_plan_value:
             kind, name = "variant", variant.name if variant else effect.variant_id
         else:
             kind, name = "default", "Catalog default"
+        if details.reason is Reason.GRANT:
+            granted = sum(g.amount for g in details.grants)
+            kind, name = "grant", f"{name} {_amount(details.value - granted)} + Grant {granted}"
         values.append(
             ResolvedValue(privilege=privilege.key, value=_catalog_value(details.value), source=kind, source_name=name)
         )
@@ -379,6 +503,59 @@ def term_errors(
     return errors
 
 
+def grant_errors(
+    privileges: Sequence[TypedPrivilege], grants: Mapping[str, int], stored: Mapping[str, int]
+) -> list[FieldError]:
+    """Why Grants are invalid: each is a positive whole-number allowance on an integer Privilege.
+
+    Like Personal terms, a Read-only Privilege takes none; a stored one may be resent unchanged.
+    """
+    by_key = {p.key: p for p in privileges}
+    errors = []
+    for key, amount in sorted(grants.items()):
+        pointer = _pointer("grants", key)
+        entry = by_key.get(key)
+        if entry is None:
+            errors.append(FieldError(pointer, "Unknown Privilege in this Product."))
+        elif not isinstance(entry, IntegerPrivilege):
+            errors.append(FieldError(pointer, "A Grant adds to an integer Privilege only."))
+        elif entry.visibility is Visibility.READ_ONLY:
+            if stored.get(key) != amount:
+                errors.append(FieldError(pointer, "A Read-only Privilege uses its Catalog default; omit this Grant."))
+        elif isinstance(amount, bool) or amount <= 0:
+            errors.append(FieldError(pointer, "Use a positive whole number."))
+    return errors
+
+
+def subject_id_error(subject_id: str) -> str | None:
+    """Why a Subject ID is not one an application sends: it is matched exactly as given."""
+    if (
+        not subject_id
+        or subject_id != subject_id.strip()
+        or len(subject_id) > MAX_SUBJECT
+        or any(ord(c) < 32 or ord(c) == 127 for c in subject_id)
+    ):
+        return (
+            f"Use the ID your application sends: at most {MAX_SUBJECT} characters, "
+            "without surrounding spaces or control characters."
+        )
+    return None
+
+
+def _user_name(name: str) -> str:
+    text = name.strip()
+    if not text or len(text) > MAX_SUBJECT:
+        raise ValidationFailed([FieldError("/name", f"Enter a name of at most {MAX_SUBJECT} characters.")])
+    return text
+
+
+def _exceptions(user: ApplicationUserRecord | None) -> tuple[str | None, str, str]:
+    """What a reason covers: Personal terms with the variant they belong to, and Grants."""
+    if user is None:
+        return None, "{}", "{}"
+    return (user.variant_id if user.terms else None), _json(user.terms), json.dumps(user.grants, sort_keys=True)
+
+
 def normalized_reason(reason: str | None) -> str | None:
     text = (reason or "").strip()
     if len(text) > MAX_REASON:
@@ -392,8 +569,16 @@ def _dump(model: OpenEntitlementModel) -> dict[str, JsonValue]:
 
 
 class OrganizationService:
-    def __init__(self, environment: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self, environment: Mapping[str, str] | None = None, *, deployment: Deployment = Deployment.SELF_HOSTED
+    ) -> None:
         self.environment = dict(environment or {})
+        self.deployment = deployment
+
+    async def _users_allowed(self, ws: OpenWorkspace) -> tuple[bool, str]:
+        workspace = await ws.repos.workspaces.get()
+        assert workspace is not None, "an open Workspace exists"
+        return user_entitlements(self.deployment, workspace), workspace.service_tier.value
 
     async def _facts(self, ws: OpenWorkspace, product_id: UUID) -> ProductFacts:
         policy = await ws.repos.tiers.policy(product_id)
@@ -411,6 +596,11 @@ class OrganizationService:
         for found in await ws.repos.organizations.assignments():
             if ws.actor.sees(found.product_id):
                 assignments.setdefault(found.organization_id, []).append(found)
+        users: dict[tuple[str, UUID], list[ApplicationUserRecord]] = {}
+        for user in await ws.repos.organizations.users():
+            if ws.actor.sees(user.product_id):
+                users.setdefault((user.organization_id, user.product_id), []).append(user)
+        allowed, _ = await self._users_allowed(ws)
         facts: dict[UUID, ProductFacts] = {}
         organizations = []
         for organization in sorted(await ws.repos.organizations.list(), key=lambda o: (o.name.casefold(), o.id)):
@@ -418,7 +608,9 @@ class OrganizationService:
             for assignment in sorted(assignments.get(organization.id, []), key=lambda a: str(a.product_id)):
                 if assignment.product_id not in facts:
                     facts[assignment.product_id] = await self._facts(ws, assignment.product_id)
-                effect, values = resolve(assignment, facts[assignment.product_id], ws.now)
+                product_facts = facts[assignment.product_id]
+                effect, values = resolve(assignment, product_facts, ws.now)
+                found_users = sorted(users.get((organization.id, assignment.product_id), []), key=lambda u: (u.name.casefold(), u.subject_id))
                 products.append(
                     AssignmentView(
                         product_id=assignment.product_id,
@@ -433,6 +625,20 @@ class OrganizationService:
                         fallback=effect.fallback,
                         read_only=effect.read_only,
                         values=values,
+                        users=tuple(
+                            ApplicationUserView(
+                                subject_id=user.subject_id,
+                                name=user.name,
+                                variant_id=user.variant_id,
+                                terms=user.terms,
+                                grants=user.grants,
+                                version=user.version,
+                                state=user_state(assignment, user, product_facts, ws.now),
+                                # Downgraded to Cloud Pro: the record stays, user-level values are not served (ADR-0005).
+                                values=resolve(assignment, product_facts, ws.now, user)[1] if allowed else (),
+                            )
+                            for user in found_users
+                        ),
                     )
                 )
             organizations.append(
@@ -445,12 +651,13 @@ class OrganizationService:
         ws: OpenWorkspace,
         *,
         product_id: UUID | None,
-        target: Literal["organization", "assignment"],
+        target: Literal["organization", "assignment", "applicationUser"],
         key: str,
-        action: Literal["created", "changed"],
+        action: Literal["created", "changed", "removed"],
         before: dict[str, JsonValue] | None,
         after: dict[str, JsonValue] | None,
         reason: str | None = None,
+        subject_id: str | None = None,
     ) -> None:
         await ws.repos.organizations.audit(
             OrganizationChange(
@@ -462,6 +669,7 @@ class OrganizationService:
                 at=ws.now,
                 target=target,
                 key=key,
+                subject_id=subject_id,
                 action=action,
                 before=before,
                 after=after,
@@ -631,3 +839,138 @@ class OrganizationService:
             after=_dump(saved),
             reason=why if terms_changed else None,
         )
+
+    # Application users (OPE-60).
+
+    async def _user_target(
+        self, ws: OpenWorkspace, organization_id: str, product_id: UUID, subject_id: str
+    ) -> tuple[OrganizationRecord, ApplicationUserRecord | None]:
+        ws.actor.require(Permission.EDIT_PRODUCT, product_id)
+        organization = await self._organization(ws, organization_id)
+        # The Product lock: a Catalog change cannot invalidate Personal terms or Grants saved concurrently.
+        await ws.repos.catalog.lock(product_id)
+        if await ws.repos.products.get(product_id) is None:
+            raise NotFound("This Product does not exist or you have no Role in it.")
+        current = next(
+            (
+                u
+                for u in await ws.repos.organizations.users(product_id)
+                if u.organization_id == organization.id and u.subject_id == subject_id
+            ),
+            None,
+        )
+        return organization, current
+
+    async def save_user(
+        self,
+        ws: OpenWorkspace,
+        organization_id: str,
+        product_id: UUID,
+        subject_id: str,
+        wanted: ApplicationUserInput,
+        *,
+        version: int,
+        reason: str | None = None,
+    ) -> OrganizationsView:
+        """Add an application user of the Organization in the Product (version 0), or change its name, Personal terms or Grants.
+
+        The Personal terms sent belong to the Organization's variant now. A reason is required
+        whenever Personal terms or Grants change. Needs Cloud Enterprise on OpenEntitlement Cloud.
+        """
+        ws.actor.require(Permission.EDIT_PRODUCT, product_id)
+        allowed, tier = await self._users_allowed(ws)
+        if not allowed:
+            raise UserEntitlementsUnavailable(service_tier=tier)
+        problem = subject_id_error(subject_id)
+        if problem:
+            raise ValidationFailed([FieldError("/subjectId", problem)])
+        name = _user_name(wanted.name)
+        organization, current = await self._user_target(ws, organization_id, product_id, subject_id)
+        if (current.version if current else 0) != version:
+            raise RevisionConflict(kind="application user", id=subject_id)
+        assignment = next(
+            (a for a in await ws.repos.organizations.assignments(product_id) if a.organization_id == organization.id),
+            None,
+        )
+        if assignment is None:
+            raise ValidationFailed(
+                [FieldError("/", "Give this Organization a Tier variant in this Product before adding its application users.")]
+            )
+        facts = await self._facts(ws, product_id)
+        # Personal terms belong to the variant: stale ones are not "stored" for the new one.
+        stored_terms = current.terms if current and current.variant_id == assignment.variant_id else {}
+        errors = term_errors(facts.privileges, wanted.terms, stored_terms)
+        errors.extend(grant_errors(facts.privileges, wanted.grants, current.grants if current else {}))
+        if errors:
+            raise ValidationFailed(errors)
+        saved = ApplicationUserRecord(
+            workspace_id=ws.actor.workspace_id,
+            product_id=product_id,
+            organization_id=organization.id,
+            subject_id=subject_id,
+            name=name,
+            variant_id=assignment.variant_id,
+            terms=dict(wanted.terms),
+            grants=dict(wanted.grants),
+            version=version + 1,
+        )
+        changed = _exceptions(current) != _exceptions(saved)
+        why = normalized_reason(reason)
+        if changed and why is None:
+            raise ValidationFailed([FieldError("/reason", "Add a reason for changing Personal terms or Grants.")])
+        try:
+            await ws.repos.organizations.save_user(saved, expected_version=version)
+        except (StaleVersion, AlreadyExists) as exc:
+            raise RevisionConflict(kind="application user", id=subject_id) from exc
+        await self._audit(
+            ws,
+            product_id=product_id,
+            target="applicationUser",
+            key=organization.id,
+            subject_id=subject_id,
+            action="changed" if current else "created",
+            before=_dump(current) if current else None,
+            after=_dump(saved),
+            reason=why if changed else None,
+        )
+        return await self.view(ws)
+
+    async def remove_user(
+        self,
+        ws: OpenWorkspace,
+        organization_id: str,
+        product_id: UUID,
+        subject_id: str,
+        *,
+        version: int,
+        reason: str | None = None,
+    ) -> OrganizationsView:
+        """Remove an application user's record: it inherits the Organization's values again.
+
+        Allowed on Cloud Pro too, so a downgraded Workspace can clear records it can no longer change.
+        """
+        organization, current = await self._user_target(ws, organization_id, product_id, subject_id)
+        if current is None:
+            raise NotFound("This application user has no record in this Product.")
+        if current.version != version:
+            raise RevisionConflict(kind="application user", id=subject_id)
+        changed = _exceptions(current) != _exceptions(None)
+        why = normalized_reason(reason)
+        if changed and why is None:
+            raise ValidationFailed([FieldError("/reason", "Add a reason for removing Personal terms or Grants.")])
+        try:
+            await ws.repos.organizations.delete_user(current, expected_version=version)
+        except StaleVersion as exc:
+            raise RevisionConflict(kind="application user", id=subject_id) from exc
+        await self._audit(
+            ws,
+            product_id=product_id,
+            target="applicationUser",
+            key=organization.id,
+            subject_id=subject_id,
+            action="removed",
+            before=_dump(current),
+            after=None,
+            reason=why if changed else None,
+        )
+        return await self.view(ws)

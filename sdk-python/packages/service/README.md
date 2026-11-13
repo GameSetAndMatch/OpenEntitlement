@@ -168,7 +168,7 @@ Account, Product, target and before/after state (`tier_changes`); the filtered a
 `npm run test:python-service` from `console` runs guided creation, trial and grace, grace days,
 the status policy and archive/restore in Chromium against the service.
 
-### Organizations (OPE-41)
+### Organizations and application users (OPE-41, OPE-60)
 
 Under `/api/workspaces/{workspace_id}/organizations`:
 
@@ -178,6 +178,8 @@ Under `/api/workspaces/{workspace_id}/organizations`:
 | `POST` | `{id, name, assignment?: {productId, variantId, status, terms}, reason?}`: a Product's Manager or an Owner adds an Organization, optionally with its Tier variant in one Product, in one transaction |
 | `PATCH /{organization}` | `{name, version}`: rename. The ID, which applications send, never changes |
 | `PUT /{organization}/products/{product}` | `{variantId, status, terms, version, reason?}`: version `0` gives a first variant in the Product. That Product's Managers only |
+| `PUT /{organization}/products/{product}/users/{subject}` | `{name, terms, grants, version, reason?}`: adds an application user (version `0`) or changes its name, Personal terms or Grants. `subject` is the percent-encoded Subject ID the application sends. That Product's Managers only; [`user-entitlements-unavailable`](https://openentitlement.dev/problems/user-entitlements-unavailable/) on Cloud Pro |
+| `DELETE /{organization}/products/{product}/users/{subject}?version=&reason=` | Removes the application user's record: it inherits the Organization's values again. Allowed on Cloud Pro too |
 
 One Tier variant per Organization per Product, never a grace variant. Organization terms belong to
 the variant: a save that changes the variant stores the terms sent with it, so the previous ones
@@ -194,9 +196,23 @@ Catalog change that would make stored terms invalid is refused.
 
 Values are resolved by the SDK's `resolve_from_facts` (spec §3): each Tier variant is a plan, and
 Organization terms are Organization-scoped overrides of the variant in effect. Sources are
-`default` (Catalog default), `variant` (the variant's name), `organizationTerms`, `gracePeriod`
-and `environment`: a Boolean Privilege's environment prerequisite (`envOverride`) is read from the
+`default` (Catalog default), `variant` (the variant's name), `organizationTerms`, `personalTerms`,
+`grant` (for example "Personal terms 40 + Grant 5"), `gracePeriod` and `environment`: a Boolean Privilege's environment prerequisite (`envOverride`) is read from the
 service's environment (`true`/`false`/`1`/`0`) and can only turn the value off (ADR-0004); an unset
 or invalid variable makes that value an `error`. Because resolution reads the variable it names,
 only a Platform administrator can set or change a Privilege's environment prerequisite.
-Personal terms and Grants for application users are OPE-60.
+
+An application user is an Organization-scoped Subject identified by the Subject ID the application
+sends (at most 200 characters, without surrounding spaces or control characters, matched exactly).
+Its record is per Product and needs the Organization to have a Tier variant there; `GET` lists it
+under that Product as `users`: `subjectId`, `name`, `variantId`, `terms`, `grants`, `version`,
+`state` and its resolved `values`. Personal terms replace the Organization's values and belong to
+the Organization's variant when they were saved: they are subject-scoped overrides with that
+variant as their plan family, so after a variant change the engine keeps them inactive (`state`
+`stale`) and saving again binds the terms sent to the current variant. Grants are positive
+whole-number allowances on integer Privileges, subject-scoped grants that add to the resolved
+value and stay across variant changes. Grace and a status-policy fallback suspend both (`state`
+`suspended`). Read-only Privileges take neither. A `reason` is required whenever Personal terms or
+Grants change, including their removal, and the writes take the Product row lock; a Catalog change
+that would make stored Personal terms or Grants invalid is refused. On OpenEntitlement Cloud only
+Cloud Enterprise has user-level entitlements: on Cloud Pro, records are kept without `values`.
