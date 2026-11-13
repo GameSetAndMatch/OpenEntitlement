@@ -50,6 +50,6 @@ Supply `{pool, subject}` where `pool` is consumption of the shared pool by every
 
 ## Scope for now
 
-Consumption idempotency, reset periods, quota windows, reservations, and metering are application responsibilities. OEREP v1 does not supply those services. All code paths that create the gated resource must participate in the same locking strategy.
+Consumption idempotency, reset periods, quota windows, reservations, and metering are application responsibilities. OEREP 0.1 does not supply those services. All code paths that create the gated resource must participate in the same locking strategy.
 
 See the [concurrency specification](/specification/05-concurrency/).

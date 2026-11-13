@@ -201,8 +201,8 @@ organization_products = Table(
     ForeignKeyConstraint(["product_id", "variant_id"], ["catalog_variant_values.product_id", "catalog_variant_values.key"]),
 )
 
-# An application user's Personal terms and Grants in one Product (OPE-60). The Organization must have
-# a Tier variant there; the record goes with it. The variant the terms belong to is in ``entry``.
+# An application user's Personal terms and Grants in one Product (OPE-60). The Organization may have
+# no assignment for retained Grants (RFC-0005). The variant the terms belong to is in ``entry``.
 application_users = Table(
     "application_users", metadata,
     Column("workspace_id", Uuid, nullable=False),
@@ -211,11 +211,8 @@ application_users = Table(
     Column("subject_id", Text, primary_key=True),
     Column("version", Integer, nullable=False),
     Column("entry", JSON, nullable=False),
-    ForeignKeyConstraint(
-        ["product_id", "organization_id"],
-        ["organization_products.product_id", "organization_products.organization_id"],
-        ondelete="CASCADE",
-    ),
+    ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
+    ForeignKeyConstraint(["workspace_id", "organization_id"], ["organizations.workspace_id", "organizations.key"], ondelete="CASCADE"),
 )
 
 
@@ -234,4 +231,18 @@ audit_entries = Table(
     Column("products", ARRAY(Uuid), nullable=False),
     Column("entry", JSON, nullable=False),
     Index("ix_audit_entries_workspace_id_seq", "workspace_id", "seq"),
+)
+
+# A Product's API keys (OPE-42). Only the SHA-256 of each secret is stored; revoking deletes the row.
+api_keys = Table(
+    "api_keys", metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, nullable=False),
+    Column("product_id", Uuid, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("token_hash", Text, nullable=False, unique=True),
+    Column("hint", Text, nullable=False),
+    Column("created_by", Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
 )

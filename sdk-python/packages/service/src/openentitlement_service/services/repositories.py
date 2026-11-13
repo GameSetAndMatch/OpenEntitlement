@@ -28,6 +28,7 @@ from .models import (
 
 
 if TYPE_CHECKING:
+    from .api_keys import ApiKey
     from .audit import AuditEntry
     from .catalog import CatalogRecord, VariantValues
     from .organizations import ApplicationUserRecord, AssignmentRecord, OrganizationRecord
@@ -90,6 +91,14 @@ class OrganizationsRepository(Protocol):
 
     async def assignments(self, product_id: UUID | None = None) -> Sequence[AssignmentRecord]:
         """The Organizations' Tier variants, in one Product or in every Product."""
+        ...
+
+    async def assignment(self, product_id: UUID, organization_id: str) -> AssignmentRecord | None:
+        """The Organization's Tier variant in the Product, if it has one."""
+        ...
+
+    async def user(self, product_id: UUID, organization_id: str, subject_id: str) -> ApplicationUserRecord | None:
+        """One application user's record in the Product, if it has one."""
         ...
 
     async def save_assignment(self, assignment: AssignmentRecord, *, expected_version: int) -> None:
@@ -225,6 +234,22 @@ class MembersRepository(Protocol):
         ...
 
 
+class ApiKeysRepository(Protocol):
+    """The Workspace's API keys (OPE-42). A key goes with its Product."""
+
+    async def list(self, product_id: UUID) -> Sequence[ApiKey]: ...
+
+    async def add(self, key: ApiKey) -> None: ...
+
+    async def get(self, key_id: UUID) -> ApiKey | None: ...
+
+    async def find(self, token_hash: str) -> ApiKey | None:
+        """The key whose secret has this SHA-256 hash, if it exists (and was not revoked)."""
+        ...
+
+    async def delete(self, key_id: UUID) -> None: ...
+
+
 class InvitationsRepository(Protocol):
     async def add(self, invitation: Invitation, *, now: datetime) -> None:
         """Save the invitation and forget the Workspace's invitations that expired before ``now``."""
@@ -312,6 +337,7 @@ class Repositories:
     directory: DirectoryRepository
     invitations: InvitationsRepository
     audit: AuditRepository
+    api_keys: ApiKeysRepository
 
 
 class Store(Protocol):

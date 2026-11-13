@@ -45,6 +45,7 @@ class AuditAction(StrEnum):
     REMOVED = "removed"
     INVITED = "invited"
     JOINED = "joined"
+    REVOKED = "revoked"
 
 
 class TargetKind(StrEnum):
@@ -61,6 +62,7 @@ class TargetKind(StrEnum):
     ORGANIZATION = "Organization"
     APPLICATION_USER = "Application user"
     MEMBER = "Member"
+    API_KEY = "API key"
 
 
 class Aspect(StrEnum):
@@ -85,6 +87,10 @@ class AuditChange(OpenEntitlementModel):
     title: str | None = None
     before: JsonValue = None
     after: JsonValue = None
+    #: When ``before``/``after`` is an identity, such as a Tier variant's ID, its name at that moment.
+    #: Readers show the name; the identity decides whether anything changed.
+    before_name: str | None = None
+    after_name: str | None = None
     #: The Product this value belongs to, when the entry is about a shared record; ``None`` otherwise.
     product_id: UUID | None = None
     product_name: str | None = None
@@ -167,13 +173,15 @@ def diff(
     *,
     titles: Mapping[str, str] | None = None,
     ignore: Iterable[str] = (),
+    names: Mapping[str, tuple[str | None, str | None]] | None = None,
     product_id: UUID | None = None,
     product_name: str | None = None,
 ) -> list[AuditChange]:
     """The values that differ between two JSON records, as flat dotted paths.
 
     ``titles`` names the last segment of a path at that moment, such as a Privilege key's title in
-    ``terms.seats``, or a top-level path in full.
+    ``terms.seats``, or a top-level path in full. ``names`` gives a top-level identity path's
+    before/after names: the values are compared, the names only shown.
     """
     skipped = _IGNORED | set(ignore)
     flat_before, flat_after = _flatten(before or {}, skipped), _flatten(after or {}, skipped)
@@ -183,9 +191,17 @@ def diff(
         old, new = flat_before.get(path), flat_after.get(path)
         if old != new and not (_blank(old) and _blank(new)):
             title = titles.get(path) or titles.get(path.rsplit(".", 1)[-1]) if "." in path else titles.get(path)
+            before_name, after_name = (names or {}).get(path, (None, None))
             changes.append(
                 AuditChange(
-                    field=path, title=title, before=old, after=new, product_id=product_id, product_name=product_name
+                    field=path,
+                    title=title,
+                    before=old,
+                    after=new,
+                    before_name=before_name if old is not None else None,
+                    after_name=after_name if new is not None else None,
+                    product_id=product_id,
+                    product_name=product_name,
                 )
             )
     return changes

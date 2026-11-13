@@ -5,7 +5,7 @@ description: The shared entitlement model, evaluation semantics, JSON encoding, 
 
 OpenEntitlement defines how an application describes product capabilities and resolves an organization's entitlement to them. The goal is a contract that implementations can share independently of billing vendors or storage engines.
 
-The current specification is **v0.1.0, experimental**. OEREP v1 is a draft. This overview explains the structure; the linked numbered requirements define the behavior.
+The current specification is **v0.1.0, experimental**. OEREP 0.1 is a draft. This overview explains the structure; the linked numbered requirements define the behavior.
 
 ## Four parts of the contract
 

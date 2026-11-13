@@ -403,3 +403,19 @@ async def test_a_product_is_never_deleted_under_a_new_customer(postgres_store) -
         await scene.service.delete_product(ws, scene.storage, version=1)
     await task
     assert isinstance(assigned[0], NotFound), assigned
+
+
+async def test_reassigning_to_a_different_variant_with_the_same_name_is_audited(scene: Scene) -> None:
+    """Variant names need not be unique: the Audit log records the variant's ID, and shows its name."""
+    async with scene.open("owner") as ws:
+        variant = VariantInput(id="basic_standard", name="Pro standard", values={"seats": 5})
+        await TierService().save_variant(ws, scene.analytics, "basic", variant, version=1)
+    await scene.create()  # pro_standard, also named "Pro standard"
+    await scene.assign(variant="basic_standard", version=1)
+    async with scene.open("owner") as ws:
+        entries = [e for _, e in reversed(await ws.repos.audit.list(managed=None, limit=100))]
+    last = [e for e in entries if e.target_kind == "Organization"][-1]
+    assert (last.action, last.aspect) == ("changed", "tier")
+    variant_change = next(c for c in last.changes if c.field == "variant")
+    assert (variant_change.before, variant_change.after) == ("pro_standard", "basic_standard")
+    assert (variant_change.before_name, variant_change.after_name) == ("Pro standard", "Pro standard")

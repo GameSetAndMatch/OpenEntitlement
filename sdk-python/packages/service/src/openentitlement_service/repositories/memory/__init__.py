@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from ...services.api_keys import ApiKey
 from ...services.audit import AuditEntry
 from ...services.catalog import CatalogRecord, VariantValues
 from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationRecord
@@ -55,6 +56,8 @@ class _Rows:
     invitations: dict[UUID, dict[str, Invitation]] = field(default_factory=dict)
     #: Every Workspace's Audit log entries, in write order.
     audit: list[AuditEntry] = field(default_factory=list)
+    #: Workspace → key ID → API key.
+    api_keys: dict[UUID, dict[UUID, ApiKey]] = field(default_factory=dict)
 
 
 class InMemoryWorkspacesRepository:
@@ -130,6 +133,11 @@ class InMemoryProductsRepository:
         invitations = self._rows.invitations.get(self._workspace_id, {}) if self._workspace_id else {}
         for token_hash in [k for k, i in invitations.items() if i.product_id == product_id]:
             del invitations[token_hash]
+        for user_key in [k for k in self._rows.users if k[:2] == (self._workspace_id, product_id)]:
+            del self._rows.users[user_key]
+        keys = self._rows.api_keys.get(self._workspace_id, {}) if self._workspace_id else {}
+        for key_id in [k for k, key in keys.items() if key.product_id == product_id]:
+            del keys[key_id]
 
     async def in_use(self, product_id: UUID) -> bool:
         return any(k[:2] == (self._workspace_id, product_id) for k in self._rows.assignments)
@@ -208,6 +216,34 @@ class InMemoryInvitationsRepository:
     async def take(self, token_hash: str, *, now: datetime) -> Invitation | None:
         invitation = self._own().pop(token_hash, None)
         return invitation if invitation and invitation.expires_at > now else None
+
+
+class InMemoryApiKeysRepository:
+    def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
+        self._rows, self._workspace_id = rows, workspace_id
+
+    def _own(self) -> dict[UUID, ApiKey]:
+        return self._rows.api_keys.setdefault(self._workspace_id, {}) if self._workspace_id else {}
+
+    async def list(self, product_id: UUID) -> Sequence[ApiKey]:
+        return [k for k in self._own().values() if k.product_id == product_id]
+
+    async def add(self, key: ApiKey) -> None:
+        ensure_bound_workspace(self._workspace_id, key.workspace_id)
+        if key.product_id not in self._rows.products.get(key.workspace_id, {}):
+            raise LookupError("unknown Product")
+        if any(k.id == key.id or k.token_hash == key.token_hash for k in self._own().values()):
+            raise AlreadyExists("API key")
+        self._own()[key.id] = key
+
+    async def get(self, key_id: UUID) -> ApiKey | None:
+        return self._own().get(key_id)
+
+    async def find(self, token_hash: str) -> ApiKey | None:
+        return next((k for k in self._own().values() if k.token_hash == token_hash), None)
+
+    async def delete(self, key_id: UUID) -> None:
+        self._own().pop(key_id, None)
 
 
 class InMemoryAuditRepository:
@@ -449,6 +485,16 @@ class InMemoryOrganizationsRepository:
         )
         return sorted(found, key=lambda a: (str(a.product_id), a.organization_id))
 
+    async def assignment(self, product_id: UUID, organization_id: str) -> AssignmentRecord | None:
+        if self.workspace_id is None:
+            return None
+        return self.rows.assignments.get((self.workspace_id, product_id, organization_id))
+
+    async def user(self, product_id: UUID, organization_id: str, subject_id: str) -> ApplicationUserRecord | None:
+        if self.workspace_id is None:
+            return None
+        return self.rows.users.get((self.workspace_id, product_id, organization_id, subject_id))
+
     async def save_assignment(self, assignment: AssignmentRecord, *, expected_version: int) -> None:
         ensure_bound_workspace(self.workspace_id, assignment.workspace_id)
         if assignment.product_id not in self.rows.products.get(assignment.workspace_id, {}):
@@ -473,8 +519,10 @@ class InMemoryOrganizationsRepository:
 
     async def save_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
         ensure_bound_workspace(self.workspace_id, user.workspace_id)
-        if (user.workspace_id, user.product_id, user.organization_id) not in self.rows.assignments:
-            raise LookupError("the Organization has no Tier variant in this Product")
+        if user.product_id not in self.rows.products.get(user.workspace_id, {}):
+            raise LookupError("unknown Product")
+        if (user.workspace_id, user.organization_id) not in self.rows.organizations:
+            raise LookupError("unknown Organization")
         key = (user.workspace_id, user.product_id, user.organization_id, user.subject_id)
         current = self.rows.users.get(key)
         if current is not None and expected_version == 0:
@@ -516,6 +564,7 @@ class InMemoryStore:
                 directory=InMemoryDirectoryRepository(working, account_id),
                 invitations=InMemoryInvitationsRepository(working, workspace_id),
                 audit=InMemoryAuditRepository(working, workspace_id),
+                api_keys=InMemoryApiKeysRepository(working, workspace_id),
             )
             self._committed = working
 

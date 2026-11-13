@@ -24,6 +24,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
+from ...services.api_keys import ApiKey
 from ...services.audit import AuditEntry
 from ...services.catalog import CatalogRecord, VariantValues
 from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationRecord
@@ -47,7 +48,7 @@ from .tables import catalog_variant_values, catalog_groups, catalog_tags, catalo
 from .tables import status_policies, tiers
 from .tables import application_users, organization_products, organizations
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
-from .tables import audit_entries, invitations
+from .tables import api_keys, audit_entries, invitations
 
 
 UNIQUE_VIOLATION = "23505"
@@ -263,6 +264,35 @@ class PostgresInvitationsRepository:
         if row is None or row["expires_at"] <= now:
             return None
         return Invitation.model_validate(dict(row))
+
+
+class PostgresApiKeysRepository:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self._workspace_id = connection, workspace_id
+
+    async def list(self, product_id: UUID) -> Sequence[ApiKey]:
+        query = select(*api_keys.c).where(api_keys.c.workspace_id == self._workspace_id, api_keys.c.product_id == product_id)
+        return [ApiKey.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
+
+    async def add(self, key: ApiKey) -> None:
+        ensure_bound_workspace(self._workspace_id, key.workspace_id)
+        await _insert(self.connection, api_keys.insert().values(**key.model_dump(by_alias=False)))
+
+    async def _one(self, condition: ColumnElement[bool]) -> ApiKey | None:
+        query = select(*api_keys.c).where(api_keys.c.workspace_id == self._workspace_id, condition)
+        row = (await self.connection.execute(query)).mappings().first()
+        return ApiKey.model_validate(dict(row)) if row else None
+
+    async def get(self, key_id: UUID) -> ApiKey | None:
+        return await self._one(api_keys.c.id == key_id)
+
+    async def find(self, token_hash: str) -> ApiKey | None:
+        return await self._one(api_keys.c.token_hash == token_hash)
+
+    async def delete(self, key_id: UUID) -> None:
+        await self.connection.execute(
+            api_keys.delete().where(api_keys.c.workspace_id == self._workspace_id, api_keys.c.id == key_id)
+        )
 
 
 class PostgresAuditRepository:
@@ -560,6 +590,27 @@ class PostgresOrganizationsRepository:
         query = query.order_by(cast(table.c.product_id, Text), table.c.organization_id)
         return [AssignmentRecord.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
 
+    async def assignment(self, product_id: UUID, organization_id: str) -> AssignmentRecord | None:
+        table = organization_products
+        query = select(table.c.entry).where(
+            table.c.workspace_id == self.workspace_id,
+            table.c.product_id == product_id,
+            table.c.organization_id == organization_id,
+        )
+        row = (await self.connection.execute(query)).scalars().first()
+        return AssignmentRecord.model_validate(row) if row else None
+
+    async def user(self, product_id: UUID, organization_id: str, subject_id: str) -> ApplicationUserRecord | None:
+        table = application_users
+        query = select(table.c.entry).where(
+            table.c.workspace_id == self.workspace_id,
+            table.c.product_id == product_id,
+            table.c.organization_id == organization_id,
+            table.c.subject_id == subject_id,
+        )
+        row = (await self.connection.execute(query)).scalars().first()
+        return ApplicationUserRecord.model_validate(row) if row else None
+
     async def save_assignment(self, assignment: AssignmentRecord, *, expected_version: int) -> None:
         ensure_bound_workspace(self.workspace_id, assignment.workspace_id)
         table = organization_products
@@ -671,6 +722,7 @@ class PostgresStore:
                 directory=PostgresDirectoryRepository(connection, account_id),
                 invitations=PostgresInvitationsRepository(connection, workspace_id),
                 audit=PostgresAuditRepository(connection, workspace_id),
+                api_keys=PostgresApiKeysRepository(connection, workspace_id),
                 connection=connection,
             )
 

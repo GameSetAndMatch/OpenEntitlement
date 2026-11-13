@@ -17,7 +17,7 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 | [RFC-0002](rfcs/0002-privilege-catalog.md) | Accepted reference authoring contract; not a normative OEREP version bump |
 | [RFC-0003](rfcs/0003-consumption-dashboard.md) | Proposed read-only consumption view; blocked on a real application/metering usage source |
 | [RFC-0004](rfcs/0004-mcp-server.md) | Accepted direction: MCP server for the Workspace control plane (per-Account sign-in, Workspace opt-in, same Permissions, previewed writes, no deletes); not implemented |
-| [RFC-0005](rfcs/0005-product-scoped-evaluation.md) | Accepted direction, not implemented: amends OEREP 0.1 so requests name the Product and Privilege in the path (`/oerep/v1/products/{product}/privileges/{privilege}/resolve`), `suggest` becomes `upgrade`, and keys are bound to one Product |
+| [RFC-0005](rfcs/0005-product-scoped-evaluation.md) | Accepted direction, implemented preview on `service/python` (OPE-42), not released: amends OEREP 0.1 so requests name the Product and Privilege in the path (`/oerep/v1/products/{product}/privileges/{privilege}/resolve`), `suggest` becomes `upgrade`, and keys are bound to one Product |
 | [Normative specification](../spec/README.md) | Released/draft version stated by the spec itself governs compatible SDK/wire behavior |
 | [Revenera spike](research/revenera-connector-spike.md) | Research: read-only connector feasibility, API beta caveat and runtime allocation boundaries |
 | [Prior-art matrix](research/vendor-data-model-matrix.md) | Research evidence/inference, not product requirements or certified compatibility |

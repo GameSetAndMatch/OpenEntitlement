@@ -10,7 +10,7 @@ const server=createServer(async(req,res)=>{try{const path=resolve(root,'.'+new U
 await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const origin=`http://127.0.0.1:${server.address().port}`;
 let browser;
 try{browser=await chromium.launch();const page=await browser.newPage();const failures=[];page.on('pageerror',e=>failures.push(e.message));
- for(const story of ['changes','french']){
+ for(const story of ['changes','french','variant-names-and-api-keys','variant-names-and-api-keys-french','refresh-during-load-more','load-more-during-refresh']){
   await page.goto(`${origin}/iframe.html?id=workspace-audit-log--${story}&viewMode=story`);
   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});
  }

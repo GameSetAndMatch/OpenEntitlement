@@ -51,7 +51,7 @@ privileges:
     tags: [integration]
 ```
 
-The self-hosted service accepts this flat Catalog format at `OE_CATALOG` in YAML or JSON. Its published OEREP v1 SDK/wire catalog remains compatible through an adapter. Standalone authoring currently requires defaults and integer limits without additional min/max bounds; workspace tier variants support required values and bounded integer definitions. Unsupported standalone definitions fail startup rather than silently losing constraints.
+The self-hosted service accepts this flat Catalog format at `OE_CATALOG` in YAML or JSON. Its published OEREP 0.1 SDK/wire catalog remains compatible through an adapter. Standalone authoring currently requires defaults and integer limits without additional min/max bounds; workspace tier variants support required values and bounded integer definitions. Unsupported standalone definitions fail startup rather than silently losing constraints.
 
 The workspace console uses **Privilege Catalog → Tiers → Organizations**. It can create/edit Groups and Tags, filter by Tag and assign multiple Tags to a Privilege. `GET /api/workspaces/:id/catalog` exposes the typed authoring contract. Audited `PUT` to that endpoint accepts one Privilege as `entry`, alongside `revision` and `reason`. Groups and Tags use their corresponding workspace endpoints. Environment binding changes remain platform-administrator-only.
 

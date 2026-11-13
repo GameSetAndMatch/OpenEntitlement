@@ -8,7 +8,7 @@ An integration should preserve the entitlement model's meaning, not just rename 
 ## Choose the boundary
 
 - **SDK provider:** implement the [provider interface](/specification/06-providers/), including resolution details and accurate capability declarations. Facts-based providers can reuse the reference resolver.
-- **Remote service:** implement [OEREP v1](/specification/10-remote-evaluation/) so generic SDK providers can request decisions without vendor-specific client code.
+- **Remote service:** implement [OEREP 0.1](/specification/10-remote-evaluation/) so generic SDK providers can request decisions without vendor-specific client code.
 
 A remote service also needs equivalent resolution semantics. Passing an OpenAPI schema check alone does not demonstrate that.
 
