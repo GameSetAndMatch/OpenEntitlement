@@ -381,7 +381,8 @@ class TierService:
         return await self._view(ws, product_id)
 
     async def set_policy(self, ws: OpenWorkspace, product_id: UUID, policy: StatusPolicy, *, version: int) -> TiersView:
-        """A fallback must be a variant of this Product whose Tier is not archived."""
+        """A fallback must be a variant of this Product. A newly chosen one cannot belong to an archived Tier;
+        a field that keeps its persisted fallback may, since an archived Tier keeps serving (ADR-0008)."""
         await self._open(ws, product_id, Permission.EDIT_PRODUCT)
         current = await ws.repos.tiers.policy(product_id)
         if (current.version if current else 0) != version:
@@ -389,13 +390,17 @@ class TierService:
         variants = {v.id: v for v in await ws.repos.catalog.variants(product_id)}
         archived = {t.id for t in await ws.repos.tiers.list(product_id) if t.archived_at is not None}
         errors = []
-        for member, action in (("pastDue", policy.past_due), ("ended", policy.ended)):
+        persisted = current.policy if current else None
+        for member, action, before in (
+            ("pastDue", policy.past_due, persisted.past_due if persisted else None),
+            ("ended", policy.ended, persisted.ended if persisted else None),
+        ):
             if action.variant_id is None:
                 continue
             found = variants.get(action.variant_id)
             if found is None:
                 errors.append(FieldError(_pointer(member, "variantId"), "Choose a variant of this Product."))
-            elif found.tier_id in archived:
+            elif found.tier_id in archived and action != before:
                 errors.append(FieldError(_pointer(member, "variantId"), "This variant's Tier is archived."))
         if errors:
             raise ValidationFailed(errors)

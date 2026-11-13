@@ -105,9 +105,16 @@ async def test_tiers_over_http(store):
         archived = await client.post(f"{tiers}/pro/archive", json={"version": 2})
         assert archived.status_code == 200 and archived.json()["tiers"][0]["archivedAt"] is not None
         assert len(archived.json()["variants"]) == 3
+        # The existing archived fallback stays while the other field changes; a newly chosen one is rejected.
+        kept = {"pastDue": {"action": "readOnly"}, "ended": {"action": "fallback", "variantId": "pro_standard"}}
+        retained = await client.put(f"{product}/status-policy", json=kept | {"version": 1})
+        assert retained.status_code == 200 and retained.json()["policyVersion"] == 2
+        newly = {**kept, "pastDue": {"action": "fallback", "variantId": "pro_trial"}}
+        rejected = await client.put(f"{product}/status-policy", json=newly | {"version": 2})
+        assert rejected.status_code == 400 and _pointers(rejected) == ["/pastDue/variantId"]
         restored = await client.post(f"{tiers}/pro/restore", json={"version": 3})
         assert restored.status_code == 200 and restored.json()["tiers"][0]["archivedAt"] is None
-        await client.put(f"{product}/status-policy", json={**policy, "ended": {"action": "readOnly"}, "version": 1})
+        await client.put(f"{product}/status-policy", json={**policy, "ended": {"action": "readOnly"}, "version": 2})
         assert (await client.delete(f"{tiers}/pro?version=4")).status_code == 204
         assert (await client.get(tiers)).json()["variants"] == []
         assert (await client.post(f"{tiers}/missing/archive", json={"version": 1})).status_code == 404

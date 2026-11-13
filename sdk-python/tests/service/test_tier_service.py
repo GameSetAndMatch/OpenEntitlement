@@ -282,6 +282,33 @@ async def test_status_policy_per_product_references_its_own_variants(store):
     assert in_use.value.params["variantId"] == "basic_standard"
 
 
+async def test_an_unchanged_archived_fallback_stays_but_a_new_one_is_rejected(store):
+    service, owner, ws, product = await _setup(store)
+    tiers = TierService()
+    basic = PolicyAction(action="fallback", variant_id="basic_standard")
+    async with service.open(owner, ws) as opened:
+        await tiers.create(opened, product, NewTier(id="basic", name="Basic"), _standard("basic"))
+        await tiers.create(opened, product, NewTier(id="pro", name="Pro"), _standard("pro"))
+        await tiers.set_policy(opened, product, StatusPolicy(past_due=READ_ONLY, ended=basic), version=0)
+        await tiers.archive(opened, product, "basic", version=1)
+        # Editing only the other field keeps the existing archived fallback (it keeps serving, ADR-0008).
+        pro = PolicyAction(action="fallback", variant_id="pro_standard")
+        view = await tiers.set_policy(opened, product, StatusPolicy(past_due=pro, ended=basic), version=1)
+        assert (view.policy, view.policy_version) == (StatusPolicy(past_due=pro, ended=basic), 2)
+    # Choosing the archived variant for a field that did not already use it is rejected.
+    with pytest.raises(ValidationFailed) as problem:
+        async with service.open(owner, ws) as opened:
+            await tiers.set_policy(opened, product, StatusPolicy(past_due=basic, ended=basic), version=2)
+    assert _pointers(problem) == ["/pastDue/variantId"]
+    # Once moved away, it cannot be chosen again.
+    async with service.open(owner, ws) as opened:
+        await tiers.set_policy(opened, product, StatusPolicy(past_due=pro, ended=READ_ONLY), version=2)
+    with pytest.raises(ValidationFailed) as problem:
+        async with service.open(owner, ws) as opened:
+            await tiers.set_policy(opened, product, StatusPolicy(past_due=pro, ended=basic), version=3)
+    assert _pointers(problem) == ["/ended/variantId"]
+
+
 async def test_roles_scope_and_audit(store):
     from openentitlement_service.services.models import Member, ProductMembership, ProductRole
     from test_repository_contract import NOW
