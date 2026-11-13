@@ -33,7 +33,8 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const generation=useRef(0);
   async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=keysPath?await request(keysPath):owner&&!python?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
   async function reload(){await load();}
-  useEffect(()=>{let active=true;const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
+  // Keys of the previously selected Product never show while this one's load.
+  useEffect(()=>{let active=true;setKeys([]);const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
     // Stay current without a refresh button: reload when the person comes back to this window.
     const onFocus=()=>{if(document.visibilityState==="visible")void refresh();};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
