@@ -199,6 +199,16 @@ try{
  await page.reload();const selector=page.getByRole('combobox',{name:'Product'});await selector.waitFor();
  assert.deepEqual(await selector.locator('option').allInnerTexts(),['Acme product','Storage']);
  await selector.selectOption({label:'Storage'});await page.getByRole('heading',{name:'Define your first privilege',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Edit Seats',exact:true}).count(),0);await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
+ // Organizations are Workspace-wide: Storage has no Tiers, yet Acme is listed there and can be renamed.
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();
+ const storageCard=page.locator('.workspace-card').filter({hasText:'Acme'});await storageCard.getByText('No tier in this Product').waitFor();
+ await storageCard.click();await page.getByRole('button',{name:'Edit organization',exact:true}).click();
+ assert.equal(await page.getByLabel('Tier variant').count(),0,'No variant to give in a Product without Tiers');
+ await page.getByLabel('Name',{exact:true}).fill('Acme Corp');await saveOrganization.click();await saveOrganization.waitFor({state:'hidden'});
+ await page.locator('.workspace-card').filter({hasText:'Acme Corp'}).waitFor();
+ organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
+ assert.deepEqual(organizationsView.map(o=>[o.name,o.version,o.products.length]),[['Acme Corp',2,1]]);
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();
 
  // A change without the CSRF token is refused as a Problem Details response.
  const refused=await page.request.post(app+'/api/workspaces',{headers:{origin:app},data:{name:'No token'}});assert.equal(refused.status(),403);assert.equal((await refused.json()).type,'https://openentitlement.dev/problems/csrf-rejected');

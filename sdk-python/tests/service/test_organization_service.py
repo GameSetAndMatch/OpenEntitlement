@@ -365,3 +365,38 @@ async def test_an_environment_prerequisite_can_only_restrict(scene: Scene) -> No
             view = await OrganizationService(environment=environment).view(ws)
         found = next(v for v in view.organizations[0].products[0].values if v.privilege == "mcp")
         assert (found.value, found.source, found.source_name) == expected, environment
+
+
+async def test_a_product_is_never_deleted_under_a_new_customer(postgres_store) -> None:
+    """Deletion holds the Product lock from its in-use check to the delete, so a first assignment waits."""
+    import asyncio
+
+    scene = await Scene(postgres_store).setup()
+    async with scene.open("owner") as ws:
+        await scene.organizations.create(ws, id="acme", name="Acme")
+    assigned: list[object] = []
+
+    async def assign_meanwhile() -> None:
+        try:
+            async with scene.open("owner") as ws:
+                await scene.organizations.assign(ws, "acme", scene.storage, AssignmentInput(variant_id="small_standard"), version=0)
+            assigned.append("committed")
+        except NotFound as exc:
+            assigned.append(exc)
+
+    task = None
+    async with scene.open("owner") as ws:
+        checked = ws.repos.products.in_use
+
+        async def in_use_then_wait(product_id):
+            nonlocal task
+            result = await checked(product_id)
+            # Another Manager gives the Product to a customer between the check and the delete.
+            task = asyncio.create_task(assign_meanwhile())
+            await asyncio.sleep(0.3)
+            return result
+
+        ws.repos.products.in_use = in_use_then_wait
+        await scene.service.delete_product(ws, scene.storage, version=1)
+    await task
+    assert isinstance(assigned[0], NotFound), assigned

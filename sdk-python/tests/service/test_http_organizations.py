@@ -112,3 +112,4 @@ async def test_terms_and_a_catalog_change_never_both_commit_invalid(postgres_sto
                 # Restore a wide maximum for the next round.
                 version = (await client.get(f"{product}/catalog")).json()["versions"]["privileges"]["seats"]
                 await _privilege(client, product, seats | {"maximum": 1000}, version=version)
+

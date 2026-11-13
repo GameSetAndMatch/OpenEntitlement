@@ -69,11 +69,13 @@ export function organizationRequests(base:string,entry:Organization,view:Product
  const existing=view.organizations.find(o=>o.id===entry.id);
  const assignment={variantId:entry.variantId,status:entry.status,terms:entry.terms};
  const why=reason?{reason}:{};
- if(!existing)return [{path:`${base}/organizations`,method:'POST',body:{id:entry.id,name:entry.name,assignment:{productId,...assignment},...why}}];
+ // Without a Tier variant (the Product has none yet), only the Organization itself is saved.
+ if(!existing)return [{path:`${base}/organizations`,method:'POST',body:{id:entry.id,name:entry.name,...(entry.variantId?{assignment:{productId,...assignment},...why}:{})}}];
  const requests=[];
  if(existing.name!==entry.name)requests.push({path:`${base}/organizations/${entry.id}`,method:'PATCH',body:{name:entry.name,version:existing.version}});
  const current=existing.products.find(p=>p.productId===productId);
  // A rename alone leaves the Tier variant, its status and terms as they are.
+ if(!entry.variantId)return requests;
  if(current&&current.variantId===entry.variantId&&current.status===entry.status&&same(current.terms,entry.terms)&&requests.length)return requests;
  requests.push({path:`${base}/organizations/${entry.id}/products/${productId}`,method:'PUT',body:{...assignment,version:current?.version??0,...why}});
  return requests;
