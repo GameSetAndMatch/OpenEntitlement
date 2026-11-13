@@ -26,11 +26,12 @@ const sent=(c:ReturnType<typeof within>)=>within(c.getByRole('list',{name:'Sent'
 // An Owner of a Workspace with two Products sets a Role per Product and invites to either Product.
 export const OwnerOfTwoProducts:Story={args:{products:[analytics,storage],owner:true,viewer:'o'},play:async({canvasElement})=>{
  const c=within(canvasElement);
- await expect(c.getByLabelText('Role for owner@acme.test in Analytics')).toHaveValue('Owner');
+ await expect(c.getByLabelText('Role for owner@acme.test')).toHaveValue('Owner');
+ await expect(c.queryByLabelText('Role for owner@acme.test in Analytics')).not.toBeInTheDocument();
  await expect(c.getByLabelText('Role for user@acme.test in Storage')).toHaveValue('');
  await userEvent.selectOptions(c.getByLabelText('Role for manager@acme.test in Storage'),'');
  await userEvent.selectOptions(c.getByLabelText('Role for user@acme.test in Analytics'),'Owner');
- await userEvent.selectOptions(c.getByLabelText('Role for owner@acme.test in Storage'),'Manager');
+ await userEvent.selectOptions(c.getByLabelText('Role for owner@acme.test'),'Manager of Storage');
  await userEvent.click(c.getByRole('button',{name:'Remove user@acme.test'}));
  await userEvent.type(c.getByLabelText('Email address'),'new@acme.test');
  await userEvent.selectOptions(c.getByLabelText('Invite to product'),'s');

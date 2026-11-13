@@ -15,7 +15,8 @@ export const managesMembers = (p: ProductSummary) => ADMINISTERS.has(p.role) || 
 /**
  * Members with their Role in each Product the viewer manages, and the invitation form.
  * A member's Role is its control: one select per Product. Choosing Owner makes them Owner of the
- * whole Workspace; choosing a Product Role for an Owner ends their being Owner.
+ * whole Workspace. An Owner's row has one select, since they have every Product: choosing a Role in
+ * one Product ends their being Owner.
  */
 export function ProductMembers({ description, members, products, viewer, owner, locked, link, onRole, onRemove, onInvite }: {
   description: string; members: ProductMember[]; products: ProductSummary[]; viewer: string; owner: boolean; locked: boolean; link: string;
@@ -27,8 +28,16 @@ export function ProductMembers({ description, members, products, viewer, owner, 
   const several = products.length > 1;
   const [email, setEmail] = useState(""), [role, setRole] = useState<NewInvitation["role"]>("User"), [product, setProduct] = useState("");
   const invitedProduct = managed.find(p => p.id === product)?.id ?? managed[0]?.id;
+  // An Owner has every Product, so their row has one select: Owner, or a Role in one Product (which ends their being Owner).
+  const ownerSelect = (m: ProductMember) => <select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value="Owner" onChange={e => {
+    const [role, productId] = e.target.value.split(":");
+    onRole(m, { role: role as "Manager" | "User", productId });
+  }}>
+    <option>Owner</option>
+    {managed.flatMap(p => (["Manager", "User"] as const).map(r => <option key={`${r}:${p.id}`} value={`${r}:${p.id}`}>{several ? `${r} of ${p.name}` : r}</option>))}
+  </select>;
   const roleSelect = (m: ProductMember, p: ProductSummary) => {
-    const value = m.owner ? "Owner" : m.products.find(r => r.productId === p.id)?.role ?? "";
+    const value = m.products.find(r => r.productId === p.id)?.role ?? "";
     const label = several ? `Role for ${m.email} in ${p.name}` : `Role for ${m.email}`;
     return <select key={p.id} className="fit" disabled={locked} aria-label={label} value={value} onChange={e => {
       const next = e.target.value;
@@ -36,13 +45,13 @@ export function ProductMembers({ description, members, products, viewer, owner, 
     }}>
       {owner && <option>Owner</option>}
       <option>Manager</option><option>User</option>
-      {!m.owner && (several || value === "") && <option value="">No role</option>}
+      {(several || value === "") && <option value="">No role</option>}
     </select>;
   };
   return <>
     <Group description={description}>
       {members.map(m => <Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0, 1).toUpperCase()}</span><span className="member-email">{m.email}</span>{m.id === viewer && <span className="member-you">You</span>}</span>}>
-        {m.owner && !owner ? <span className="settings-value">Owner</span> : managed.map(p => roleSelect(m, p))}
+        {m.owner ? (owner ? ownerSelect(m) : <span className="settings-value">Owner</span>) : managed.map(p => roleSelect(m, p))}
         {(owner || !m.owner) && <button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={() => onRemove(m)}>Remove</button>}
       </Item>)}
     </Group>

@@ -129,7 +129,7 @@ try{
 
  // Members: the Owner invites the other Account as Manager of Storage with a single-use link.
  await page.getByRole('link',{name:'Members',exact:true}).click();await page.getByRole('heading',{name:'Members',exact:true,level:1}).waitFor();
- assert.equal(await page.getByLabel('Role for admin@example.test in Storage').inputValue(),'Owner');
+ assert.equal(await page.getByLabel('Role for admin@example.test',{exact:true}).inputValue(),'Owner');
  await page.getByLabel('Email address').fill('user@example.test');await page.getByLabel('Role',{exact:true}).selectOption('Manager');await page.getByLabel('Invite to product').selectOption({label:'Storage'});
  await page.getByRole('button',{name:'Create invitation link',exact:true}).click();const inviteUrl=await page.getByLabel('Invitation link (expires in 7 days)').inputValue();
  assert.match(inviteUrl,new RegExp(`/app/#invite=${workspaceId}\\.`));
