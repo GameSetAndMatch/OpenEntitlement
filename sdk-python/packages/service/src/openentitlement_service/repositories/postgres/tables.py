@@ -7,7 +7,9 @@ its own ``version`` for optimistic concurrency (ADR-0009).
 from __future__ import annotations
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
+    Identity,
     JSON,
     CheckConstraint,
     Column,
@@ -37,8 +39,11 @@ workspaces = Table(
     metadata,
     Column("id", Uuid, primary_key=True),
     Column("name", Text, nullable=False),
+    # The Cloud service tier; a self-hosted install ignores it (ADR-0008).
+    Column("service_tier", Text, nullable=False, server_default="pro"),
     Column("version", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint("service_tier in ('pro', 'enterprise')", name="service_tier"),
 )
 
 products = Table(
@@ -137,5 +142,38 @@ catalog_changes = Table(
     "catalog_changes", metadata,
     Column("id", Uuid, primary_key=True),
     Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    Column("entry", JSON, nullable=False),
+)
+
+# A single-use invitation link, stored by hash. An Owner invitation has no Product; a Manager or
+# User invitation names one, and is deleted with it.
+invitations = Table(
+    "invitations", metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    Column("token_hash", Text, nullable=False, unique=True),
+    Column("email", Text, nullable=False),
+    Column("owner", Boolean, nullable=False),
+    Column("product_id", Uuid),
+    Column("role", Text),
+    Column("invited_by", Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
+    CheckConstraint(
+        "(owner and product_id is null and role is null)"
+        " or (not owner and product_id is not null and role in ('Manager', 'User'))",
+        name="role",
+    ),
+)
+
+# Immutable audit facts about members, invitations and the Cloud service tier (ADR-0007).
+settings_changes = Table(
+    "settings_changes", metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    # Write order, so changes made in one transaction (at the same time) read back in order.
+    Column("seq", BigInteger, Identity(always=True), nullable=False),
+    Column("at", DateTime(timezone=True), nullable=False),
     Column("entry", JSON, nullable=False),
 )

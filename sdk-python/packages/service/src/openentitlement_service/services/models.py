@@ -8,9 +8,18 @@ from uuid import UUID
 from openentitlement.model import OpenEntitlementModel
 
 
+class ServiceTier(StrEnum):
+    """A Workspace's Cloud service tier (GLOSSARY). Cloud Pro allows one Product; Enterprise any number."""
+
+    PRO = "pro"
+    ENTERPRISE = "enterprise"
+
+
 class Workspace(OpenEntitlementModel):
     id: UUID
     name: str
+    #: Applies on OpenEntitlement Cloud only; a self-hosted install ignores it (ADR-0008).
+    service_tier: ServiceTier = ServiceTier.PRO
     version: int = 1
     created_at: datetime
 
@@ -92,3 +101,42 @@ class WorkspaceMembership(OpenEntitlementModel):
     workspace: Workspace
     owner: bool
     roles: tuple[ProductRole, ...] = ()
+
+
+class Invitation(OpenEntitlementModel):
+    """A single-use link to join a Workspace, bound to the invited email. Only its hash is stored.
+
+    An Owner invitation has no Product; a Manager or User invitation names one.
+    """
+
+    id: UUID
+    workspace_id: UUID
+    token_hash: str
+    email: str
+    owner: bool = False
+    product_id: UUID | None = None
+    role: ProductRole | None = None
+    invited_by: UUID
+    created_at: datetime
+    expires_at: datetime
+
+
+class SettingsChange(OpenEntitlementModel):
+    """An authenticated audit fact about members, invitations or the Cloud service tier (ADR-0007).
+
+    ``product_id`` is the Product the change concerns, or ``None`` for a Workspace-wide change
+    (Owners, the Cloud service tier). The target's name is recorded as it was at that moment.
+    """
+
+    id: UUID
+    workspace_id: UUID
+    product_id: UUID | None = None
+    actor_id: UUID
+    actor_email: str
+    at: datetime
+    action: str
+    target_kind: str
+    target_id: str
+    target_name: str
+    before: str | None = None
+    after: str | None = None

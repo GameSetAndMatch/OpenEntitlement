@@ -191,6 +191,53 @@ class LastProduct(Problem):
         super().__init__("A Workspace keeps at least one Product. Create another one before deleting this one.", id=id)
 
 
+# Members, invitations and the Cloud service tier (OPE-44).
+
+
+class LastOwner(Problem):
+    """A Workspace always keeps at least one Owner."""
+
+    slug = "last-owner"
+    status = 409
+    title = "Last Owner"
+
+    def __init__(self, *, id: str) -> None:  # noqa: A002
+        super().__init__("A Workspace keeps at least one Owner. Make another member Owner first.", id=id)
+
+
+class ProductLimit(Problem):
+    """Cloud Pro allows one Product (ADR-0008). ``products`` lists the Workspace's Products."""
+
+    slug = "product-limit"
+    status = 409
+    title = "Product limit reached"
+
+    def __init__(self, detail: str, *, service_tier: str, limit: int, products: Sequence[Mapping[str, str]]) -> None:
+        super().__init__(detail, serviceTier=service_tier, limit=limit, products=[dict(p) for p in products])
+
+
+class InvitationInvalid(Problem):
+    """The invitation link does not exist, was already used, or expired. The three are not told apart."""
+
+    slug = "invitation-invalid"
+    status = 404
+    title = "Invitation not valid"
+
+    def __init__(self) -> None:
+        super().__init__("This invitation link is not valid. It may have expired or been used. Ask for a new one.")
+
+
+class InvitationForAnotherEmail(Problem):
+    """The signed-in Account's verified email is not the invited one."""
+
+    slug = "invitation-for-another-email"
+    status = 403
+    title = "Invitation for another email"
+
+    def __init__(self) -> None:
+        super().__init__("This invitation is for another email address. Sign in with the invited email to accept it.")
+
+
 def escape_pointer_token(token: object) -> str:
     return str(token).replace("~", "~0").replace("/", "~1")
 

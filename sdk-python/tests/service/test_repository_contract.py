@@ -8,11 +8,14 @@ import pytest
 
 from openentitlement_service.services.models import (
     Account,
+    Invitation,
     Member,
     Product,
     ProductMembership,
     ProductRole,
+    ServiceTier,
     Session,
+    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -287,3 +290,124 @@ async def test_another_workspaces_product_cannot_be_read_or_changed(store: Store
         assert await repos.products.get(analytics.id) is None
         with pytest.raises(StaleVersion):
             await repos.products.delete(analytics.id, expected_version=1)
+
+
+# Members, invitations and the Cloud service tier (OPE-44).
+
+
+def role(ws: Workspace, product_id: UUID, who: Account, value: ProductRole) -> ProductMembership:
+    return ProductMembership(workspace_id=ws.id, product_id=product_id, account_id=who.id, role=value)
+
+
+async def test_members_are_listed_owned_and_removed_with_their_roles(store: Store) -> None:
+    ws = await given_workspace(store)
+    alice, bob = await given_account(store, "alice"), await given_account(store, "bob")
+    analytics, storage = product(ws.id, "analytics"), product(ws.id, "storage")
+    await given_member(store, ws, alice, owner=True)
+    await given_member(store, ws, bob)
+    async with store.transaction(ws.id) as repos:
+        await repos.products.add(analytics)
+        await repos.products.add(storage)
+        await repos.members.set_product_role(role(ws, analytics.id, bob, ProductRole.MANAGER))
+        await repos.members.set_product_role(role(ws, storage.id, bob, ProductRole.USER))
+        await repos.members.set_owner(bob.id, True)
+        await repos.members.remove_product_role(storage.id, bob.id)
+        await repos.members.remove_product_role(storage.id, alice.id)  # none: nothing happens
+    async with store.transaction(ws.id) as repos:
+        assert {(m.account_id, m.owner) for m in await repos.members.list()} == {(alice.id, True), (bob.id, True)}
+        assert [(r.product_id, r.account_id) for r in await repos.members.all_product_roles()] == [(analytics.id, bob.id)]
+        await repos.members.remove(bob.id)
+    async with store.transaction(ws.id) as repos:
+        assert [m.account_id for m in await repos.members.list()] == [alice.id]
+        assert list(await repos.members.all_product_roles()) == []
+        with pytest.raises(LookupError):
+            await repos.members.set_owner(bob.id, False)
+
+
+async def test_another_workspaces_members_are_never_listed_or_changed(store: Store) -> None:
+    acme, globex = await given_workspace(store, "ACME"), await given_workspace(store, "Globex")
+    alice = await given_account(store, "alice")
+    await given_member(store, acme, alice, owner=True)
+    async with store.transaction(globex.id) as repos:
+        assert list(await repos.members.list()) == []
+        await repos.members.remove(alice.id)
+        with pytest.raises(LookupError):
+            await repos.members.set_owner(alice.id, False)
+    async with store.transaction(acme.id) as repos:
+        assert [(m.account_id, m.owner) for m in await repos.members.list()] == [(alice.id, True)]
+
+
+def invitation(ws: Workspace, inviter: Account, token_hash: str, *, expires_at: datetime, product_id: UUID | None = None) -> Invitation:
+    return Invitation(
+        id=uuid4(), workspace_id=ws.id, token_hash=token_hash, email="bob@acme.test", owner=product_id is None,
+        product_id=product_id, role=ProductRole.USER if product_id else None, invited_by=inviter.id,
+        created_at=NOW, expires_at=expires_at,
+    )
+
+
+async def test_an_invitation_is_taken_once_within_its_workspace_until_it_expires(store: Store) -> None:
+    acme, globex = await given_workspace(store, "ACME"), await given_workspace(store, "Globex")
+    alice = await given_account(store, "alice")
+    analytics = product(acme.id, "analytics")
+    later = NOW + timedelta(days=7)
+    async with store.transaction(acme.id) as repos:
+        await repos.products.add(analytics)
+        await repos.invitations.add(invitation(acme, alice, "owner", expires_at=later), now=NOW)
+        await repos.invitations.add(invitation(acme, alice, "user", expires_at=later, product_id=analytics.id), now=NOW)
+        await repos.invitations.add(invitation(acme, alice, "expired", expires_at=NOW + timedelta(seconds=1)), now=NOW)
+    async with store.transaction(globex.id) as repos:
+        assert await repos.invitations.take("owner", now=NOW) is None
+    async with store.transaction(acme.id) as repos:
+        taken = await repos.invitations.take("user", now=NOW)
+        assert taken is not None and (taken.product_id, taken.role, taken.owner) == (analytics.id, ProductRole.USER, False)
+        assert await repos.invitations.take("user", now=NOW) is None
+        assert await repos.invitations.take("expired", now=NOW + timedelta(seconds=1)) is None
+        owner = await repos.invitations.take("owner", now=NOW)
+        assert owner is not None and owner.owner and owner.product_id is None
+
+
+async def test_deleting_a_product_deletes_its_invitations(store: Store) -> None:
+    ws, alice = await given_workspace(store), await given_account(store, "alice")
+    analytics = product(ws.id, "analytics")
+    async with store.transaction(ws.id) as repos:
+        await repos.products.add(analytics)
+        await repos.invitations.add(invitation(ws, alice, "user", expires_at=NOW + timedelta(days=7), product_id=analytics.id), now=NOW)
+        await repos.products.delete(analytics.id, expected_version=1)
+    async with store.transaction(ws.id) as repos:
+        assert await repos.invitations.take("user", now=NOW) is None
+
+
+async def test_the_service_tier_changes_by_version(store: Store) -> None:
+    ws = await given_workspace(store)
+    assert ws.service_tier is ServiceTier.PRO
+    enterprise = ws.model_copy(update={"service_tier": ServiceTier.ENTERPRISE, "version": 2})
+    async with store.transaction(ws.id) as repos:
+        await repos.workspaces.lock()
+        await repos.workspaces.update(enterprise, expected_version=1)
+    with pytest.raises(StaleVersion):
+        async with store.transaction(ws.id) as repos:
+            await repos.workspaces.update(enterprise, expected_version=1)
+    async with store.transaction(ws.id) as repos:
+        assert await repos.workspaces.get() == enterprise
+
+
+async def test_settings_changes_read_back_in_write_order_within_their_workspace(store: Store) -> None:
+    acme, globex = await given_workspace(store, "ACME"), await given_workspace(store, "Globex")
+    alice = await given_account(store, "alice")
+
+    def change(ws: Workspace, action: str) -> SettingsChange:
+        return SettingsChange(
+            id=uuid4(), workspace_id=ws.id, actor_id=alice.id, actor_email=alice.email, at=NOW, action=action,
+            target_kind="Member", target_id=str(alice.id), target_name=alice.email, before="User", after="Manager",
+        )
+
+    written = [change(acme, f"step-{i}") for i in range(5)]
+    async with store.transaction(acme.id) as repos:
+        for c in written:
+            await repos.settings_changes.add(c)
+    async with store.transaction(globex.id) as repos:
+        await repos.settings_changes.add(change(globex, "elsewhere"))
+        with pytest.raises(PermissionError):
+            await repos.settings_changes.add(change(acme, "forged"))
+    async with store.transaction(acme.id) as repos:
+        assert list(await repos.settings_changes.list()) == written

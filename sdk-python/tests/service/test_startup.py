@@ -34,6 +34,13 @@ def test_settings_come_from_the_environment(tmp_path) -> None:  # type: ignore[n
     )
 
 
+def test_the_deployment_mode_is_self_hosted_unless_set_to_saas() -> None:
+    assert Settings.from_env({}).deployment == "self_hosted"
+    assert Settings.from_env({"OE_DEPLOYMENT_MODE": "saas"}).deployment == "saas"
+    with pytest.raises(SystemExit):
+        Settings.from_env({"OE_DEPLOYMENT_MODE": "cloud"})
+
+
 def test_defaults_listen_locally() -> None:
     settings = Settings.from_env({})
     assert (settings.port, settings.host, settings.database_url, settings.in_memory, settings.transaction_pooler) == (

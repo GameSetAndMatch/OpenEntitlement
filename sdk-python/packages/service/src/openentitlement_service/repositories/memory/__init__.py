@@ -17,10 +17,12 @@ from uuid import UUID
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
 from ...services.models import (
     Account,
+    Invitation,
     Member,
     Product,
     ProductMembership,
     Session,
+    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -43,6 +45,9 @@ class _Rows:
     sign_in_flows: dict[str, SignInFlow] = field(default_factory=dict)
     #: Products an Organization uses. Organizations arrive with OPE-41; tests may mark a Product used.
     used_products: set[UUID] = field(default_factory=set)
+    #: Workspace → token hash → Invitation.
+    invitations: dict[UUID, dict[str, Invitation]] = field(default_factory=dict)
+    settings_changes: list[SettingsChange] = field(default_factory=list)
 
 
 class InMemoryWorkspacesRepository:
@@ -57,6 +62,17 @@ class InMemoryWorkspacesRepository:
 
     async def get(self) -> Workspace | None:
         return self._rows.workspaces.get(self._workspace_id) if self._workspace_id else None
+
+    async def lock(self) -> None:
+        pass  # The store serializes transactions.
+
+    async def update(self, workspace: Workspace, *, expected_version: int) -> None:
+        ensure_bound_workspace(self._workspace_id, workspace.id)
+        current = self._rows.workspaces.get(workspace.id)
+        if current is None or current.version != expected_version:
+            raise StaleVersion(f"workspace {workspace.id}")
+        update = {"service_tier": workspace.service_tier, "version": workspace.version}
+        self._rows.workspaces[workspace.id] = current.model_copy(update=update)
 
 
 class InMemoryProductsRepository:
@@ -104,6 +120,9 @@ class InMemoryProductsRepository:
         roles = self._rows.product_roles.get(self._workspace_id, {}) if self._workspace_id else {}
         for key in [k for k in roles if k[0] == product_id]:
             del roles[key]
+        invitations = self._rows.invitations.get(self._workspace_id, {}) if self._workspace_id else {}
+        for token_hash in [k for k, i in invitations.items() if i.product_id == product_id]:
+            del invitations[token_hash]
 
     async def in_use(self, product_id: UUID) -> bool:
         return product_id in self._own() and product_id in self._rows.used_products
@@ -133,8 +152,67 @@ class InMemoryMembersRepository:
         roles[(membership.product_id, membership.account_id)] = membership
 
     async def product_roles(self, account_id: UUID) -> Sequence[ProductMembership]:
-        roles = self._rows.product_roles.get(self._workspace_id, {}) if self._workspace_id else {}
-        return sorted((m for m in roles.values() if m.account_id == account_id), key=lambda m: str(m.product_id))
+        return [m for m in await self.all_product_roles() if m.account_id == account_id]
+
+    def _members(self) -> dict[UUID, Member]:
+        return self._rows.members.get(self._workspace_id, {}) if self._workspace_id else {}
+
+    def _roles(self) -> dict[tuple[UUID, UUID], ProductMembership]:
+        return self._rows.product_roles.get(self._workspace_id, {}) if self._workspace_id else {}
+
+    async def list(self) -> Sequence[Member]:
+        return sorted(self._members().values(), key=lambda m: str(m.account_id))
+
+    async def all_product_roles(self) -> Sequence[ProductMembership]:
+        return sorted(self._roles().values(), key=lambda m: (str(m.product_id), str(m.account_id)))
+
+    async def set_owner(self, account_id: UUID, owner: bool) -> None:
+        members = self._members()
+        if account_id not in members:
+            raise LookupError(f"member {account_id}")
+        members[account_id] = members[account_id].model_copy(update={"owner": owner})
+
+    async def remove_product_role(self, product_id: UUID, account_id: UUID) -> None:
+        self._roles().pop((product_id, account_id), None)
+
+    async def remove(self, account_id: UUID) -> None:
+        self._members().pop(account_id, None)
+        roles = self._roles()
+        for key in [k for k in roles if k[1] == account_id]:
+            del roles[key]
+
+
+class InMemoryInvitationsRepository:
+    def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
+        self._rows, self._workspace_id = rows, workspace_id
+
+    def _own(self) -> dict[str, Invitation]:
+        return self._rows.invitations.setdefault(self._workspace_id, {}) if self._workspace_id else {}
+
+    async def add(self, invitation: Invitation, *, now: datetime) -> None:
+        ensure_bound_workspace(self._workspace_id, invitation.workspace_id)
+        own = self._own()
+        for key in [k for k, i in own.items() if i.expires_at <= now]:
+            del own[key]
+        if invitation.token_hash in own:
+            raise AlreadyExists("invitation")
+        own[invitation.token_hash] = invitation
+
+    async def take(self, token_hash: str, *, now: datetime) -> Invitation | None:
+        invitation = self._own().pop(token_hash, None)
+        return invitation if invitation and invitation.expires_at > now else None
+
+
+class InMemorySettingsChangesRepository:
+    def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
+        self._rows, self._workspace_id = rows, workspace_id
+
+    async def add(self, change: SettingsChange) -> None:
+        ensure_bound_workspace(self._workspace_id, change.workspace_id)
+        self._rows.settings_changes.append(change)
+
+    async def list(self) -> Sequence[SettingsChange]:
+        return [c for c in self._rows.settings_changes if c.workspace_id == self._workspace_id]
 
 
 class InMemoryAccountsRepository:
@@ -280,6 +358,8 @@ class InMemoryStore:
                 sign_in_flows=InMemorySignInFlowsRepository(working),
                 catalog=InMemoryCatalogRepository(working, workspace_id),
                 directory=InMemoryDirectoryRepository(working, account_id),
+                invitations=InMemoryInvitationsRepository(working, workspace_id),
+                settings_changes=InMemorySettingsChangesRepository(working, workspace_id),
             )
             self._committed = working
 
