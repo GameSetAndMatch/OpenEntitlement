@@ -109,4 +109,6 @@ jobs:
       - run: npm run build
       - run: npm run test:diagrams --workspace website
       - run: npm run test:demo --workspace website
+      - run: npm run test:analytics --workspace website
+      - run: node --test tools/posthog/*.test.mjs
       - run: npx wrangler deploy --dry-run

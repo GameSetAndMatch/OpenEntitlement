@@ -1,0 +1,35 @@
+{
+  "source": "PostHog project 724077, read on 2026-11-13 after OPE-49. Only name, description, query and dashboard are kept; server metadata (people, timestamps, ids) is dropped.",
+  "insights": [
+    {
+      "dashboard": "Console activation",
+      "name": "Console and service errors",
+      "description": "Console browser errors and server exceptions, by service. Website errors are excluded; they have their own insight.",
+      "query": {"kind":"InsightVizNode","source":{"kind":"TrendsQuery","series":[{"kind":"EventsNode","name":"$exception","event":"$exception","properties":[{"key":"$host","type":"event","value":["openentitlement.dev"],"operator":"is_not"}]}],"version":4,"interval":"day","dateRange":{"date_from":"-30d","explicitDate":false,"excludeIncompletePeriods":false},"properties":[],"breakdownFilter":{"breakdown":"service","breakdown_type":"event"},"filterTestAccounts":true}}
+    },
+    {
+      "dashboard": "Console activation",
+      "name": "Workspace retention",
+      "description": "Of people who created a Workspace in a given week, the share who saved at least one change to any Workspace in each later week. Counts people (signed-in Accounts), not Workspaces.",
+      "query": {"kind":"InsightVizNode","source":{"kind":"RetentionQuery","version":2,"dateRange":{"date_from":"-8w","explicitDate":false,"excludeIncompletePeriods":false},"properties":[],"retentionFilter":{"period":"Week","targetEntity":{"id":"workspace_created","name":"workspace_created","type":"events"},"totalIntervals":8,"aggregationType":"count","returningEntity":{"id":"workspace_changed","name":"workspace_changed","type":"events"},"cohortLabelStartIndex":0,"aggregationPropertyType":"event"},"filterTestAccounts":true}}
+    },
+    {
+      "dashboard": "Website acquisition",
+      "name": "Acquisition funnel: homepage → docs → quickstart → copy → GitHub/Docker",
+      "description": "Where visitors drop off before trying OpenEntitlement. 14-day conversion window.",
+      "query": {"kind":"InsightVizNode","source":{"kind":"FunnelsQuery","series":[{"kind":"EventsNode","name":"$pageview","event":"$pageview","properties":[{"key":"$pathname","type":"event","value":"/","operator":"exact"}],"custom_name":"Homepage"},{"kind":"EventsNode","name":"$pageview","event":"$pageview","properties":[{"key":"$pathname","type":"event","value":"/docs/","operator":"icontains"}],"custom_name":"Any docs page"},{"kind":"EventsNode","name":"$pageview","event":"$pageview","properties":[{"key":"$pathname","type":"event","value":"/docs/quickstart/","operator":"exact"}],"custom_name":"Quickstart"},{"kind":"EventsNode","name":"docs_code_copied","event":"docs_code_copied","properties":[],"custom_name":"Copied a code block"},{"kind":"EventsNode","name":"outbound_link_clicked","event":"outbound_link_clicked","properties":[{"key":"destination","type":"event","value":["github","docker","pypi","npm"],"operator":"exact"}],"custom_name":"Went to GitHub, Docker, PyPI or npm"}],"version":2,"dateRange":{"date_from":"-30d","explicitDate":false,"excludeIncompletePeriods":false},"properties":[],"funnelsFilter":{"layout":"vertical","exclusions":[],"showLegend":false,"funnelVizType":"steps","legendPosition":"bottom","funnelOrderType":"ordered","showAnnotations":true,"showValuesOnSeries":false,"funnelStepReference":"total","funnelWindowInterval":14,"breakdownAttributionType":"first_touch","funnelWindowIntervalUnit":"day","hideIncompleteConversionWindowPeriods":false},"filterTestAccounts":true}}
+    },
+    {
+      "dashboard": "Website acquisition",
+      "name": "Homepage conversion: homepage → call to action → quickstart",
+      "description": "Does the landing page move people to the quickstart? 1-day window.",
+      "query": {"kind":"InsightVizNode","source":{"kind":"FunnelsQuery","series":[{"kind":"EventsNode","name":"$pageview","event":"$pageview","properties":[{"key":"$pathname","type":"event","value":"/","operator":"exact"}],"custom_name":"Homepage"},{"kind":"EventsNode","name":"cta_clicked","event":"cta_clicked","properties":[{"key":"path","type":"event","value":"/","operator":"exact"}],"custom_name":"Clicked a call to action or scene"},{"kind":"EventsNode","name":"$pageview","event":"$pageview","properties":[{"key":"$pathname","type":"event","value":"/docs/quickstart/","operator":"exact"}],"custom_name":"Quickstart"}],"version":2,"dateRange":{"date_from":"-30d","explicitDate":false,"excludeIncompletePeriods":false},"properties":[],"funnelsFilter":{"layout":"vertical","exclusions":[],"showLegend":false,"funnelVizType":"steps","legendPosition":"bottom","funnelOrderType":"ordered","showAnnotations":true,"showValuesOnSeries":false,"funnelStepReference":"total","funnelWindowInterval":1,"breakdownAttributionType":"first_touch","funnelWindowIntervalUnit":"day","hideIncompleteConversionWindowPeriods":false},"filterTestAccounts":true}}
+    },
+    {
+      "dashboard": "Console activation",
+      "name": "Activation funnel: sign-in → Workspace → Catalog → Tier → Organization → API key → first evaluation",
+      "description": "Each step is recorded by the server after a successful, audited change. 30-day conversion window.",
+      "query": {"kind":"InsightVizNode","source":{"kind":"FunnelsQuery","series":[{"kind":"EventsNode","name":"$identify","event":"$identify","properties":[],"custom_name":"Signed in"},{"kind":"EventsNode","name":"workspace_created","event":"workspace_created","properties":[],"custom_name":"Created a Workspace"},{"kind":"EventsNode","name":"workspace_changed","event":"workspace_changed","properties":[{"key":"section","type":"event","value":["catalog","privileges"],"operator":"exact"}],"custom_name":"Defined a Privilege"},{"kind":"EventsNode","name":"workspace_changed","event":"workspace_changed","properties":[{"key":"section","type":"event","value":["tiers","variants"],"operator":"exact"}],"custom_name":"Created a Tier or variant"},{"kind":"EventsNode","name":"workspace_changed","event":"workspace_changed","properties":[{"key":"section","type":"event","value":"organizations","operator":"exact"}],"custom_name":"Added an Organization"},{"kind":"EventsNode","name":"api_key_created","event":"api_key_created","properties":[],"custom_name":"Created an API key"},{"kind":"EventsNode","name":"api_evaluation_served","event":"api_evaluation_served","properties":[],"custom_name":"First evaluation from an application"}],"version":2,"dateRange":{"date_from":"-30d","explicitDate":false,"excludeIncompletePeriods":false},"properties":[],"funnelsFilter":{"layout":"vertical","exclusions":[],"showLegend":false,"funnelVizType":"steps","legendPosition":"bottom","funnelOrderType":"ordered","showAnnotations":true,"showValuesOnSeries":false,"funnelStepReference":"total","funnelWindowInterval":30,"breakdownAttributionType":"first_touch","funnelWindowIntervalUnit":"day","hideIncompleteConversionWindowPeriods":false},"filterTestAccounts":true}}
+    }
+  ]
+}
