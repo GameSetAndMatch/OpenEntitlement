@@ -83,6 +83,21 @@ export const PersonalAllowance: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await userEvent.click(c.getByRole("button", { name: "Add user" }));
+    // The form replaces the list while it is open, like every other form.
+    await expect(
+      c.queryByRole("button", { name: "Add user" }),
+    ).not.toBeInTheDocument();
+    await expect(c.queryByText(/No personal exceptions/)).not.toBeInTheDocument();
+    await expect(
+      [...canvasElement.querySelectorAll(".form-actions button")].map(
+        (b) => b.textContent,
+      ),
+    ).toEqual(["Cancel", "Save user entitlements"]);
+    await expect(
+      [...canvasElement.querySelectorAll(".form-section > legend")].map(
+        (l) => l.textContent,
+      ),
+    ).toEqual(["User", "Personal terms Optional", "Personal grants Optional"]);
     await userEvent.type(c.getByLabelText("User display name"), "Alice");
     await userEvent.type(c.getByLabelText(/^Subject ID/), "idp|alice");
     await expect(c.getByText("2000")).toBeVisible();
@@ -95,6 +110,17 @@ export const PersonalAllowance: Story = {
     await expect(
       c.getByRole("row", { name: /AI tokens.*2050.*SUBJECT_GRANT/ }),
     ).toBeVisible();
+    canvasElement.dataset.playComplete = "true";
+  },
+};
+/** The open form, for the layout check at desktop and phone widths. */
+export const FormOpen: Story = {
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Add user" }));
+    await userEvent.click(c.getByLabelText("Grant ai_tokens"));
+    await expect(c.getByLabelText("grant_ai_tokens")).toBeVisible();
+    canvasElement.dataset.playComplete = "true";
   },
 };
 export const CloudPro: Story = {

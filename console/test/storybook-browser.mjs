@@ -27,13 +27,18 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
  assert.equal(await page.locator('#error-stack').isVisible(),false);
  for(const width of [1280,390,360]){
   await page.setViewportSize({width,height:900});
-  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator']){
+  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator','read-only-keeps-catalog-default','read-only-without-default']){
    await page.goto(`${origin}/iframe.html?id=privilege-catalog-privilege-form--${story}&viewMode=story`);
    await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-form--${story} did not finish its play function at ${width}px`);});
    await assertFormLayout(page);
   }
-  await page.goto(`${origin}/iframe.html?id=privilege-catalog--one-form-at-a-time&viewMode=story`);
-  await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-catalog--one-form-at-a-time did not finish at ${width}px`);});
+  for(const story of ['one-form-at-a-time','tag-filter-hides-empty-groups']){
+   await page.goto(`${origin}/iframe.html?id=privilege-catalog--${story}&viewMode=story`);
+   await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-catalog--${story} did not finish at ${width}px`);});
+  }
+  await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--form-open&viewMode=story`);
+  await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story user-entitlements--form-open did not finish at ${width}px`);});
+  await assertFormLayout(page);
   for(const story of ['folders-and-new-groups','long-name-collisions','save-failure']){
    await page.goto(`${origin}/iframe.html?id=catalog-group-picker--${story}&viewMode=story`);
    await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story group-picker--${story} did not finish its play function at ${width}px`);});
@@ -46,7 +51,7 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`A long workspace name widens the page at ${width}px`);
  }
  await page.setViewportSize({width:1280,height:720});
- for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
+ for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
  for(const story of ['inline-labels','save-failure']){await page.goto(`${origin}/iframe.html?id=catalog-privilege-tags--${story}&viewMode=story`);if(story==='inline-labels'){await page.getByRole('button',{name:'Remove tag Operations'}).waitFor();await page.waitForFunction(()=>!document.querySelector('details').open);}else{await page.getByRole('alert').waitFor();}assert.equal(await page.locator('#error-stack').isVisible(),false);}
  assert.deepEqual(failures,[]);console.log('Compiled Storybook stories rendered successfully in Chromium');
 }finally{await browser?.close();await new Promise(ok=>server.close(ok));}

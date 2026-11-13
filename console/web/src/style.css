@@ -157,8 +157,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .configuration-code { margin: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 5px; background: var(--fill); overflow: auto; max-height: 65vh; line-height: 1.7; tab-size: 2; }
 .configuration-code code { white-space: pre; overflow-wrap: normal; color: var(--ink); }
 
-.unlimited-control { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 13px; cursor: pointer; font-weight: 400; }
-.unlimited-control input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+/* The box sits on the first line of its label, also when a narrow column wraps the label. */
+.unlimited-control { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; font-size: 13px; line-height: 1.5; cursor: pointer; font-weight: 400; }
+.unlimited-control input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
 .int-input > input:disabled { background: var(--fill); color: var(--faint); border-color: var(--line); cursor: not-allowed; opacity: 1; }
 .value-field { margin: 16px 0; font-size: 13px; font-weight: 550; }
 

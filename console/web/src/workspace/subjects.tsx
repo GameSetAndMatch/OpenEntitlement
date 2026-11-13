@@ -3,6 +3,7 @@ import type { Workspace, Save } from "./app.tsx";
 import { resolve, type Value } from "../../../server/workspace/model.ts";
 import { ValuesEditor, Field } from "./fields.tsx";
 import { EnvironmentNotice } from "../ui.tsx";
+import { FormField } from "../form.tsx";
 
 export function EffectiveEntitlements({
   workspace: w,
@@ -66,12 +67,12 @@ export function EffectiveEntitlements({
                       />
                       {d.subjectState === "stale" && (
                         <small>
-                          Previous variant’s user terms are inactive
+                          Previous variant’s personal terms are inactive
                         </small>
                       )}
                       {d.subjectState === "suspended" && (
                         <small>
-                          User terms are suspended by contract status
+                          Personal terms are suspended by contract status
                         </small>
                       )}
                     </td>
@@ -103,12 +104,15 @@ export function SubjectEntitlements({
   save,
   canEdit,
   busy,
+  onFormChange,
 }: {
   workspace: Workspace;
   organizationId: string;
   save: Save;
   canEdit: boolean;
   busy: boolean;
+  /** Lets the page hide everything else while the form is open. */
+  onFormChange?: (open: boolean) => void;
 }) {
   const fresh = () => ({
     organizationId,
@@ -154,6 +158,164 @@ export function SubjectEntitlements({
   const organization = w.data.organizations.find(
     (o) => o.id === organizationId,
   )!;
+  function open() {
+    setShow(true);
+    onFormChange?.(true);
+  }
+  function close() {
+    setShow(false);
+    onFormChange?.(false);
+  }
+  // While the form is open it is the only thing on the page, like the Organization form.
+  if (show && allowed && canEdit)
+    return (
+      <form
+        className="panel form"
+        aria-label="User entitlements"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save("subjects", draft, "Save user entitlements").then((ok) => {
+            if (ok) {
+              close();
+              setSelected(draft.subjectId);
+            }
+          });
+        }}
+      >
+        <div className="form-header">
+          <h2>
+            {editing ? `Edit ${draft.name || draft.subjectId}` : "Add an application user"}
+          </h2>
+          <p>
+            An application user is someone in {organization.name} your
+            application identifies. They inherit the Organization’s values unless
+            you set personal terms or grants. No sign-in account is created.
+          </p>
+        </div>
+        <fieldset className="form-section">
+          <legend>User</legend>
+          <div className="form-grid">
+            <FormField label="User display name">
+              <input
+                required
+                maxLength={200}
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </FormField>
+            <FormField
+              label="Subject ID"
+              hint={
+                editing
+                  ? "Your application sends this ID. It cannot change."
+                  : "The identifier your application sends with this Organization ID."
+              }
+            >
+              <input
+                className="mono"
+                required
+                maxLength={200}
+                disabled={editing}
+                value={draft.subjectId}
+                onChange={(e) =>
+                  setDraft({ ...draft, subjectId: e.target.value })
+                }
+              />
+            </FormField>
+          </div>
+        </fieldset>
+        <fieldset className="form-section">
+          <legend>
+            Personal terms <span className="optional">Optional</span>
+          </legend>
+          <p className="section-hint">
+            Leave a value inherited, or replace it for this user only. Saving
+            binds these terms to {organization.variantId}.
+          </p>
+          <ValuesEditor
+            definitions={visible}
+            base={base}
+            environment={w.environment}
+            frozenFeatures={w.data.features
+              .filter((f) => f.frozen)
+              .map((f) => f.id)}
+            values={draft.terms}
+            onChange={(terms) => setDraft({ ...draft, terms })}
+          />
+        </fieldset>
+        {numeric.length > 0 && (
+          <fieldset className="form-section">
+            <legend>
+              Personal grants <span className="optional">Optional</span>
+            </legend>
+            <p className="section-hint">
+              An allowance added on top of this user’s value. Your application
+              measures usage; evaluation does not consume it.
+            </p>
+            <div className="workspace-values">
+              {numeric.map((def) => {
+                const granted = Object.hasOwn(draft.grants, def.key);
+                return (
+                  <fieldset className="setup-value" key={def.key}>
+                    <legend className="sr-only">{def.name}</legend>
+                    <div>
+                      <strong>{def.name}</strong>
+                      <code>{def.key}</code>
+                      <label className="unlimited-control">
+                        <input
+                          type="checkbox"
+                          aria-label={`Grant ${def.key}`}
+                          checked={granted}
+                          onChange={(e) => {
+                            const grants = { ...draft.grants };
+                            if (e.target.checked) grants[def.key] = 1;
+                            else delete grants[def.key];
+                            setDraft({ ...draft, grants });
+                          }}
+                        />
+                        Add an allowance
+                      </label>
+                    </div>
+                    <div>
+                      {granted ? (
+                        <Field
+                          def={{
+                            ...def,
+                            key: `grant_${def.key}`,
+                            minimum: 1,
+                            unlimited: false,
+                          }}
+                          value={draft.grants[def.key]}
+                          onChange={(v) =>
+                            setDraft({
+                              ...draft,
+                              grants: { ...draft.grants, [def.key]: v as number },
+                            })
+                          }
+                        />
+                      ) : (
+                        <div className="inherited-value">
+                          <strong>None</strong>
+                          <small>No grant</small>
+                        </div>
+                      )}
+                    </div>
+                  </fieldset>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+        <div className="form-actions">
+          <button type="button" className="btn" onClick={close}>
+            Cancel
+          </button>
+          <button className="btn primary" disabled={busy}>
+            Save user entitlements
+          </button>
+        </div>
+      </form>
+    );
   return (
     <section className="panel workspace-form">
       <div className="section-title">
@@ -165,7 +327,7 @@ export function SubjectEntitlements({
             onClick={() => {
               setDraft(fresh());
               setEditing(false);
-              setShow(true);
+              open();
             }}
           >
             Add user
@@ -183,123 +345,6 @@ export function SubjectEntitlements({
           entitlements. Existing user records are retained but user evaluation
           is unavailable.
         </p>
-      )}
-      {show && allowed && canEdit && (
-        <form
-          aria-label="User entitlements"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save("subjects", draft, "Save user entitlements").then(
-              (ok) => {
-                if (ok) {
-                  setShow(false);
-                  setSelected(draft.subjectId);
-                }
-              },
-            );
-          }}
-        >
-          <h3>{editing ? "Edit user entitlements" : "Add application user"}</h3>
-          <div className="two-cols">
-            <label>
-              User display name
-              <input
-                required
-                maxLength={200}
-                value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              />
-            </label>
-            <label>
-              Subject ID
-              <input
-                required
-                maxLength={200}
-                disabled={editing}
-                value={draft.subjectId}
-                onChange={(e) =>
-                  setDraft({ ...draft, subjectId: e.target.value })
-                }
-              />
-              <small>
-                The identifier your application sends with this Organization ID.
-                No sign-in account is created.
-              </small>
-            </label>
-          </div>
-          <h3>Personal terms</h3>
-          <p>
-            Unchecked values continue to inherit. Saving explicitly binds these
-            terms to {organization.variantId}.
-          </p>
-          <ValuesEditor
-            definitions={visible}
-            base={base}
-            environment={w.environment}
-            frozenFeatures={w.data.features
-              .filter((f) => f.frozen)
-              .map((f) => f.id)}
-            values={draft.terms}
-            onChange={(terms) => setDraft({ ...draft, terms })}
-          />
-          {numeric.length > 0 && (
-            <>
-              <h3>Personal grants</h3>
-              <p>
-                Additional allowances for this user. Usage is measured by your
-                application; evaluation does not consume them.
-              </p>
-              {numeric.map((def) => (
-                <div className="setup-value" key={def.key}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      aria-label={`Grant ${def.key}`}
-                      checked={Object.hasOwn(draft.grants, def.key)}
-                      onChange={(e) => {
-                        const grants = { ...draft.grants };
-                        if (e.target.checked) grants[def.key] = 1;
-                        else delete grants[def.key];
-                        setDraft({ ...draft, grants });
-                      }}
-                    />
-                    Add {def.name} allowance
-                  </label>
-                  {Object.hasOwn(draft.grants, def.key) && (
-                    <Field
-                      def={{
-                        ...def,
-                        key: `grant_${def.key}`,
-                        minimum: 1,
-                        unlimited: false,
-                      }}
-                      value={draft.grants[def.key]}
-                      onChange={(v) =>
-                        setDraft({
-                          ...draft,
-                          grants: { ...draft.grants, [def.key]: v as number },
-                        })
-                      }
-                    />
-                  )}
-                </div>
-              ))}
-            </>
-          )}
-          <div className="row">
-            <button className="btn primary" disabled={busy}>
-              Save user entitlements
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={busy}
-              onClick={() => setShow(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
       )}
       {!rows.length && (
         <p>
@@ -337,7 +382,7 @@ export function SubjectEntitlements({
                   const { variantId: _, ...entry } = selectedUser;
                   setDraft(structuredClone(entry));
                   setEditing(true);
-                  setShow(true);
+                  open();
                 }}
               >
                 Edit user entitlements
@@ -356,7 +401,6 @@ export function SubjectEntitlements({
                   ).then((ok) => {
                     if (ok) {
                       setSelected("");
-                      setShow(false);
                     }
                   })
                 }

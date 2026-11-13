@@ -15,6 +15,8 @@ export interface WorkspaceData { hostedTier?: "pro" | "enterprise"; subjects: Su
 export type StatusPolicy = { action: "readOnly" } | { action: "fallback"; variantId: string };
 export const emptyData = (): WorkspaceData => ({ subjects: [], groups: [], tags:[], features: [], privileges: [], tiers: [], variants: [], organizations: [], statusPolicy: { past_due: { action: "readOnly" }, ended: { action: "readOnly" } } });
 export const actions: Action[] = ["catalog:write", "tiers:write", "organizations:write", "contracts:write", "members:manage", "api_keys:manage"];
+/** A save sent with an old revision. Reloading the workspace is the fix, so the console offers it. */
+export const STALE_REVISION = "Workspace changed elsewhere. Refresh before saving.";
 export class WorkspaceError extends Error {
   status: number;
   constructor(message: string, status = 400) { super(message); this.status = status; }
