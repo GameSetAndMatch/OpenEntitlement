@@ -13,6 +13,7 @@ data.privileges = [
     description: "Personal token allowance.",
     type: "integer",
     default: 100,
+    maximum: 5000,
   },
 ];
 data.tiers = [
@@ -120,6 +121,11 @@ export const FormOpen: Story = {
     await userEvent.click(c.getByRole("button", { name: "Add user" }));
     await userEvent.click(c.getByLabelText("Grant ai_tokens"));
     await expect(c.getByLabelText("grant_ai_tokens")).toBeVisible();
+    // A Grant is not bounded by the Privilege's maximum (spec §3.1.7): 6000 is a valid allowance.
+    const grant = c.getByLabelText("grant_ai_tokens") as HTMLInputElement;
+    await userEvent.clear(grant);
+    await userEvent.type(grant, "6000");
+    await expect(grant.checkValidity()).toBe(true);
     canvasElement.dataset.playComplete = "true";
   },
 };

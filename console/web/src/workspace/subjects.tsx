@@ -358,6 +358,8 @@ export function SubjectEntitlements({
                             ...def,
                             key: `grant_${def.key}`,
                             minimum: 1,
+                            // A Grant adds to the value: the Privilege's maximum bounds authored values, not Grants.
+                            maximum: undefined,
                             unlimited: false,
                           }}
                           value={draft.grants[def.key]}
