@@ -142,6 +142,15 @@ try{
  // The Catalog sees the new variants: a Privilege without a default asks for a value in each.
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
  assert.deepEqual((await (await page.request.get(catalogPath)).json()).variants.map(v=>v.tierId),['pro','pro','pro']);
+ // Requiring a value asks for every existing variant's value in the same save, each sent with that variant's version.
+ await page.getByRole('button',{name:'Define privilege',exact:true}).click();
+ await page.getByLabel('Title',{exact:true}).fill('Projects');await page.getByLabel('Value type').selectOption('integer');
+ await page.getByRole('checkbox',{name:'Require a value in every Tier variant'}).check();
+ await page.getByText('3 variants need a value. One value applies to every variant unless you set each one.',{exact:true}).waitFor();
+ await page.getByRole('spinbutton',{name:'Value for every variant'}).fill('3');
+ await page.getByRole('checkbox',{name:'Set per variant'}).check();await page.getByRole('spinbutton',{name:'Value for Pro trial'}).fill('1');
+ await page.getByRole('button',{name:'Save privilege',exact:true}).click();await page.getByRole('button',{name:'Edit Projects',exact:true}).waitFor();
+ assert.deepEqual(Object.fromEntries((await (await page.request.get(productPath+'/tiers')).json()).variants.map(v=>[v.id,v.values.projects])),{pro_grace_period:3,pro_standard:3,pro_trial:1});
 
  // Organizations: Workspace-wide, with one Tier variant per Product and Organization terms that need a reason.
  const organizationsPath=app+`/api/workspaces/${workspaceId}/organizations`;
@@ -164,8 +173,8 @@ try{
  assert.deepEqual(organizationsView.map(o=>[o.id,o.products[0].variantId,o.products[0].terms]),[['acme','pro_standard',{seats:25}]]);
  // Changing the variant clears the terms; switching back before saving keeps them.
  await page.getByRole('button',{name:'Edit organization',exact:true}).click();
- await page.getByLabel('Tier variant').selectOption({label:'Pro trial'});assert.equal(await page.getByLabel('Override seats').isChecked(),false);
- await page.getByLabel('Tier variant').selectOption({label:'Pro standard'});assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'25');
+ await page.getByLabel('Tier variant').selectOption({label:'Pro trial'});assert.equal(await page.getByLabel('Override seats').isChecked(),false);await page.getByText('Saving clears 1 term: Seats',{exact:true}).waitFor();
+ await page.getByLabel('Tier variant').selectOption({label:'Pro standard'});assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'25');assert.equal(await page.getByText(/^Saving clears/).count(),0);
  // A contract status change alone saves without a reason.
  await page.getByLabel('Contract status').selectOption('ended');
  await saveOrganization.click();await saveOrganization.waitFor({state:'hidden'});assert.equal(await page.getByRole('dialog').count(),0);
@@ -246,7 +255,14 @@ try{
  const created=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});assert.equal(created.status(),201);
  await page.reload();const selector=page.getByRole('combobox',{name:'Product'});await selector.waitFor();
  assert.deepEqual(await selector.locator('option').allInnerTexts(),['Acme product','Storage']);
- await selector.selectOption({label:'Storage'});await page.getByRole('heading',{name:'Define your first privilege',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Edit Seats',exact:true}).count(),0);await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
+ // Switching Product with an unsaved Privilege draft asks first; keeping it stays on this Product with the draft.
+ await page.getByRole('button',{name:'Edit Seats',exact:true}).click();await page.getByLabel('seats',{exact:true}).fill('13');
+ await selector.selectOption({label:'Storage'});
+ const discard=page.getByRole('dialog').filter({hasText:'Discard your changes?'});await discard.waitFor();
+ await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await discard.waitFor({state:'hidden'});
+ assert.equal(await selector.locator('option:checked').innerText(),'Acme product');assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'13');
+ await selector.selectOption({label:'Storage'});await discard.getByRole('button',{name:'Discard',exact:true}).click();
+await page.getByRole('heading',{name:'Define your first privilege',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Edit Seats',exact:true}).count(),0);await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
  // Organizations are Workspace-wide: Storage has no Tiers, yet Acme is listed there and can be renamed.
  await page.getByRole('link',{name:'Organizations',exact:true}).click();
  const storageCard=page.locator('.workspace-card').filter({hasText:'Acme'});await storageCard.getByText('No tier in this Product').waitFor();

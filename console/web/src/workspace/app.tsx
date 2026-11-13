@@ -81,7 +81,7 @@ export function WorkspaceApp(){
   // Saves read the newest revision, so a flow can save twice in a row (a tier, then its first variant).
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const ask=useReason(),toast=useToast();
-  // Leaving a form with unsaved changes asks first: another page, another workspace, joining one, or signing out.
+  // Leaving a form with unsaved changes asks first: another page, Product or workspace, joining one, or signing out.
   // A write already sent may still commit, so leaving first waits for its outcome: a saved form has closed, a failed one asks.
   const confirm=useConfirm(),[leaving,setLeaving]=useState(false),leaveToken=useRef(0);
   async function mayLeave(){
@@ -203,7 +203,7 @@ export function WorkspaceApp(){
   const inSettings=settingsPages.includes(shown);
   const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
   return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>leave(()=>{setSelected(id);setError("");})} onCreate={()=>leave(()=>{setCreating(true);setError("");})}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
-    {!creating&&workspace?.products&&<ProductSelector products={workspace.products} current={product} disabled={busy} onSelect={id=>{setProduct(id);rememberProduct(workspace.id,id);}}/>}
+    {!creating&&workspace?.products&&<ProductSelector products={workspace.products} current={product} disabled={busy} onSelect={id=>leave(()=>{setProduct(id);rememberProduct(workspace.id,id);})}/>}
     {selected&&!creating&&(inSettings
       ?<><a className="settings-back" href="#catalog"><span aria-hidden="true">‹</span> Back to workspace</a><nav aria-label="Settings"><p className="nav-heading" aria-hidden="true">Settings</p>{visibleSettings.map(link)}</nav></>
       :<><nav aria-label="Workspace navigation">{pages.map(link)}</nav><a className="nav settings-link" href="#settings/members">Settings</a></>)}
