@@ -24,6 +24,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
+from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
 from ...services.models import (
     Account,
     Member,
@@ -38,6 +39,7 @@ from ...services.problems import ServiceUnavailable
 from ...services.repositories import AlreadyExists, Repositories, StaleVersion, ensure_bound_workspace
 from .migrate import migrate
 from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
+from .tables import catalog_variant_values, catalog_changes, catalog_groups, catalog_tags, catalog_privileges
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
 
 
@@ -266,6 +268,52 @@ class PostgresDirectoryRepository:
         return [Workspace.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
 
 
+class PostgresCatalogRepository:
+    async def variants(self, product_id: UUID) -> Sequence[VariantValues]:
+        table = catalog_variant_values
+        rows = (await self.connection.execute(select(table.c.entry).where(table.c.workspace_id == self.workspace_id, table.c.product_id == product_id).order_by(table.c.key))).scalars()
+        return [VariantValues.model_validate(row) for row in rows]
+
+    async def save_variant(self, variant: VariantValues, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, variant.workspace_id)
+        table = catalog_variant_values
+        values = dict(workspace_id=variant.workspace_id, product_id=variant.product_id, key=variant.id, version=variant.version, entry=variant.model_dump(mode='json'))
+        if expected_version == 0:
+            await _insert(self.connection, table.insert().values(**values))
+        else:
+            statement = table.update().where(table.c.workspace_id == self.workspace_id, table.c.product_id == variant.product_id, table.c.key == variant.id, table.c.version == expected_version).values(version=variant.version, entry=values['entry'])
+            if (await self.connection.execute(statement)).rowcount != 1:
+                raise StaleVersion(variant.id)
+
+    async def audit(self, change: CatalogChange) -> None:
+        ensure_bound_workspace(self.workspace_id, change.workspace_id)
+        await self.connection.execute(catalog_changes.insert().values(id=change.id, workspace_id=change.workspace_id, entry=change.model_dump(mode="json")))
+
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self.workspace_id = connection, workspace_id
+
+    async def lock(self, product_id: UUID) -> None:
+        await self.connection.execute(select(products.c.id).where(products.c.workspace_id == self.workspace_id, products.c.id == product_id).with_for_update())
+
+    async def list(self, product_id: UUID) -> Sequence[CatalogRecord]:
+        result: list[CatalogRecord] = []
+        for kind, table in (("groups", catalog_groups), ("tags", catalog_tags), ("privileges", catalog_privileges)):
+            rows = (await self.connection.execute(select(table).where(table.c.workspace_id == self.workspace_id, table.c.product_id == product_id).order_by(table.c.key))).mappings()
+            result.extend(CatalogRecord.model_validate(dict(row) | {"kind": kind}) for row in rows)
+        return result
+
+    async def save(self, record: CatalogRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, record.workspace_id)
+        table = {"groups": catalog_groups, "tags": catalog_tags, "privileges": catalog_privileges}[record.kind]
+        values = record.model_dump(mode="python", by_alias=False, exclude={"kind", "entry"}) | {"entry": record.entry.model_dump(mode="json")}
+        if expected_version == 0:
+            await _insert(self.connection, table.insert().values(**values))
+        else:
+            statement = table.update().where(table.c.workspace_id == self.workspace_id, table.c.product_id == record.product_id, table.c.key == record.key, table.c.version == expected_version).values(version=record.version, entry=values["entry"])
+            if (await self.connection.execute(statement)).rowcount != 1:
+                raise StaleVersion(record.key)
+
+
 @dataclass(frozen=True)
 class PostgresRepositories(Repositories):
     """The repositories of one transaction, plus that transaction's connection."""
@@ -299,6 +347,7 @@ class PostgresStore:
                 accounts=PostgresAccountsRepository(connection),
                 sessions=PostgresSessionsRepository(connection),
                 sign_in_flows=PostgresSignInFlowsRepository(connection),
+                catalog=PostgresCatalogRepository(connection, workspace_id),
                 directory=PostgresDirectoryRepository(connection, account_id),
                 connection=connection,
             )

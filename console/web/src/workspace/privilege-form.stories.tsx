@@ -137,3 +137,12 @@ export const ReadOnlyWithoutDefault:Story={args:{initial:{...seats,visibility:'r
  await expect(args.onSave).toHaveBeenCalledWith(expect.objectContaining({visibility:'read_only',default:0}));
  done(canvasElement);
 }};
+
+export const RequiredVariantValues:Story={args:{initial:{key:'seats',title:'Seats',description:'',type:'integer',visibility:'editable',tags:[]},variants:[{id:'standard',name:'Pro standard',version:3,values:{}},{id:'trial',name:'Pro trial',version:1,values:{}}]},play:async({canvasElement,args})=>{
+ const canvas=within(canvasElement);
+ await userEvent.type(canvas.getByRole('spinbutton',{name:/seats in Pro standard/}),'20');
+ await userEvent.type(canvas.getByRole('spinbutton',{name:/seats in Pro trial/}),'5');
+ await userEvent.click(canvas.getByRole('button',{name:'Save privilege'}));
+ await expect(args.onSave).toHaveBeenCalledWith(expect.objectContaining({key:'seats'}),{standard:{version:3,value:20},trial:{version:1,value:5}});
+ done(canvasElement);
+}};

@@ -27,7 +27,7 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
  assert.equal(await page.locator('#error-stack').isVisible(),false);
  for(const width of [1280,390,360]){
   await page.setViewportSize({width,height:900});
-  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator','read-only-keeps-catalog-default','read-only-without-default']){
+  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator','read-only-keeps-catalog-default','read-only-without-default','required-variant-values']){
    await page.goto(`${origin}/iframe.html?id=privilege-catalog-privilege-form--${story}&viewMode=story`);
    await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-form--${story} did not finish its play function at ${width}px`);});
    await assertFormLayout(page);

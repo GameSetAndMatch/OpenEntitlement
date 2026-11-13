@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
 from uuid import UUID
 
 from .models import (
@@ -24,6 +24,24 @@ from .models import (
     Workspace,
     WorkspaceMembership,
 )
+
+
+if TYPE_CHECKING:
+    from .catalog import CatalogRecord, CatalogChange, VariantValues
+
+
+class CatalogRepository(Protocol):
+    async def variants(self, product_id: UUID) -> Sequence[VariantValues]: ...
+
+    async def save_variant(self, variant: VariantValues, *, expected_version: int) -> None: ...
+
+    async def audit(self, change: CatalogChange) -> None: ...
+
+    async def lock(self, product_id: UUID) -> None: ...
+
+    async def list(self, product_id: UUID) -> Sequence[CatalogRecord]: ...
+
+    async def save(self, record: CatalogRecord, *, expected_version: int) -> None: ...
 
 
 def ensure_bound_workspace(bound: UUID | None, record_workspace: UUID) -> None:
@@ -158,6 +176,7 @@ class Repositories:
     accounts: AccountsRepository
     sessions: SessionsRepository
     sign_in_flows: SignInFlowsRepository
+    catalog: CatalogRepository
     directory: DirectoryRepository
 
 

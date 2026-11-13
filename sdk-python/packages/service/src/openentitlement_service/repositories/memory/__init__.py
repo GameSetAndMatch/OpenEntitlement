@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
 from ...services.models import (
     Account,
     Member,
@@ -29,6 +30,9 @@ from ...services.repositories import AlreadyExists, Repositories, StaleVersion, 
 
 @dataclass
 class _Rows:
+    variant_values: dict[tuple[UUID, UUID, str], VariantValues] = field(default_factory=dict)
+    catalog_changes: list[CatalogChange] = field(default_factory=list)
+    catalog: dict[tuple[UUID, UUID, str, str], CatalogRecord] = field(default_factory=dict)
     workspaces: dict[UUID, Workspace] = field(default_factory=dict)
     products: dict[UUID, dict[UUID, Product]] = field(default_factory=dict)
     members: dict[UUID, dict[UUID, Member]] = field(default_factory=dict)
@@ -93,6 +97,10 @@ class InMemoryProductsRepository:
     async def delete(self, product_id: UUID, *, expected_version: int) -> None:
         self._current(product_id, expected_version)
         del self._own()[product_id]
+        for catalog_key in [k for k in self._rows.catalog if k[:2] == (self._workspace_id, product_id)]:
+            del self._rows.catalog[catalog_key]
+        for variant_key in [k for k in self._rows.variant_values if k[:2] == (self._workspace_id, product_id)]:
+            del self._rows.variant_values[variant_key]
         roles = self._rows.product_roles.get(self._workspace_id, {}) if self._workspace_id else {}
         for key in [k for k in roles if k[0] == product_id]:
             del roles[key]
@@ -211,6 +219,44 @@ class InMemoryDirectoryRepository:
         return sorted(self._rows.workspaces.values(), key=lambda w: (w.name, str(w.id)))
 
 
+class InMemoryCatalogRepository:
+    async def variants(self, product_id: UUID) -> Sequence[VariantValues]:
+        return sorted((v for v in self.rows.variant_values.values() if v.workspace_id == self.workspace_id and v.product_id == product_id and product_id in self.rows.products.get(v.workspace_id, {})), key=lambda v: v.id)
+
+    async def save_variant(self, variant: VariantValues, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, variant.workspace_id)
+        if variant.product_id not in self.rows.products.get(variant.workspace_id, {}):
+            raise LookupError('unknown Product')
+        key = (variant.workspace_id, variant.product_id, variant.id)
+        current = self.rows.variant_values.get(key)
+        if (current.version if current else 0) != expected_version:
+            raise StaleVersion(variant.id)
+        self.rows.variant_values[key] = variant
+
+    async def audit(self, change: CatalogChange) -> None:
+        ensure_bound_workspace(self.workspace_id, change.workspace_id)
+        self.rows.catalog_changes.append(change)
+
+    def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
+        self.rows, self.workspace_id = rows, workspace_id
+
+    async def lock(self, product_id: UUID) -> None:
+        pass  # The store serializes transactions.
+
+    async def list(self, product_id: UUID) -> Sequence[CatalogRecord]:
+        return sorted((r for r in self.rows.catalog.values() if r.workspace_id == self.workspace_id and r.product_id == product_id and product_id in self.rows.products.get(r.workspace_id, {})), key=lambda r: (r.kind, r.key))
+
+    async def save(self, record: CatalogRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, record.workspace_id)
+        if record.product_id not in self.rows.products.get(record.workspace_id, {}):
+            raise LookupError('unknown Product')
+        key = (record.workspace_id, record.product_id, record.kind, record.key)
+        current = self.rows.catalog.get(key)
+        if (current.version if current else 0) != expected_version:
+            raise StaleVersion(record.key)
+        self.rows.catalog[key] = record
+
+
 class InMemoryStore:
     def __init__(self) -> None:
         self._committed = _Rows()
@@ -229,6 +275,7 @@ class InMemoryStore:
                 accounts=InMemoryAccountsRepository(working),
                 sessions=InMemorySessionsRepository(working),
                 sign_in_flows=InMemorySignInFlowsRepository(working),
+                catalog=InMemoryCatalogRepository(working, workspace_id),
                 directory=InMemoryDirectoryRepository(working, account_id),
             )
             self._committed = working

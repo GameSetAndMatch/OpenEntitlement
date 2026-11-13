@@ -15,7 +15,7 @@ from ...services.problems import NotFound
 from ...services.repositories import Store
 from ...services.sign_in import SignInPolicy, SignInService
 from ...services.workspaces import WorkspaceService, utcnow
-from . import auth, problems, workspaces
+from . import auth, problems, workspaces, catalog
 from .oidc import OidcClient
 
 
@@ -51,6 +51,7 @@ def create_app(
     )
     app.include_router(auth.router)
     app.include_router(workspaces.router)
+    app.include_router(catalog.router)
 
     @app.get("/healthz", tags=["health"])
     async def health() -> dict[str, str]:
