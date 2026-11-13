@@ -1,11 +1,12 @@
-import {useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import type {Workspace,Save} from "./app.tsx";
 import type {Tier,Variant} from "../../../server/workspace/model.ts";
 import {ValuesEditor} from "./fields.tsx";
 import {FormField} from "../form.tsx";
 import {StatusPolicy} from "./status-policy.tsx";
 import {identifierFromTitle} from "./identifier.ts";
-import {TierCreate,uniqueIdentifier} from "./tier-create.tsx";
+import {TierCreate} from "./tier-create.tsx";
+import {uniqueIdentifier,variantName} from "./identifier.ts";
 
 const purpose=(kind:Variant["kind"])=>kind==="grace"?"Grace period":kind==="trial"?"Trial":"Standard";
 
@@ -15,12 +16,15 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
   // Creating a tier is a guided flow: values, review, then an offer to add a trial and a grace period.
   const [creating,setCreating]=useState(false),[created,setCreated]=useState<string>(),[graceDays,setGraceDays]=useState(7);
   const open=Boolean(tier||variant||creating||created);
+  // The "is ready" step replaces the form; move focus to it when it appears and when a variant form returns to it.
+  const nextHeading=useRef<HTMLHeadingElement>(null);
+  useEffect(()=>{if(created&&!variant)nextHeading.current?.focus();},[created,variant]);
   const tiers=w.data.tiers.slice().sort((a,b)=>a.rank-b.rank);
   if(!w.data.privileges.length)return <section className="panel empty-workspace"><h2>Define your privileges first</h2><p>Your Privilege Catalog supplies the defaults each tier inherits.</p><a className="btn primary" href="#catalog">Go to the Privilege Catalog</a></section>;
 
   // A new tier only needs a name. It ranks above the existing tiers; rank and grace are edited later, when they matter.
   function newTier(){setCreating(true);setTier(undefined);setVariant(undefined);}
-  function addVariant(t:Tier,kind:Variant["kind"]){const name=`${t.name} ${kind==="grace"?"grace period":kind}`;setVariant({id:uniqueIdentifier(name,"variant",w.data.variants.map(v=>v.id)),name,tierId:t.id,kind,values:{}});setGraceDays(t.gracePeriodDays||7);setEditingVariant(false);setVariantIdEdited(false);setTier(undefined);}
+  function addVariant(t:Tier,kind:Variant["kind"]){const name=variantName(t.name,kind==="grace"?"grace period":kind);setVariant({id:uniqueIdentifier(name,"variant",w.data.variants.map(v=>v.id)),name,tierId:t.id,kind,values:{}});setGraceDays(t.gracePeriodDays||7);setEditingVariant(false);setVariantIdEdited(false);setTier(undefined);}
   function editTier(t:Tier){setTier({...t});setEditingTier(true);setVariant(undefined);}
   const freeKinds=(t:Tier)=>(["standard","trial","grace"] as const).filter(k=>!w.data.variants.some(v=>v.tierId===t.id&&v.kind===k));
   function newVariant(t:Tier){setVariant({id:"",name:"",tierId:t.id,kind:freeKinds(t)[0]??"standard",values:{}});setGraceDays(t.gracePeriodDays||7);setEditingVariant(false);setVariantIdEdited(false);setTier(undefined);}
@@ -63,7 +67,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
     {canEdit&&tiers.length>0&&!open&&<div className="workspace-actions"><button className="btn primary" onClick={newTier}>Create tier</button></div>}
     {creating&&canEdit&&<TierCreate workspace={w} save={save} busy={busy} onCancel={()=>setCreating(false)} onCreated={id=>{setCreating(false);setCreated(id);}}/>}
     {created&&!variant&&(()=>{const t=w.data.tiers.find(x=>x.id===created);if(!t)return null;const has=(k:Variant["kind"])=>w.data.variants.find(v=>v.tierId===t.id&&v.kind===k);
-      return <section className="panel form tier-next" aria-labelledby="tier-next-title"><div className="form-header"><h2 id="tier-next-title">{t.name} is ready</h2><p>Organizations you assign to {t.name} get its standard values. You can also offer a free trial, and keep access for a while when a payment is late.</p></div>
+      return <section className="panel form tier-next" aria-labelledby="tier-next-title"><div className="form-header"><h2 id="tier-next-title" ref={nextHeading} tabIndex={-1}>{t.name} is ready</h2><p>Organizations you assign to {t.name} get its standard values. You can also offer a free trial, and keep access for a while when a payment is late.</p></div>
         <div className="form-section"><ul className="tier-next-list">{(["trial","grace"] as const).map(k=>{const v=has(k);return <li key={k}><div><strong>{k==="trial"?"Free trial":"Grace period"}</strong><small>{v?`Added: ${v.name}${k==="grace"?` · ${t.gracePeriodDays} days`:""}`:k==="trial"?"Values while an Organization tries this tier.":"Values while a payment is late, for a set number of days."}</small></div>{!v&&<button className="btn" onClick={()=>addVariant(t,k)}>{k==="trial"?"Add a free trial":"Add a grace period"}</button>}</li>;})}</ul></div>
         <div className="form-actions"><button className="btn primary" onClick={()=>setCreated(undefined)}>Done</button></div></section>;})()}
     {tierForm}{variantForm}

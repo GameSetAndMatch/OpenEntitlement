@@ -64,13 +64,19 @@ try{
  await page.getByRole('link',{name:'Tiers',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Create variant'}).count(),0);await page.getByRole('button',{name:'Create tier',exact:true}).click();await assertFormLayout(page);await page.getByLabel('Name',{exact:true}).fill('Pro');assert.equal(await page.getByLabel('ID',{exact:true}).inputValue(),'pro');assert.equal(await page.getByLabel('Rank').count(),0);assert.equal(await page.getByLabel('Past-due grace period').count(),0);
  // Creating a tier sets its values, reviews them, then creates the tier with its standard variant and offers a trial and a grace period.
  await page.getByLabel('Override max_exports').check();await page.getByLabel('max_exports',{exact:true}).fill('10');await page.getByRole('button',{name:'Review tier',exact:true}).click();
- const review=page.getByRole('region',{name:'Review Pro'});assert.match(await review.getByRole('row').filter({hasText:'max_exports'}).innerText(),/10\s+Set for this tier/);await review.getByRole('button',{name:'Create tier',exact:true}).click();
- const ready=page.getByRole('region',{name:'Pro is ready'});await ready.waitFor();await noDialog();assert.equal(await ready.getByRole('button',{name:'Add a free trial',exact:true}).count(),1);
+ const review=page.getByRole('region',{name:'Review Pro'});assert.match(await review.getByRole('row').filter({hasText:'max_exports'}).innerText(),/10\s+Set for this tier/);
+ // Each step replaces the form, so focus moves to its heading.
+ await page.waitForFunction(()=>document.activeElement?.textContent==='Review Pro',undefined,{timeout:3000});
+ // If the standard variant fails after the tier is saved, creating again resumes instead of failing on the existing ID.
+ await page.route('**/variants',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Simulated failure',message:'Simulated failure'})}),{times:1});
+ await review.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByText('Simulated failure').first().waitFor();
+ await review.getByRole('button',{name:'Create tier',exact:true}).click();
+ const ready=page.getByRole('region',{name:'Pro is ready'});await ready.waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await noDialog();assert.equal(await ready.getByRole('button',{name:'Add a free trial',exact:true}).count(),1);
  await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro grace period');assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');await page.getByLabel('Grace period (days)').fill('5');await save('Save variant');
  await ready.getByText('Added: Pro grace period · 5 days').waitFor();await ready.getByRole('button',{name:'Done',exact:true}).click();
  const proPanel=page.locator('.tier-panel').filter({has:page.getByRole('heading',{name:'Pro',exact:true})});await proPanel.getByText('Pro standard',{exact:true}).waitFor();await proPanel.getByText('5 days of past-due grace',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Edit tier',exact:true}).click();assert.equal(await page.getByLabel('Rank').inputValue(),'0');assert.equal(await page.getByLabel('Past-due grace period').inputValue(),'5');await page.getByRole('button',{name:'Cancel',exact:true}).click();
- 
+
  // Grace days stay visible and editable when they're set, even before the tier has a grace variant.
  {const session=await (await page.request.get(running.url+'/api/session')).json();const current=await (await page.request.get(running.url+`/api/workspaces/${workspaceId}`)).json();
   assert.equal((await page.request.put(running.url+`/api/workspaces/${workspaceId}/tiers`,{headers:{origin:running.url,'x-oe-csrf':session.csrf},data:{entry:{id:'legacy',name:'Legacy',rank:9,gracePeriodDays:7},revision:current.revision,reason:'Tier saved by the previous form'}})).status(),200);}
