@@ -18,7 +18,8 @@
     "storybook": "storybook dev -p 6006 --host 127.0.0.1 --disable-telemetry",
     "build:storybook": "storybook build --disable-telemetry -o build/storybook",
     "test:workspaces": "node --conditions=source test/workspace-browser.mjs",
-    "test:storybook": "node test/storybook-browser.mjs"
+    "test:storybook": "node test/storybook-browser.mjs",
+    "test:python-service": "node --conditions=source test/python-service-browser.mjs"
   },
   "dependencies": {
     "@openentitlement/core": "file:../sdk-js/packages/core",

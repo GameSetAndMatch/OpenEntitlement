@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
@@ -49,7 +49,7 @@ class OidcSettings:
     app_url: str
     issuer: str
     client_id: str
-    client_secret: str | None = None
+    client_secret: str | None = field(default=None, repr=False)
     allow_local_http: bool = False
 
     def __post_init__(self) -> None:

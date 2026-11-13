@@ -8,9 +8,11 @@ import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
 import { changesContractTerms,type WorkspaceData } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
+import { ProductSelector, pickProduct, type ProductSummary } from "./product-selector.tsx";
 import { FormField } from "../form.tsx";
 import "./style.css";
-export interface Workspace {hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+// The Python service sends the Products the member can see; Catalog data per Product arrives with later tickets.
+export interface Workspace {products?:ProductSummary[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
@@ -34,6 +36,10 @@ const legacy:Record<string,string>={settings:"Members",configuration:"Configurat
 const LAST_WORKSPACE="oe.workspace";
 function rememberedWorkspace(){try{return localStorage.getItem(LAST_WORKSPACE)??"";}catch{return "";}}
 function remember(id:string){try{if(id)localStorage.setItem(LAST_WORKSPACE,id);else localStorage.removeItem(LAST_WORKSPACE);}catch{/* storage unavailable */}}
+// The last Product chosen in each workspace, also a convenience only.
+const productKey=(workspace:string)=>`oe.product.${workspace}`;
+function rememberedProduct(workspace:string){try{return localStorage.getItem(productKey(workspace))??"";}catch{return "";}}
+function rememberProduct(workspace:string,id:string){try{localStorage.setItem(productKey(workspace),id);}catch{/* storage unavailable */}}
 function pick(list:Array<{id:string}>,preferred=rememberedWorkspace()){return list.find(w=>w.id===preferred)?.id??list[0]?.id??"";}
 function currentPage(){const hash=location.hash.slice(1);return allPages.find(p=>p.hash===hash)?.name??(Object.hasOwn(legacy,hash)?legacy[hash]:undefined)??"Privilege Catalog";}
 export function WorkspaceApp(){
@@ -48,6 +54,7 @@ export function WorkspaceApp(){
   const loadToken=useRef(0);
   const failed=(e:unknown)=>{const {message,status}=e as {message:string;status?:number};setError(message,status===409&&message===STALE_REVISION);};
   const [list,setList]=useState<Array<{id:string;name:string;role:string}>>([]),[selected,setSelected]=useState(""),[workspace,setWorkspace]=useState<Workspace>(),[page,setPage]=useState(currentPage);
+  const [product,setProduct]=useState("");
   const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false),[audit,setAudit]=useState<any[]>([]);
   const [invite,setInvite]=useState(()=>{const incoming=location.hash.startsWith("#invite=")?location.hash.slice(8):"";if(incoming){sessionStorage.setItem("oe.invite",incoming);history.replaceState(null,"","/app/");}return incoming||sessionStorage.getItem("oe.invite")||"";});
   const savingRef=useRef(false);
@@ -74,7 +81,8 @@ export function WorkspaceApp(){
   const navigated=useRef(false);
   useEffect(()=>{if(!navigated.current)return;navigated.current=false;if(document.activeElement&&document.activeElement!==document.body)return;document.querySelector<HTMLElement>('aside nav a[aria-current="page"]')?.focus();},[page]);
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
-  useEffect(()=>{if(page!=="Audit log"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[page,workspace]);
+  useEffect(()=>{if(workspace?.products)setProduct(pickProduct(workspace.products,rememberedProduct(workspace.id)));},[workspace]);
+  useEffect(()=>{if(page!=="Audit log"||!workspace||workspace.data===undefined)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[page,workspace]);
   const save:Save=async(section,entry,title,method="PUT")=>{
     const workspace=workspaceRef.current;
     if(!workspace||savingRef.current)return false;savingRef.current=true;
@@ -95,6 +103,7 @@ export function WorkspaceApp(){
   const inSettings=settingsPages.includes(shown);
   const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
   return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>{setSelected(id);setError("");}} onCreate={()=>{setCreating(true);setError("");}}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
+    {!creating&&workspace?.products&&<ProductSelector products={workspace.products} current={product} disabled={busy} onSelect={id=>{setProduct(id);rememberProduct(workspace.id,id);}}/>}
     {selected&&!creating&&(inSettings
       ?<><a className="settings-back" href="#catalog"><span aria-hidden="true">‹</span> Back to workspace</a><nav aria-label="Settings"><p className="nav-heading" aria-hidden="true">Settings</p>{visibleSettings.map(link)}</nav></>
       :<><nav aria-label="Workspace navigation">{pages.map(link)}</nav><a className="nav settings-link" href="#settings/members">Settings</a></>)}
@@ -105,12 +114,15 @@ export function WorkspaceApp(){
       {(creating||!selected)&&<form className="panel workspace-create" onSubmit={e=>{e.preventDefault();void create();}}><h1>Create a workspace</h1><p>A workspace holds one product’s privileges, tiers and Organizations. To join an existing one, open the invitation link its Owner sent you.</p><FormField label="Workspace name"><input required autoFocus={creating} maxLength={200} value={name} onChange={e=>setName(e.target.value)} /></FormField><div className="form-actions">{selected&&<button type="button" className="btn" onClick={()=>{setCreating(false);requestAnimationFrame(()=>document.querySelector<HTMLElement>(".workspace-trigger")?.focus());}}>Cancel</button>}<button className="btn primary" disabled={busy}>{busy?"Creating…":"Create workspace"}</button></div></form>}
       {selected&&!creating&&!workspace&&!error.message&&<p role="status" className="notice">Loading workspace…</p>}
       {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
+      {workspace.data===undefined&&<p className="notice">This page is not available on this service yet.</p>}
+      {workspace.data!==undefined&&<>
       {shown.name==="Privilege Catalog"&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
       {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
       {shown.name==="Audit log"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason||"—"}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
+      </>}
       </>}
     </main></div>;
 }

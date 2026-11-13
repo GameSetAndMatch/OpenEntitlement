@@ -11,5 +11,8 @@
     "test/**/*.ts",
     "dev/**/*.ts",
     ".storybook/*.ts"
+  ],
+  "ignoreBinaries": [
+    "uv"
   ]
 }
