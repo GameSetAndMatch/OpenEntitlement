@@ -178,7 +178,7 @@ class WorkspaceService:
     async def archive_product(self, ws: OpenWorkspace, product_id: UUID, *, version: int) -> ProductView:
         """Archive: current customers keep the Product; it cannot be given to a new one (ADR-0008)."""
         current = await self._managed(ws, product_id, version)
-        return await self._change(ws, product_id, version, archived_at=current.archived_at or ws.now)
+        return await self._persist_change(ws, current, archived_at=current.archived_at or ws.now)
 
     async def restore_product(self, ws: OpenWorkspace, product_id: UUID, *, version: int) -> ProductView:
         return await self._change(ws, product_id, version, archived_at=None)
@@ -213,6 +213,10 @@ class WorkspaceService:
 
     async def _change(self, ws: OpenWorkspace, product_id: UUID, version: int, **changes: Any) -> ProductView:
         current = await self._managed(ws, product_id, version)
+        return await self._persist_change(ws, current, **changes)
+
+    async def _persist_change(self, ws: OpenWorkspace, current: Product, **changes: Any) -> ProductView:
+        version, product_id = current.version, current.id
         changed = current.model_copy(update={**changes, "version": version + 1})
         try:
             await ws.repos.products.update(changed, expected_version=version)

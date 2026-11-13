@@ -50,7 +50,7 @@ try{
  const created=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});assert.equal(created.status(),201);
  await page.reload();const selector=page.getByRole('combobox',{name:'Product'});await selector.waitFor();
  assert.deepEqual(await selector.locator('option').allInnerTexts(),['Acme product','Storage']);
- await selector.selectOption({label:'Storage'});await page.reload();assert.equal(await page.getByRole('combobox',{name:'Product'}).locator('option:checked').innerText(),'Storage');
+ await selector.selectOption({label:'Storage'});await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
 
  // A change without the CSRF token is refused as a Problem Details response.
  const refused=await page.request.post(app+'/api/workspaces',{headers:{origin:app},data:{name:'No token'}});assert.equal(refused.status(),403);assert.equal((await refused.json()).type,'https://openentitlement.dev/problems/csrf-rejected');
