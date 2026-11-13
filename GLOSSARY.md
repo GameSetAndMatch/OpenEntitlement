@@ -18,6 +18,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Environment prerequisite** | An install condition that can veto a boolean Privilege but cannot grant it. |
 | **Tier** | A reusable commercial level of one Product, such as Basic, Business or Enterprise. Preferred over Plan in new authoring language. |
 | **Tier variant** | A Tier's standard, trial or grace conditions and default Privilege values. |
+| **Tier minimum** | The lowest value an integer Privilege may have on one Tier, such as Enterprise `seat_max` ≥ 50. It constrains the standard variant and Organization terms when they are saved, not evaluation. Distinct from a required Privilege and an environment prerequisite. |
 | **Archived** | A Tier or Product that its current Organizations keep, but that can no longer be given to another Organization. |
 | **Trial** | A time-limited variant of a Tier, not a commercial Tier itself. |
 | **Grace period** | A bounded period of defined rights after a qualifying contract-status change. |
@@ -30,6 +31,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Subject** | A person, service account or other actor to whom an entitlement may apply. |
 | **Resource** | An application object that may be subject to an entitlement. |
 | **Contract** | The link between agreed commercial terms and an Organization's entitled rights. |
+| **Minimum commitment** | An amount an Organization commits to, such as 10M tokens a week, recorded on its contract and displayed only. Not an entitlement value and not charged by OpenEntitlement. |
 | **Assignment** | The association between an Organization and its current Tier variant in one Product. |
 | **Override** | A scoped replacement for an inherited commercial value. Distinct from a restrictive environment prerequisite. |
 | **Grant** | An additive allowance for a scope, rather than a replacement value. |
