@@ -1,6 +1,6 @@
 # RFC-0004: An MCP server for the Workspace control plane
 
-- **Status:** accepted direction (2026-11-10); all design questions answered. Not implemented.
+- **Status:** accepted direction (2026-11-10); all design questions answered. Not implemented. The server is built with FastMCP inside the Python service ([ADR-0009](../../ADR-0009.md)), not in the Node service; the local stdio bridge is `uvx openentitlement-mcp` instead of `npx @openentitlement/mcp`.
 - **Date:** 2026-11-10
 - **Tracks:** [PRD.md](../../PRD.md), "Agents and integrations"
 
@@ -47,11 +47,11 @@ An AI agent can do this through the [Model Context Protocol](https://modelcontex
 | `set_organization_terms` | Set, schedule or remove Organization terms, with an optional end date |
 | `set_user_terms`, `grant_allowance` | Application-user exceptions |
 
-Each write tool returns a preview with an opaque, unforgeable `change_id` that expires after five minutes. The server binds it to the authenticated Account, OAuth client, Workspace, exact operation, immutable validated payload and reason, and Workspace revision. The apply call supplies only that identifier; it cannot replace fields or a reason after preview.
+Each write tool returns a preview with an opaque, unforgeable `change_id` that expires after five minutes. The server binds it to the authenticated Account, OAuth client, Workspace, exact operation, immutable validated payload and reason, and the versions of every record its result depends on: the records it will change and the records that determine its validated operation, the affected Organizations and the before/after values it displays. These are per-record versions under [ADR-0009](../../ADR-0009.md), which replace the single Workspace revision. Creating or deleting a record that would change that result also invalidates the preview. The apply call supplies only that identifier; it cannot replace fields or a reason after preview.
 
-`apply_change(change_id)` rechecks the token/resource scope, current membership and operation Permission, selected Workspace and its MCP opt-in. A revision match is necessary but never substitutes for authorization. A changed selection, removed membership, reduced Permission, disabled MCP, expired token or expired preview refuses application. Applying as another Account or OAuth client is refused even if the caller otherwise has write access.
+`apply_change(change_id)` rechecks the token/resource scope, current membership and operation Permission, selected Workspace and its MCP opt-in. A version match is necessary but never substitutes for authorization. A changed selection, removed membership, reduced Permission, disabled MCP, expired token or expired preview refuses application. Applying as another Account or OAuth client is refused even if the caller otherwise has write access.
 
-Successful application atomically checks the revision, consumes the preview once, commits the mutation and records its audit entry. Concurrent/repeated apply calls cannot duplicate a change; a consumed preview is refused. A failed authorization, expiry or revision check makes no entitlement mutation. Changing Workspace selection invalidates outstanding previews for the previous Workspace.
+Successful application atomically checks the versions of those dependencies, consumes the preview once, commits the mutation and records its audit entry. Concurrent/repeated apply calls cannot duplicate a change; a consumed preview is refused. A failed authorization, expiry or version check makes no entitlement mutation. Changing Workspace selection invalidates outstanding previews for the previous Workspace.
 
 **No delete tools.** MCP never deletes Privileges, Groups, Tags, Tiers, variants, Organizations, members or API keys. Removing a value goes back to its inherited default through the same write tools, for example by removing an Organization term. Deletions stay in the console.
 
@@ -66,7 +66,7 @@ Successful application atomically checks the revision, consumes the preview once
 - **Per-Account sign-in.** The MCP client signs the person in with their own Account, using the MCP authorization flow (OAuth 2.1 with PKCE, authorization-server metadata and dynamic client registration). The service acts as the authorization server for MCP clients. People authenticate through the same identity provider as the console (Google on the hosted service, the configured OIDC provider when self-hosted). There are no shared or personal static tokens. Access tokens are short-lived, refreshable and revocable from the console. They're bound to the Account and to the `/mcp` resource.
 - **Choosing a Workspace.** After sign-in, the agent calls `list_workspaces` and **asks the person which Workspace to use**, then calls `select_workspace`. The selection lasts for the MCP session. Switching requires another `select_workspace`, which the agent should confirm with the person.
 - **Workspaces opt in.** MCP is **off by default**. An Owner enables it in Workspace settings, and it can be disabled again at any time. Only Workspaces with MCP enabled appear in `list_workspaces` or can be selected. Disabling MCP ends access for every MCP session on that Workspace at the next call. Enabling and disabling are audited.
-- **Local:** an optional `npx @openentitlement/mcp` stdio bridge for clients without remote MCP support. It runs the same sign-in flow and forwards to the same endpoint.
+- **Local:** an optional `uvx openentitlement-mcp` stdio bridge (amended by ADR-0009; originally `npx @openentitlement/mcp`) for clients without remote MCP support. It runs the same sign-in flow and forwards to the same endpoint.
 
 ## Analytics
 
@@ -85,10 +85,10 @@ Each tool call records a product event (`mcp_tool_called`, with `tool` and `work
 - **No deletes:** asking the agent to delete an Organization yields no tool for it. The agent points the person to the console.
 - **Ordinary path:** an Owner's agent explains why Globex is limited to 25 seats, proposes Organization terms of 40 until March 31 with reason MSA-12, shows the preview, and applies it. The audit log records the Owner, the client and the reason.
 - **Opt-in:** an Account belonging to two Workspaces, one with MCP enabled, sees only that one in `list_workspaces`. Selecting the other is refused. When the Owner disables MCP, the next tool call in an existing session is refused.
-- **Boundary case:** a User-role Account calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after another change to the Workspace fails with a conflict, and nothing changes.
+- **Boundary case:** a User-role Account calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after a change to one of its dependencies fails with a conflict, and nothing changes; for example, a preview of `assign_tier_variant` is refused if the destination Tier variant's values change before apply. An unrelated change elsewhere in the Workspace does not invalidate it.
 
 - **Manager authority:** *superseded by [ADR-0008](../../ADR-0008.md).* A Manager may preview and apply `set_organization_terms` for the Products they manage, exactly as in the console; for any other Product it receives the same Permission refusal as the console. MCP never grants more than the console.
 - **Preview identity:** another Account or OAuth client cannot apply a preview. Switching Workspaces invalidates the old preview; the change ID cannot be used to bypass selection.
-- **Revocation:** removing membership, demoting the Account or disabling MCP between preview and apply refuses the change, even when the Workspace revision is otherwise unchanged.
+- **Revocation:** removing membership, demoting the Account or disabling MCP between preview and apply refuses the change, even when the record versions are otherwise unchanged.
 - **Expiry and replay:** an expired preview makes no change. Two concurrent applications of a valid preview commit at most once; subsequent replay is refused and produces no second mutation audit entry.
 - **Immutable payload:** a person cannot change values or the reason through `apply_change`; a different proposal requires a new preview.
