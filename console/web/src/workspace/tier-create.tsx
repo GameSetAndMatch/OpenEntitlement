@@ -16,6 +16,8 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
   const [values,setValues]=useState<Record<string,Value>>({}),[error,setError]=useState("");
   // The tier saved by this form, if its standard variant failed afterwards: retrying resumes instead of failing on the existing ID.
   const [savedTier,setSavedTier]=useState<string>();
+  // Creation spans two saves; nothing in the form changes until both have finished.
+  const [submitting,setSubmitting]=useState(false);
   // Each step replaces the form, so focus moves to the new step's heading.
   const heading=useRef<HTMLHeadingElement>(null),moved=useRef(false);
   useEffect(()=>{if(!moved.current){moved.current=true;return;}heading.current?.focus();},[step]);
@@ -33,9 +35,11 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
     const standard={id:uniqueIdentifier(standardName,"variant",w.data.variants.map(v=>v.id)),name:standardName,tierId:id,kind:"standard" as const,values};
     // Validate both records with the server's rules before saving either, so a tier is never left without its variant.
     try{validTier(tier);validVariant({...w.data,tiers:[...w.data.tiers.filter(t=>t.id!==id),tier]},standard);}catch(e){setError((e as Error).message);return;}
-    setError("");
-    if(savedTier!==id){if(!await save("tiers",tier,"Create tier"))return;setSavedTier(id);}
-    if(await save("variants",standard,"Create standard variant"))onCreated(id);
+    setError("");setSubmitting(true);
+    try{
+      if(savedTier!==id){if(!await save("tiers",tier,"Create tier"))return;setSavedTier(id);}
+      if(await save("variants",standard,"Create standard variant"))onCreated(id);
+    }finally{setSubmitting(false);}
   }
 
   if(step==="review")return <section className="panel form" aria-labelledby="tier-review-title">
@@ -44,7 +48,7 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
       {definitions.map(p=>{const set=Object.hasOwn(values,p.key);const value=set?values[p.key]:p.default;return <tr key={p.key}><td><strong>{p.name}</strong><code>{p.key}</code></td><td>{value===undefined?"—":formatValue(value as Json)}</td><td>{set?"Set for this tier":"Catalog default"}</td></tr>;})}
     </tbody></table></div>
     {error&&<div className="form-section"><p role="alert" className="notice error">{error}</p></div>}
-    <div className="form-actions"><button type="button" className="btn" onClick={()=>setStep("values")}>Back</button><button type="button" className="btn primary" disabled={busy} onClick={()=>void create()}>Create tier</button></div>
+    <div className="form-actions"><button type="button" className="btn" disabled={busy||submitting} onClick={()=>setStep("values")}>Back</button><button type="button" className="btn primary" disabled={busy||submitting} onClick={()=>void create()}>Create tier</button></div>
   </section>;
 
   return <form className="panel form" onSubmit={e=>{e.preventDefault();review();}}>

@@ -69,11 +69,14 @@ try{
  await page.waitForFunction(()=>document.activeElement?.textContent==='Review Pro',undefined,{timeout:3000});
  // If the standard variant fails after the tier is saved, creating again resumes instead of failing on the existing ID.
  await page.route('**/variants',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Simulated failure',message:'Simulated failure'})}),{times:1});
- await review.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByText('Simulated failure').first().waitFor();
+ // While the tier is saving, the review cannot be left or submitted again.
+ await page.route('**/tiers',async route=>{await new Promise(done=>setTimeout(done,500));await route.continue();},{times:1});
+ await review.getByRole('button',{name:'Create tier',exact:true}).click();assert.equal(await review.getByRole('button',{name:'Back',exact:true}).isDisabled(),true);assert.equal(await review.getByRole('button',{name:'Create tier',exact:true}).isDisabled(),true);
+ await page.getByText('Simulated failure').first().waitFor();
  await review.getByRole('button',{name:'Create tier',exact:true}).click();
  const ready=page.getByRole('region',{name:'Pro is ready'});await ready.waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await noDialog();assert.equal(await ready.getByRole('button',{name:'Add a free trial',exact:true}).count(),1);
  await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro grace period');assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');await page.getByLabel('Grace period (days)').fill('5');await save('Save variant');
- await ready.getByText('Added: Pro grace period · 5 days').waitFor();await ready.getByRole('button',{name:'Done',exact:true}).click();
+ await ready.getByText('Added: Pro grace period · 5 days').waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await ready.getByRole('button',{name:'Done',exact:true}).click();
  const proPanel=page.locator('.tier-panel').filter({has:page.getByRole('heading',{name:'Pro',exact:true})});await proPanel.getByText('Pro standard',{exact:true}).waitFor();await proPanel.getByText('5 days of past-due grace',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Edit tier',exact:true}).click();assert.equal(await page.getByLabel('Rank').inputValue(),'0');assert.equal(await page.getByLabel('Past-due grace period').inputValue(),'5');await page.getByRole('button',{name:'Cancel',exact:true}).click();
 
