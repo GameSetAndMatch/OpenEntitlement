@@ -26,6 +26,7 @@ Primary users:
 | Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | ✅ | #40, merged on `main` |
 | Privilege Catalog authoring contract: Groups, Tags, visibility | ✅ accepted (RFC-0002) | #24 |
 | Product-scoped evaluation in OEREP 0.1: `/oerep/v1/products/{product}/privileges/{privilege}/resolve`, `upgrade` replaces `suggest`, keys bound to one Product | 🚧 implemented preview on `service/python` (OPE-42); not released (RFC-0005) | `docs/rfcs/0005-product-scoped-evaluation.md` |
+| Allowances that reset per period ("10M tokens a week"): optional day, week or month reset period on integer Privileges, returned by OEREP with the value; usage stays the application's | 📋 proposed (RFC-0006), open questions for the owner; after the Python switch-over (OPE-45) | `docs/rfcs/0006-periodic-allowances.md`, OPE-62 |
 | Read-only consumption dashboard | 📋 proposed (RFC-0003), blocked on a real usage source | `docs/rfcs/0003-consumption-dashboard.md` |
 | Generated JSON Schema as the shared cross-language contract | 🚧 | ADR-0006, #39; regenerated from #38 models, shared parity and serialization fixtures |
 
@@ -64,6 +65,8 @@ Primary users:
 | Application-user entitlements: personal terms and grants | ✅ | #27 |
 | Workspace API keys and evaluation endpoint | ✅ preview | #22 |
 | Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 🚧 Products, per-Product roles and Product archiving on `service/python` (OPE-38), per-Product Catalog (OPE-39), Tiers and Tier archiving (OPE-40), Organizations with one Tier variant per Product (OPE-41), Cloud limits (OPE-44) · accepted (ADR-0008) | OPE-38 |
+| Tier minimums: a Tier sets the lowest value of an integer Privilege, checked when Organization terms are saved, an Organization is given the Tier, and the minimum changes; standard variant and Organization terms only; a raise above existing terms is refused and lists those Organizations; authoring only, no protocol change | 📋 accepted (ADR-0011); Python service only, after OPE-45 | `ADR-0011.md`, OPE-62 |
+| Minimum commitments: recorded on an Organization's contract and displayed only; charging out of scope | 📋 accepted (ADR-0011); Python service only, after OPE-45 | `ADR-0011.md`, OPE-62 |
 | Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 📋 accepted (ADR-0007) | — |
 | Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, glossary names for value sources, standard user form | 📋 | — |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
