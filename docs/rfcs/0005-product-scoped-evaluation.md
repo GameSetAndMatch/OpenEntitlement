@@ -25,7 +25,7 @@ POST /oerep/v1/products/{product}/privileges/{privilege}/upgrade    the lowest-r
 
 `upgrade` replaces the `suggest` endpoint (§10.3): it names what the request is for. Its body (`{context, need}`) and response (`{requiredPlan}`) do not change. Wire field names such as `requiredPlan` keep their existing spelling. The protocol is named OEREP 0.1, after the specification version. The `/v1/` in the path is the API's own version and stays as it is; documentation stops calling the protocol "OEREP v1".
 
-The Product is not part of the evaluation context. The context says who is evaluated and when (§2). The Product says which Catalog the privilege key belongs to. Bodies, responses, error shapes and caching rules do not change.
+The Product is not part of the evaluation context. The context says who is evaluated and when (§2). The Product says which Catalog the privilege key belongs to. Request bodies, successful response bodies and caching rules do not change; error responses adopt Problem Details as described below.
 
 ### API keys belong to one Product
 
