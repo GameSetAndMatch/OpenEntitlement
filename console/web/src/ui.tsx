@@ -79,21 +79,23 @@ export const Value = ({ v }: { v: Json }) => <span className={`value ${isUnlimit
 
 // ------------------------------------------------------------------ reason dialog (console policy: contract terms need a reason) and plain confirmation
 
-type Ask = (title: string, detail?: ReactNode, options?: { reason?: boolean }) => Promise<string | null>;
+/** `confirm` and `cancel` name the dialog's buttons after their outcome ("Discard", "Keep editing"). */
+type Labels = { confirm?: string; cancel?: string };
+type Ask = (title: string, detail?: ReactNode, options?: { reason?: boolean } & Labels) => Promise<string | null>;
 const ReasonCtx = createContext<Ask>(async () => null);
 export const useReason = () => useContext(ReasonCtx);
 /** Asks only "are you sure", for an action that is hard to undo. */
-export const useConfirm = () => { const ask = useContext(ReasonCtx); return (title: string, detail?: ReactNode) => ask(title, detail, { reason: false }).then((v) => v !== null); };
+export const useConfirm = () => { const ask = useContext(ReasonCtx); return (title: string, detail?: ReactNode, labels?: Labels) => ask(title, detail, { ...labels, reason: false }).then((v) => v !== null); };
 
 export function ReasonProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ title: string; detail?: ReactNode; reason: boolean; resolve: (v: string | null) => void } | null>(null);
+  const [state, setState] = useState<{ title: string; detail?: ReactNode; reason: boolean; labels: Labels; resolve: (v: string | null) => void } | null>(null);
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (state) { dialog.current?.showModal(); (state.reason ? ref.current : dialog.current?.querySelector<HTMLButtonElement>("button.primary"))?.focus(); }
   }, [state]);
-  const ask: Ask = (title, detail, options) => new Promise((resolve) => (setText(""), setState({ title, detail, reason: options?.reason ?? true, resolve })));
+  const ask: Ask = (title, detail, options) => new Promise((resolve) => (setText(""), setState({ title, detail, reason: options?.reason ?? true, labels: { confirm: options?.confirm, cancel: options?.cancel }, resolve })));
   const close = (v: string | null) => {
     state?.resolve(v);
     setState(null);
@@ -118,10 +120,10 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
             <textarea id="change-reason" name="reason" ref={ref} className="input" rows={3} value={text} onChange={(e) => setText(e.target.value)} /></>}
             <div className="row end">
               <button type="button" className="btn ghost" onClick={() => close(null)}>
-                Cancel
+                {state.labels.cancel ?? "Cancel"}
               </button>
               <button className="btn primary" disabled={state.reason && !text.trim()}>
-                Confirm
+                {state.labels.confirm ?? "Confirm"}
               </button>
             </div>
           </form>

@@ -5,10 +5,16 @@ import {EffectiveEntitlements, SubjectEntitlements} from "./subjects.tsx";
 import { ValuesEditor } from "./fields.tsx";
 import { FormField } from "../form.tsx";
 import { identifierFromTitle } from "./identifier.ts";
+import { useUnsavedChanges } from "./unsaved.ts";
 export function Organizations({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:Save;canEdit:boolean;busy:boolean}){
   const fresh=():Organization=>({id:"",name:"",variantId:w.data.variants.find(v=>v.kind!=="grace")?.id??"",terms:{},status:"active"});
   const [draft,setDraft]=useState<Organization>(fresh),[show,setShow]=useState(false),[editing,setEditing]=useState(false),[idEdited,setIdEdited]=useState(false),[selected,setSelected]=useState(""),[userForm,setUserForm]=useState(false);
   const assigned=w.data.variants.find(v=>v.id===draft.variantId);
+  useUnsavedChanges(show,draft);
+  // Organization terms belong to the Tier variant. Choosing another variant clears them on save; choosing the saved one again restores them.
+  const saved=editing?w.data.organizations.find(o=>o.id===draft.id):undefined;
+  const cleared=saved&&draft.variantId!==saved.variantId?Object.keys(saved.terms).map(key=>w.data.privileges.find(p=>p.key===key)?.name??key):[];
+  function changeVariant(variantId:string){setDraft({...draft,variantId,terms:saved&&variantId===saved.variantId?structuredClone(saved.terms):{}});}
   const selectedOrg=w.data.organizations.find(o=>o.id===selected);
   if(!w.data.variants.length)return <section className="panel empty-workspace"><h2>Create a tier variant first</h2><p>Then assign that offer to your first Organization.</p><a className="btn primary" href="#tiers">Go to Tiers</a></section>;
   const definitions=w.data.privileges.filter(p=>!p.hidden&&!w.data.features.find(f=>f.id===p.featureId)?.hidden);
@@ -20,7 +26,7 @@ export function Organizations({workspace:w,save,canEdit,busy}:{workspace:Workspa
         <div className="form-grid">
           <FormField label="Name"><input required value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value,...(editing||idEdited?{}:{id:identifierFromTitle(e.target.value,"org")})})}/></FormField>
           <FormField label="ID" hint={editing?"Your application sends this ID. It cannot change.":"Filled from the name. Your application sends this ID, and it cannot change after saving."}><input className="mono" required disabled={editing} pattern="[a-z][a-z0-9_]*" maxLength={80} value={draft.id} onChange={e=>{setIdEdited(e.target.value!=="");setDraft({...draft,id:e.target.value});}}/></FormField>
-          <FormField label="Tier variant" hint={editing?"Changing it clears this Organization's terms below.":undefined}><select value={draft.variantId} onChange={e=>setDraft({...draft,variantId:e.target.value,terms:{}})}>{w.data.variants.filter(v=>v.kind!=="grace").map(v=><option value={v.id} key={v.id}>{v.name}</option>)}</select></FormField>
+          <FormField label="Tier variant" hint={cleared.length?<span role="status">Saving clears {cleared.length===1?"1 term":`${cleared.length} terms`}: {cleared.join(", ")}</span>:editing?"Organization terms belong to the variant. Choosing another clears them on save.":undefined}><select value={draft.variantId} onChange={e=>changeVariant(e.target.value)}>{w.data.variants.filter(v=>v.kind!=="grace").map(v=><option value={v.id} key={v.id}>{v.name}</option>)}</select></FormField>
           <FormField label="Contract status"><select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value as Organization["status"]})}><option value="active">Active</option><option value="past_due">Past due</option><option value="ended">Ended</option></select></FormField>
         </div>
       </fieldset>

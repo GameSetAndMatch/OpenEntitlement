@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useUnsavedChanges } from "./unsaved.ts";
 import type { Workspace, Save } from "./app.tsx";
 import { resolve, type Value, type WorkspaceData } from "../../../server/workspace/model.ts";
 import { ValuesEditor, Field } from "./fields.tsx";
@@ -145,6 +146,7 @@ export function SubjectEntitlements({
     [show, setShow] = useState(false),
     [editing, setEditing] = useState(false),
     [selected, setSelected] = useState("");
+  useUnsavedChanges(show, draft);
   const allowed = w.hosting?.subjectEntitlements === true;
   const rows = w.data.subjects.filter(
     (s) => s.organizationId === organizationId,

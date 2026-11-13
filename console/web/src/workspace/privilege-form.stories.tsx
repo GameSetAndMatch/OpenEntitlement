@@ -137,3 +137,21 @@ export const ReadOnlyWithoutDefault:Story={args:{initial:{...seats,visibility:'r
  await expect(args.onSave).toHaveBeenCalledWith(expect.objectContaining({visibility:'read_only',default:0}));
  done(canvasElement);
 }};
+
+const variants=[{id:'pro',name:'Pro',values:{}},{id:'pro_trial',name:'Pro trial',values:{}},{id:'team',name:'Team',values:{seats:3}}];
+/** Requiring a value when variants exist asks for their values in the same save: one for every variant, or one per variant. */
+export const RequireValueInExistingVariants:Story={args:{initial:{...seats,default:5},editing:true,variants},play:async({canvasElement,args})=>{
+ const canvas=within(canvasElement);
+ await expect(canvas.queryByRole('spinbutton',{name:'Value for every variant'})).not.toBeInTheDocument();
+ await userEvent.click(canvas.getByRole('checkbox',{name:'Require a value in every Tier variant'}));
+ // Team already sets its own value; the others start from the default being removed.
+ await expect(canvas.getByText('2 variants need a value. One value applies to every variant unless you set each one.')).toBeInTheDocument();
+ await expect(canvas.getByRole('spinbutton',{name:'Value for every variant'})).toHaveValue(5);
+ await userEvent.click(canvas.getByRole('checkbox',{name:'Set per variant'}));
+ await expect(canvas.queryByRole('spinbutton',{name:'Value for Team'})).not.toBeInTheDocument();
+ const trial=canvas.getByRole('spinbutton',{name:'Value for Pro trial'});
+ await userEvent.clear(trial);await userEvent.type(trial,'2');
+ await userEvent.click(canvas.getByRole('button',{name:'Save changes'}));
+ await expect(args.onSave).toHaveBeenCalledWith(expect.not.objectContaining({default:expect.anything()}),{pro:5,pro_trial:2});
+ done(canvasElement);
+}};

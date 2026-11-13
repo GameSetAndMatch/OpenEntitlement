@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useUnsavedChanges} from "./unsaved.ts";
 import type {Workspace,Save} from "./app.tsx";
 import type {Tier,Variant} from "../../../server/workspace/model.ts";
 import {ValuesEditor} from "./fields.tsx";
@@ -16,6 +17,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
   // Creating a tier is a guided flow: values, review, then an offer to add a trial and a grace period.
   const [creating,setCreating]=useState(false),[created,setCreated]=useState<string>(),[graceDays,setGraceDays]=useState(7);
   const open=Boolean(tier||variant||creating||created);
+  useUnsavedChanges(Boolean(tier),tier);useUnsavedChanges(Boolean(variant),variant);
   // The "is ready" step replaces the form; move focus to it when it appears and when a variant form returns to it.
   const nextHeading=useRef<HTMLHeadingElement>(null);
   useEffect(()=>{if(created&&!variant)nextHeading.current?.focus();},[created,variant]);

@@ -5,7 +5,9 @@ import {FormField} from '../form.tsx';
 import {GroupPicker,newGroupId} from './group-picker.tsx';
 import {catalogDefinition} from '../../../server/workspace/catalog-adapter.ts';
 import type {Privilege} from '../../../server/workspace/privilege-definition.ts';
-import type {Group} from '../../../server/workspace/model.ts';
+import {ownValueHolders,type Group} from '../../../server/workspace/model.ts';
+import {useConfirm} from '../ui.tsx';
+import {useUnsavedChanges} from './unsaved.ts';
 import type {Workspace,Save} from './app.tsx';
 export function Catalog({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:Save;canEdit:boolean;busy:boolean}){
  const [draft,setDraft]=useState<Privilege>(freshPrivilege),[editing,setEditing]=useState(false),[show,setShow]=useState(false);
@@ -14,6 +16,16 @@ export function Catalog({workspace:w,save,canEdit,busy}:{workspace:Workspace;sav
  const groups=w.data.groups.filter(g=>!w.data.features.find(f=>f.id===g.legacyFeatureId)?.hidden);
  const visible=definitions.filter(p=>p.visibility!=='hidden'&&(!tagFilter||p.tags.includes(tagFilter)));
  const envEditable=w.role==='Platform administrator';
+ const confirm=useConfirm();
+ useUnsavedChanges(Boolean(container),meta);
+ async function savePrivilege(p:Privilege,variantValues?:Record<string,unknown>){
+  // Read-only Privileges use their Catalog default everywhere, so the values records set themselves are removed in the same change.
+  const holders=p.visibility==='read_only'?ownValueHolders(w.data,p.key):[];
+  if(holders.length&&!await confirm(`Make ${p.title} Read-only?`,`${new Intl.ListFormat('en',{type:'conjunction'}).format(holders)} ${holders.length===1?'sets its own value; it':'set their own value; they'} will use the Catalog default instead.`,{confirm:'Make Read-only'}))return false;
+  const ok=await save('catalog',p,editing?'Update Privilege':'Define Privilege','PUT',variantValues?{variantValues}:undefined);
+  if(ok)setShow(false);
+  return ok;
+ }
  function begin(p?:Privilege){setContainer(undefined);setDraft(p?structuredClone(p):freshPrivilege());setEditing(Boolean(p));setShow(true);}
  function newGroup(){setShow(false);setContainer('groups');setMeta({id:'',name:'',description:''});}
  function metadata(row:Group){setShow(false);setContainer('groups');setMeta({id:row.id,name:row.name,description:row.description,...(row.parentId?{parentId:row.parentId}:{})});}
@@ -34,7 +46,7 @@ export function Catalog({workspace:w,save,canEdit,busy}:{workspace:Workspace;sav
    <div className="form-actions"><button className="btn" type="button" onClick={()=>setContainer(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>{meta.id?'Save group':'Create group'}</button></div>
   </form>}
   {show&&canEdit&&<PrivilegeForm key={draft.key+String(editing)} initial={draft} editing={editing} groups={groups} tags={w.data.tags} environment={w.environment} envEditable={envEditable} busy={busy}
-   onSave={p=>save('catalog',p,editing?'Update Privilege':'Define Privilege').then(ok=>{if(ok)setShow(false);return ok;})} onCreateTag={tag=>save('tags',tag,'Add tag')} takenGroupIds={w.data.groups.map(g=>g.id)} onCreateGroup={group=>save('groups',group,'Create Group')} onCancel={()=>setShow(false)}/>}
+   variants={w.data.variants} onSave={savePrivilege} onCreateTag={tag=>save('tags',tag,'Add tag')} takenGroupIds={w.data.groups.map(g=>g.id)} onCreateGroup={group=>save('groups',group,'Create Group')} onCancel={()=>setShow(false)}/>}
   {!visible.length&&!show&&!container&&(definitions.length?<section className="panel empty-workspace"><h2>No privileges match</h2><p>Choose another tag, or all tags.</p></section>:<section className="panel empty-workspace"><h2>Define your first privilege</h2><p>A privilege is one thing your product allows or limits, such as a feature or a seat limit.</p>{canEdit&&<button className="btn primary" onClick={()=>begin()}>Define privilege</button>}</section>)}
   {!show&&!container&&<>{groups.filter(g=>!g.parentId).map(groupRows)}{visible.some(p=>!p.groupId)&&<section className="catalog-group catalog-ungrouped" aria-label="Ungrouped privileges">{visible.filter(p=>!p.groupId).map(row)}</section>}</>}
  </>;

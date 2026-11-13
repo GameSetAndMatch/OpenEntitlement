@@ -1,4 +1,5 @@
 import { useEffect,useRef,useState } from "react";
+import { useUnsavedChanges } from "./unsaved.ts";
 import { Field,Group,Item,Row } from "./settings-group.tsx";
 import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
 import { stringify } from "yaml";
@@ -10,10 +11,12 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
   const sectionGeneration=useRef(0);
-  useEffect(()=>{sectionGeneration.current++;setError("");},[section]);
+  // Leaving a section discards what was typed in it (the console asked first).
+  useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");},[section]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
-  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
+  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier,section]);
+  useUnsavedChanges(true,{email,name,hostedTier:hostedTier!==(w.hosting?.tier??"pro")});
   const confirm=useConfirm(),toast=useToast();
   const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||w.role==="Manager";
   const base=`/api/workspaces/${w.id}`;

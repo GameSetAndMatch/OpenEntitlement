@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readJson, send } from "../http.ts";
 import { Authentication } from "./auth.ts";
 import { WorkspaceStore } from "./store.ts";
-import { WorkspaceError, object, text, group, feature, privilege, tag, tier, variant, organization, resolve, catalogEnvironment, changesContractTerms, type StatusPolicy } from "./model.ts";
+import { WorkspaceError, object, text, group, feature, tag, tier, variant, organization, changePrivilege, resolve, catalogEnvironment, changesContractTerms, type StatusPolicy } from "./model.ts";
 
 export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:NodeJS.ProcessEnv={...process.env}) {
   const mode=deploymentMode(env);
@@ -103,9 +103,10 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
       if(section==="tags")upsert(data.tags,tag(entry),v=>v.id);
       if (section === "features") upsert(data.features,feature(data,entry),v=>v.id);
       if (section === "privileges"||section==="catalog") {
-        const def=privilege(data,entry),previous=data.privileges.find(p=>p.key===def.key);
-        if(def.envVariable!==previous?.envVariable&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change server environment bindings",403);
-        upsert(data.privileges,def,v=>v.key);
+        const previous=data.privileges.find(p=>p.key===(entry as {key?:unknown}|undefined)?.key)?.envVariable;
+        // One change: the definition, the values it needs in existing variants, and the values Read-only removes.
+        const def=changePrivilege(data,entry,section==="catalog"?body.variantValues:undefined);
+        if(def.envVariable!==previous&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change server environment bindings",403);
       }
       if (section === "tiers") upsert(data.tiers,tier(entry),v => v.id);
       if (section === "variants") upsert(data.variants,variant(data,entry),v => v.id);

@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useUnsavedChanges} from "./unsaved.ts";
 import type {Workspace,Save} from "./app.tsx";
 import {tier as validTier,variant as validVariant,type Tier,type Value} from "../../../server/workspace/model.ts";
 import {ValuesEditor} from "./fields.tsx";
@@ -18,6 +19,7 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
   const [savedTier,setSavedTier]=useState<string>();
   // Creation spans two saves; nothing in the form changes until both have finished.
   const [submitting,setSubmitting]=useState(false);
+  useUnsavedChanges(true,{name,id,values});
   // Each step replaces the form, so focus moves to the new step's heading.
   const heading=useRef<HTMLHeadingElement>(null),moved=useRef(false);
   useEffect(()=>{if(!moved.current){moved.current=true;return;}heading.current?.focus();},[step]);

@@ -8,12 +8,14 @@ import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
 import { changesContractTerms,type WorkspaceData } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
+import { hasUnsavedChanges,useDiscardChanges } from "./unsaved.ts";
 import { FormField } from "../form.tsx";
 import "./style.css";
 export interface Workspace {hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
-export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
+/** Saves one entry as one audited change. `extra` adds fields the section accepts beside the entry, such as a new Privilege's variant values. */
+export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE",extra?:Record<string,unknown>)=>Promise<boolean>;
 // The workspace's daily pages. Administration lives in Settings, which swaps the sidebar (as in Linear).
 const pages=[
   {name:"Privilege Catalog",hash:"catalog",about:"What your product allows or limits."},
@@ -55,6 +57,9 @@ export function WorkspaceApp(){
   // Saves read the newest revision, so a flow can save twice in a row (a tier, then its first variant).
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const ask=useReason(),toast=useToast();
+  // Leaving a form with unsaved changes asks first: another page, another workspace, joining one, or signing out.
+  const discard=useDiscardChanges(),discardRef=useRef(discard);discardRef.current=discard;
+  const leave=(go:()=>void)=>void discard().then(ok=>{if(ok)go();});
   async function loadList(){const data=await request<typeof list>("/api/workspaces");setList(data);return data;}
   async function loadWorkspace(id:string){setWorkspace(undefined);const next=await request<Workspace>(`/api/workspaces/${id}`);if(selectedRef.current===id)setWorkspace(next);}
   // Access to the open workspace ended (another Owner removed you, or it was deleted): move to another one.
@@ -73,14 +78,17 @@ export function WorkspaceApp(){
   // Following "Settings" or "Back to workspace" swaps the sidebar and removes the focused link. Keep focus on the current page's link.
   const navigated=useRef(false);
   useEffect(()=>{if(!navigated.current)return;navigated.current=false;if(document.activeElement&&document.activeElement!==document.body)return;document.querySelector<HTMLElement>('aside nav a[aria-current="page"]')?.focus();},[page]);
-  useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
+  useEffect(()=>{const changed=(event:HashChangeEvent)=>{
+    // The hash already moved. Put it back while the person decides, then go on only if they discard.
+    if(!location.hash.startsWith("#invite=")&&location.hash!=="#workspace-main"&&hasUnsavedChanges()){const target=location.hash;history.replaceState(null,"",event.oldURL);void discardRef.current().then(ok=>{if(ok)location.hash=target;});return;}
+    if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit log"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[page,workspace]);
-  const save:Save=async(section,entry,title,method="PUT")=>{
+  const save:Save=async(section,entry,title,method="PUT",extra)=>{
     const workspace=workspaceRef.current;
     if(!workspace||savingRef.current)return false;savingRef.current=true;
     const generation=pageGeneration.current;
     setBusy(true);setError("");
-    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
+    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{...extra,entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
     catch(e){if(generation===pageGeneration.current)failed(e);return false;}finally{savingRef.current=false;setBusy(false);}
   };
   async function create(){setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name});await loadList();setSelected(value.id);setCreating(false);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
@@ -94,14 +102,14 @@ export function WorkspaceApp(){
   const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canEdit))??settingsPages[0]!;
   const inSettings=settingsPages.includes(shown);
   const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
-  return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>{setSelected(id);setError("");}} onCreate={()=>{setCreating(true);setError("");}}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
+  return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>leave(()=>{setSelected(id);setError("");})} onCreate={()=>leave(()=>{setCreating(true);setError("");})}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
     {selected&&!creating&&(inSettings
       ?<><a className="settings-back" href="#catalog"><span aria-hidden="true">‹</span> Back to workspace</a><nav aria-label="Settings"><p className="nav-heading" aria-hidden="true">Settings</p>{visibleSettings.map(link)}</nav></>
       :<><nav aria-label="Workspace navigation">{pages.map(link)}</nav><a className="nav settings-link" href="#settings/members">Settings</a></>)}
-    <div className="sidebar-footer"><p>{session.account.email}{session.account.platformAdmin&&<small>Platform administrator</small>}</p><button className="btn" onClick={()=>void request("/auth/logout","POST").then(()=>{resetIdentity();remember("");setCsrf("");setSession(undefined);setWorkspace(undefined);setSelected("");setCreating(false);setList([]);}).catch(e=>setError(e.message))}>Sign out</button></div></aside>
+    <div className="sidebar-footer"><p>{session.account.email}{session.account.platformAdmin&&<small>Platform administrator</small>}</p><button className="btn" onClick={()=>leave(()=>void request("/auth/logout","POST").then(()=>{resetIdentity();remember("");setCsrf("");setSession(undefined);setWorkspace(undefined);setSelected("");setCreating(false);setList([]);}).catch(e=>setError(e.message)))}>Sign out</button></div></aside>
     <main id="workspace-main" tabIndex={-1}>
       {error.message&&<div role="alert" className="notice error">{error.message}{selected&&error.refresh&&<button className="btn" onClick={()=>retryLoad(selected)}>Refresh workspace</button>}</div>}
-      {invite&&<section className="panel invitation"><h2>You have a workspace invitation</h2><p>Join using the verified email address you signed in with.</p><button className="btn primary" disabled={busy} onClick={()=>void accept()}>Join workspace</button><button className="btn" disabled={busy} onClick={()=>{sessionStorage.removeItem("oe.invite");setInvite("");setError("");}}>Dismiss invitation</button></section>}
+      {invite&&<section className="panel invitation"><h2>You have a workspace invitation</h2><p>Join using the verified email address you signed in with.</p><button className="btn primary" disabled={busy} onClick={()=>leave(()=>void accept())}>Join workspace</button><button className="btn" disabled={busy} onClick={()=>{sessionStorage.removeItem("oe.invite");setInvite("");setError("");}}>Dismiss invitation</button></section>}
       {(creating||!selected)&&<form className="panel workspace-create" onSubmit={e=>{e.preventDefault();void create();}}><h1>Create a workspace</h1><p>A workspace holds one product’s privileges, tiers and Organizations. To join an existing one, open the invitation link its Owner sent you.</p><FormField label="Workspace name"><input required autoFocus={creating} maxLength={200} value={name} onChange={e=>setName(e.target.value)} /></FormField><div className="form-actions">{selected&&<button type="button" className="btn" onClick={()=>{setCreating(false);requestAnimationFrame(()=>document.querySelector<HTMLElement>(".workspace-trigger")?.focus());}}>Cancel</button>}<button className="btn primary" disabled={busy}>{busy?"Creating…":"Create workspace"}</button></div></form>}
       {selected&&!creating&&!workspace&&!error.message&&<p role="status" className="notice">Loading workspace…</p>}
       {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
