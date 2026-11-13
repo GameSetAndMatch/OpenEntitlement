@@ -9,7 +9,8 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
-  useEffect(()=>setError(""),[section]);
+  const sectionGeneration=useRef(0);
+  useEffect(()=>{sectionGeneration.current++;setError("");},[section]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
   useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
@@ -26,7 +27,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
   },[base,manager,owner]); // load reads exactly base, manager and owner
   // Settings changes are audited with their actor; only removals ask to confirm.
-  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);try{if(ask&&!await confirm(label))return;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
+  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
   const tierChanged=hostedTier!==(w.hosting?.tier??"pro");
   const roleSelect=(m:{id:string;email:string;role:string})=><select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>;
   const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
