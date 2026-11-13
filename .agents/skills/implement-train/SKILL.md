@@ -18,7 +18,7 @@ The argument names the spec: a Linear project whose description is the spec, and
 3. **Dispatch the frontier.** For each frontier ticket except the closing ticket, up to the parallel limit (two agents unless the person says otherwise; a running review counts as an agent), start an implementer with `delegate_task` (`isolation: "worktree"`, async) and the brief in [BRIEF.md](BRIEF.md). Move the ticket to In Progress. Done when every frontier ticket has an implementer or waits only on the limit.
 4. **Gate.** When an implementer reports a completed PR, check GitHub yourself:
    - the pull request targets the base from step 2;
-   - the latest Codex review comment says "OK to merge" for the current head SHA;
+   - the latest review comment from the designated reviewer (see Rotation) says "OK to merge" for the current head SHA;
    - every required check passes on that head.
 
    **Questions take a separate path.** If an implementer reports a question that the spec and decision records cannot answer, park that ticket: record the question, the work it blocks and the implementer's recommendation as a comment on its Linear issue. Retain its branch/PR and completed work; parking is not Done and does not satisfy the merge gate. Release its agent slot and dispatch another unblocked frontier ticket within the same two-agent limit. Tickets depending on the parked ticket remain blocked; unrelated work continues.
@@ -31,7 +31,7 @@ The argument names the spec: a Linear project whose description is the spec, and
 7. **Repeat** from step 3 with the new frontier.
 8. **Close the spec.** When only the ticket that merges the integration branch into `main` is left:
    1. run the `code-review` skill on the whole integration branch against `main`, and fix its findings through one more ticket;
-   2. open the closing ticket's pull request from the integration branch into `main`, with the same Codex review loop as the brief (steps 7 and 8), and run it through the gate with `main` as its base; its merge moves it to Done;
+   2. open the closing ticket's pull request from the integration branch into `main`, with the same review loop as the brief (steps 7 and 8), and run it through the gate with `main` as its base; its merge moves it to Done;
    3. run Matt Pocock's `retro` skill on the train.
 
    Done when every spec ticket is Done and the integration branch is merged.
