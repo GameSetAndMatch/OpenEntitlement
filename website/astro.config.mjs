@@ -40,6 +40,7 @@ export default defineConfig({
         { label: 'OEREP HTTP API', slug: 'docs/oerep' },
         { label: 'Implementing the contract', slug: 'docs/implementing' },
         { label: 'Glossary', slug: 'reference/glossary' },
+        { label: 'Problem types', collapsed: true, items: [{ autogenerate: { directory: 'problems' } }] },
         { label: 'Specification', items: [{ autogenerate: { directory: 'specification' } }] },
       ] },
       { label: 'Project', items: [

@@ -1,0 +1,77 @@
+"""Starting the service: configuration, migrations at startup, health."""
+from __future__ import annotations
+
+import psycopg
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.engine import make_url
+
+from openentitlement_service.main import Settings, build_app
+
+
+def test_settings_come_from_the_environment(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    settings = Settings.from_env(
+        {
+            "PORT": "9000",
+            "OE_HOST": "0.0.0.0",
+            "DATABASE_URL": "postgresql://oe:oe@db:5432/oe",
+            "OE_DATABASE_TRANSACTION_POOLER": "true",
+            "OE_CONSOLE_DIR": str(tmp_path),
+        }
+    )
+    assert settings == Settings(
+        port=9000,
+        host="0.0.0.0",
+        database_url="postgresql://oe:oe@db:5432/oe",
+        transaction_pooler=True,
+        console_dir=tmp_path,
+    )
+
+
+def test_defaults_listen_locally() -> None:
+    settings = Settings.from_env({})
+    assert (settings.port, settings.host, settings.database_url, settings.in_memory, settings.transaction_pooler) == (
+        8787,
+        "127.0.0.1",
+        None,
+        False,
+        False,
+    )
+
+
+def test_refuses_to_start_without_a_database_unless_memory_is_chosen() -> None:
+    with pytest.raises(SystemExit, match="DATABASE_URL"):
+        build_app(Settings.from_env({}))
+    with TestClient(build_app(Settings.from_env({"OE_IN_MEMORY": "true"}))) as client:
+        assert client.get("/healthz").json() == {"status": "ok"}
+
+
+def test_warns_when_the_database_role_could_bypass_row_level_security(
+    migrated_postgres_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    # The test role is a superuser, like the default role of the postgres image.
+    with TestClient(build_app(Settings(database_url=migrated_postgres_url))):
+        pass
+    assert "bypass row-level security" in caplog.text
+
+
+def test_service_applies_its_migrations_at_startup(fresh_database_url: str) -> None:
+    with TestClient(build_app(Settings(database_url=fresh_database_url))) as client:
+        assert client.get("/healthz").json() == {"status": "ok"}
+    dsn = make_url(fresh_database_url).set(drivername="postgresql").render_as_string(hide_password=False)
+    with psycopg.connect(dsn) as conn:
+        assert conn.execute("select version_num from alembic_version").fetchone() == ("0001_baseline",)
+
+
+def test_health_is_service_unavailable_when_the_database_is_gone() -> None:
+    app = build_app(Settings(database_url="postgresql://oe:oe@127.0.0.1:1/oe"), migrate_at_startup=False)
+    with TestClient(app) as client:
+        response = client.get("/healthz")
+    assert response.status_code == 503
+    assert response.json()["type"] == "https://openentitlement.dev/problems/service-unavailable"
+
+
+def test_startup_migrations_follow_the_transaction_pooler_setting(fresh_database_url: str) -> None:
+    settings = Settings(database_url=fresh_database_url, transaction_pooler=True)
+    with TestClient(build_app(settings)) as client:
+        assert client.get("/healthz").json() == {"status": "ok"}
