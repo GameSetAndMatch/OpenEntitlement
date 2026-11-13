@@ -23,7 +23,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Literal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from openentitlement.catalog import PrivilegeDefinition, ValueType
 from openentitlement.details import EvaluationContext, Reason
@@ -43,7 +43,9 @@ from openentitlement.resolver import resolve_from_facts
 from openentitlement.values import UNLIMITED, is_unlimited
 from pydantic import Field, JsonValue, StrictInt, TypeAdapter, ValidationError
 
+from . import audit
 from .access import Permission
+from .audit import Aspect, AuditAction, TargetKind
 from .catalog import CatalogValue, VariantValues, value_error
 from .problems import (
     AlreadyTaken,
@@ -184,28 +186,6 @@ class OrganizationView(OpenEntitlementModel):
 
 class OrganizationsView(OpenEntitlementModel):
     organizations: tuple[OrganizationView, ...]
-
-
-class OrganizationChange(OpenEntitlementModel):
-    """An immutable audit fact about an Organization or its Tier variant in a Product."""
-
-    id: UUID
-    workspace_id: UUID
-    #: Set for a change to the Organization's variant, status or terms in one Product.
-    product_id: UUID | None
-    actor_id: UUID
-    actor_email: str
-    at: datetime
-    target: Literal["organization", "assignment", "applicationUser"]
-    #: The Organization's ID.
-    key: str
-    #: The application user's Subject ID, for an ``applicationUser`` change.
-    subject_id: str | None = None
-    action: Literal["created", "changed", "removed"]
-    before: dict[str, JsonValue] | None
-    after: dict[str, JsonValue] | None
-    #: Why Organization terms, Personal terms or Grants changed; required exactly then.
-    reason: str | None = None
 
 
 # Resolution through the SDK engine.
@@ -568,6 +548,31 @@ def _dump(model: OpenEntitlementModel) -> dict[str, JsonValue]:
     return data
 
 
+@dataclass(frozen=True)
+class _Assigned:
+    """What saving an Organization's Tier variant changed, for its Audit log entry."""
+
+    changes: list[audit.AuditChange]
+    reason: str | None
+
+
+def _assignment_fields(assignment: AssignmentRecord, facts: ProductFacts) -> dict[str, JsonValue]:
+    """An Organization's Tier variant in a Product as the Audit log shows it: the variant by its name now."""
+    data = _dump(assignment)
+    variant = facts.variants.get(assignment.variant_id)
+    return {
+        "variant": variant.name if variant else assignment.variant_id,
+        "status": data["status"],
+        "graceEndsAt": data.get("graceEndsAt"),
+        "terms": data["terms"],
+    }
+
+
+def _user_fields(user: ApplicationUserRecord) -> dict[str, JsonValue]:
+    data = _dump(user)
+    return {"name": data["name"], "terms": data["terms"], "grants": data["grants"]}
+
+
 class OrganizationService:
     def __init__(
         self, environment: Mapping[str, str] | None = None, *, deployment: Deployment = Deployment.SELF_HOSTED
@@ -646,36 +651,9 @@ class OrganizationService:
             )
         return OrganizationsView(organizations=tuple(organizations))
 
-    async def _audit(
-        self,
-        ws: OpenWorkspace,
-        *,
-        product_id: UUID | None,
-        target: Literal["organization", "assignment", "applicationUser"],
-        key: str,
-        action: Literal["created", "changed", "removed"],
-        before: dict[str, JsonValue] | None,
-        after: dict[str, JsonValue] | None,
-        reason: str | None = None,
-        subject_id: str | None = None,
-    ) -> None:
-        await ws.repos.organizations.audit(
-            OrganizationChange(
-                id=uuid4(),
-                workspace_id=ws.actor.workspace_id,
-                product_id=product_id,
-                actor_id=ws.actor.account.id,
-                actor_email=ws.actor.account.email,
-                at=ws.now,
-                target=target,
-                key=key,
-                subject_id=subject_id,
-                action=action,
-                before=before,
-                after=after,
-                reason=reason,
-            )
-        )
+    async def _titles(self, ws: OpenWorkspace, product_id: UUID) -> dict[str, str]:
+        """Each Privilege's title now, to name terms and Grants in the Audit log."""
+        return {r.key: r.entry.title for r in await ws.repos.catalog.list(product_id) if isinstance(r.entry, Privilege)}
 
     async def create(
         self,
@@ -703,11 +681,20 @@ class OrganizationService:
             await ws.repos.organizations.add(organization)
         except AlreadyExists as exc:
             raise AlreadyTaken(f"Another Organization already uses the ID {id}.", kind="Organization", key=id) from exc
-        await self._audit(
-            ws, product_id=None, target="organization", key=id, action="created", before=None, after=_dump(organization)
-        )
+        changes = audit.diff(None, {"name": organization.name})
+        why = None
         if product_id is not None and assignment is not None:
-            await self._assign(ws, organization, product_id, assignment, version=0, reason=reason, pointer="/assignment")
+            assigned = await self._assign(
+                ws, organization, product_id, assignment, version=0, reason=reason, pointer="/assignment"
+            )
+            # One entry: every Manager reads the new name; only this Product's Managers its Tier and terms.
+            names = await audit.product_names(ws)
+            changes += [c.model_copy(update={"product_id": product_id, "product_name": names.get(product_id)}) for c in assigned.changes]
+            why = assigned.reason
+        await audit.record(
+            ws, action=AuditAction.CREATED, target_kind=TargetKind.ORGANIZATION, target_id=id,
+            target_name=organization.name, changes=changes, reason=why,
+        )
         return await self.view(ws)
 
     async def rename(self, ws: OpenWorkspace, organization_id: str, *, name: str, version: int) -> OrganizationsView:
@@ -722,9 +709,9 @@ class OrganizationService:
             await ws.repos.organizations.update(changed, expected_version=version)
         except StaleVersion as exc:
             raise RevisionConflict(kind="Organization", id=organization_id) from exc
-        await self._audit(
-            ws, product_id=None, target="organization", key=organization_id, action="changed",
-            before=_dump(current), after=_dump(changed),
+        await audit.record(
+            ws, action=AuditAction.CHANGED, target_kind=TargetKind.ORGANIZATION, target_id=organization_id,
+            target_name=current.name, changes=audit.diff({"name": current.name}, {"name": changed.name}),
         )
         return await self.view(ws)
 
@@ -741,8 +728,49 @@ class OrganizationService:
         """Give the Organization a Tier variant in the Product (version 0), or change it, its status or terms."""
         ws.actor.require(Permission.EDIT_PRODUCT, product_id)
         organization = await self._organization(ws, organization_id)
-        await self._assign(ws, organization, product_id, assignment, version=version, reason=reason, pointer="")
+        assigned = await self._assign(ws, organization, product_id, assignment, version=version, reason=reason, pointer="")
+        terms = [c.field.startswith("terms.") for c in assigned.changes]
+        # The sentence names the part that changed: the terms, the Tier variant and status, or both (none).
+        aspect = Aspect.TERMS if all(terms) else None if any(terms) else Aspect.TIER
+        await audit.record(
+            ws,
+            action=AuditAction.CHANGED,
+            target_kind=TargetKind.ORGANIZATION,
+            target_id=organization.id,
+            target_name=organization.name,
+            aspect=aspect,
+            product_id=product_id,
+            changes=assigned.changes,
+            reason=assigned.reason,
+        )
         return await self.view(ws)
+
+    async def _audit_user(
+        self,
+        ws: OpenWorkspace,
+        before: ApplicationUserRecord | None,
+        after: ApplicationUserRecord | None,
+        reason: str | None,
+    ) -> None:
+        user = before or after
+        assert user is not None
+        changes = audit.diff(
+            _user_fields(before) if before else None,
+            _user_fields(after) if after else None,
+            titles=await self._titles(ws, user.product_id),
+        )
+        exceptions = any(c.field.startswith(("terms.", "grants.")) for c in changes)
+        await audit.record(
+            ws,
+            action=AuditAction.CHANGED if before and after else AuditAction.CREATED if after else AuditAction.REMOVED,
+            target_kind=TargetKind.APPLICATION_USER,
+            target_id=f"{user.organization_id}/{user.subject_id}",
+            target_name=user.name or user.subject_id,
+            aspect=Aspect.TERMS if before and after and exceptions else None,
+            product_id=user.product_id,
+            changes=changes,
+            reason=reason,
+        )
 
     async def _organization(self, ws: OpenWorkspace, organization_id: str) -> OrganizationRecord:
         found = await ws.repos.organizations.get(organization_id)
@@ -760,7 +788,8 @@ class OrganizationService:
         version: int,
         reason: str | None,
         pointer: str,
-    ) -> None:
+    ) -> _Assigned:
+        """Save the Organization's Tier variant in the Product; return what changed for the Audit log."""
         ws.actor.require(Permission.EDIT_PRODUCT, product_id)
         # The Product lock: Catalog, Tier and Organization-term writes of one Product run one at a time.
         await ws.repos.catalog.lock(product_id)
@@ -829,16 +858,11 @@ class OrganizationService:
             await ws.repos.organizations.save_assignment(saved, expected_version=version)
         except (StaleVersion, AlreadyExists) as exc:
             raise RevisionConflict(kind="Organization's Tier variant", id=organization.id) from exc
-        await self._audit(
-            ws,
-            product_id=product_id,
-            target="assignment",
-            key=organization.id,
-            action="changed" if current else "created",
-            before=_dump(current) if current else None,
-            after=_dump(saved),
-            reason=why if terms_changed else None,
+        titles = {p.key: p.title for p in facts.privileges}
+        changes = audit.diff(
+            _assignment_fields(current, facts) if current else None, _assignment_fields(saved, facts), titles=titles
         )
+        return _Assigned(changes=changes, reason=why if terms_changed else None)
 
     # Application users (OPE-60).
 
@@ -922,17 +946,7 @@ class OrganizationService:
             await ws.repos.organizations.save_user(saved, expected_version=version)
         except (StaleVersion, AlreadyExists) as exc:
             raise RevisionConflict(kind="application user", id=subject_id) from exc
-        await self._audit(
-            ws,
-            product_id=product_id,
-            target="applicationUser",
-            key=organization.id,
-            subject_id=subject_id,
-            action="changed" if current else "created",
-            before=_dump(current) if current else None,
-            after=_dump(saved),
-            reason=why if changed else None,
-        )
+        await self._audit_user(ws, current, saved, why if changed else None)
         return await self.view(ws)
 
     async def remove_user(
@@ -962,15 +976,5 @@ class OrganizationService:
             await ws.repos.organizations.delete_user(current, expected_version=version)
         except StaleVersion as exc:
             raise RevisionConflict(kind="application user", id=subject_id) from exc
-        await self._audit(
-            ws,
-            product_id=product_id,
-            target="applicationUser",
-            key=organization.id,
-            subject_id=subject_id,
-            action="removed",
-            before=_dump(current),
-            after=None,
-            reason=why if changed else None,
-        )
+        await self._audit_user(ws, current, None, why if changed else None)
         return await self.view(ws)

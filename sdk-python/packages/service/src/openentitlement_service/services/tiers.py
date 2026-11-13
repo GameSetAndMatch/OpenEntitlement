@@ -10,14 +10,16 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, Literal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from openentitlement.model import OpenEntitlementModel
 from openentitlement.privileges import Identifier, Privilege, Title, TypedPrivilege, Visibility
 
 from pydantic import Field, JsonValue, ValidationError, model_serializer, model_validator
 
+from . import audit
 from .access import Permission
+from .audit import AuditAction, TargetKind
 from .catalog import CatalogValue, VariantKind, VariantValues, value_error
 from .problems import AlreadyTaken, FieldError, NotFound, RevisionConflict, TierInUse, ValidationFailed, escape_pointer_token
 from .repositories import AlreadyExists, StaleVersion
@@ -100,22 +102,6 @@ class TiersView(OpenEntitlementModel):
     policy_version: int
 
 
-class TierChange(OpenEntitlementModel):
-    """An immutable audit fact about a Tier, a Tier variant or the status policy."""
-
-    id: UUID
-    workspace_id: UUID
-    product_id: UUID
-    actor_id: UUID
-    actor_email: str
-    at: datetime
-    target: Literal["tier", "variant", "status-policy"]
-    key: str
-    action: Literal["created", "changed", "archived", "restored", "deleted"]
-    before: dict[str, JsonValue] | None
-    after: dict[str, JsonValue] | None
-
-
 def upgrade_candidates(tiers: Iterable[TierRecord], current: str | None) -> list[TierRecord]:
     """Tiers an Organization on ``current`` could upgrade to, lowest rank first (spec §3.4).
 
@@ -129,6 +115,11 @@ def upgrade_candidates(tiers: Iterable[TierRecord], current: str | None) -> list
 
 def _pointer(*tokens: str) -> str:
     return "".join("/" + escape_pointer_token(t) for t in tokens)
+
+
+def _tier_fields(tier: TierRecord) -> dict[str, JsonValue]:
+    """A Tier's own values in the Audit log; archiving is its action, not a changed value."""
+    return {k: v for k, v in _dump(tier).items() if k != "archivedAt"}
 
 
 def _dump(model: OpenEntitlementModel) -> dict[str, JsonValue]:
@@ -211,27 +202,19 @@ class TierService:
         self,
         ws: OpenWorkspace,
         product_id: UUID,
-        target: Literal["tier", "variant", "status-policy"],
-        key: str,
-        action: Literal["created", "changed", "archived", "restored", "deleted"],
-        before: dict[str, JsonValue] | None,
-        after: dict[str, JsonValue] | None,
+        kind: TargetKind,
+        target_id: str,
+        name: str,
+        action: AuditAction,
+        changes: Sequence[audit.AuditChange],
     ) -> None:
-        await ws.repos.tiers.audit(
-            TierChange(
-                id=uuid4(),
-                workspace_id=ws.actor.workspace_id,
-                product_id=product_id,
-                actor_id=ws.actor.account.id,
-                actor_email=ws.actor.account.email,
-                at=ws.now,
-                target=target,
-                key=key,
-                action=action,
-                before=before,
-                after=after,
-            )
+        await audit.record(
+            ws, action=action, target_kind=kind, target_id=target_id, target_name=name, product_id=product_id, changes=changes
         )
+
+    async def _titles(self, ws: OpenWorkspace, product_id: UUID) -> dict[str, str]:
+        """Each Privilege's title now, to name a variant's values in the Audit log."""
+        return {p.key: p.title for p in await self._privileges(ws, product_id)}
 
     async def create(self, ws: OpenWorkspace, product_id: UUID, tier: NewTier, standard: VariantInput) -> TiersView:
         """Create the Tier and its standard variant in one transaction: never a Tier without its variant."""
@@ -271,7 +254,11 @@ class TierService:
         except (AlreadyExists, StaleVersion) as exc:
             raise RevisionConflict(kind="Tier", id=tier.id) from exc
         await self._audit(
-            ws, product_id, "tier", tier.id, "created", None, {"tier": _dump(record), "variants": [_dump(variant)]}
+            ws, product_id, TargetKind.TIER, tier.id, tier.name, AuditAction.CREATED,
+            [
+                *audit.diff(None, _tier_fields(record)),
+                *audit.diff(None, {"values": _dump(variant)["values"]}, titles=await self._titles(ws, product_id)),
+            ],
         )
         return await self._view(ws, product_id)
 
@@ -287,29 +274,30 @@ class TierService:
             )
         except ValidationError as exc:
             raise ValidationFailed([FieldError(_pointer(*map(str, e["loc"])), e["msg"]) for e in exc.errors()]) from exc
-        return await self._persist(ws, current, changed, "changed")
+        return await self._persist(ws, current, changed, AuditAction.CHANGED)
 
     async def archive(self, ws: OpenWorkspace, product_id: UUID, tier_id: str, *, version: int) -> TiersView:
         """Archive: it keeps serving its Organizations with all its variants; it is never given to new ones."""
         await self._open(ws, product_id, Permission.EDIT_PRODUCT)
         current = await self._tier(ws, product_id, tier_id, version)
         changed = current.model_copy(update={"archived_at": current.archived_at or ws.now, "version": version + 1})
-        return await self._persist(ws, current, changed, "archived")
+        return await self._persist(ws, current, changed, AuditAction.ARCHIVED)
 
     async def restore(self, ws: OpenWorkspace, product_id: UUID, tier_id: str, *, version: int) -> TiersView:
         await self._open(ws, product_id, Permission.EDIT_PRODUCT)
         current = await self._tier(ws, product_id, tier_id, version)
         changed = current.model_copy(update={"archived_at": None, "version": version + 1})
-        return await self._persist(ws, current, changed, "restored")
+        return await self._persist(ws, current, changed, AuditAction.RESTORED)
 
-    async def _persist(
-        self, ws: OpenWorkspace, current: TierRecord, changed: TierRecord, action: Literal["changed", "archived", "restored"]
-    ) -> TiersView:
+    async def _persist(self, ws: OpenWorkspace, current: TierRecord, changed: TierRecord, action: AuditAction) -> TiersView:
         try:
             await ws.repos.tiers.save(changed, expected_version=current.version)
         except StaleVersion as exc:
             raise RevisionConflict(kind="Tier", id=current.id) from exc
-        await self._audit(ws, current.product_id, "tier", current.id, action, {"tier": _dump(current)}, {"tier": _dump(changed)})
+        await self._audit(
+            ws, current.product_id, TargetKind.TIER, current.id, current.name, action,
+            audit.diff(_tier_fields(current), _tier_fields(changed)),
+        )
         return await self._view(ws, current.product_id)
 
     async def delete(self, ws: OpenWorkspace, product_id: UUID, tier_id: str, *, version: int) -> TiersView:
@@ -330,7 +318,7 @@ class TierService:
         except StaleVersion as exc:
             raise RevisionConflict(kind="Tier", id=tier_id) from exc
         await self._audit(
-            ws, product_id, "tier", tier_id, "deleted", {"tier": _dump(current), "variants": [_dump(v) for v in variants]}, None
+            ws, product_id, TargetKind.TIER, tier_id, current.name, AuditAction.DELETED, audit.diff(_tier_fields(current), None)
         )
         return await self._view(ws, product_id)
 
@@ -372,11 +360,11 @@ class TierService:
         await self._audit(
             ws,
             product_id,
-            "variant",
+            TargetKind.TIER_VARIANT,
             variant.id,
-            "changed" if current else "created",
-            _dump(current) if current else None,
-            _dump(saved),
+            current.name if current else saved.name,
+            AuditAction.CHANGED if current else AuditAction.CREATED,
+            audit.diff(_dump(current) if current else None, _dump(saved), titles=await self._titles(ws, product_id)),
         )
         return await self._view(ws, product_id)
 
@@ -411,13 +399,14 @@ class TierService:
             await ws.repos.tiers.save_policy(record, expected_version=version)
         except (StaleVersion, AlreadyExists) as exc:
             raise RevisionConflict(kind="status policy", id=str(product_id)) from exc
+        product = await ws.repos.products.get(product_id)
         await self._audit(
             ws,
             product_id,
-            "status-policy",
+            TargetKind.STATUS_POLICY,
             str(product_id),
-            "changed",
-            _dump(current.policy) if current else None,
-            _dump(policy),
+            product.name if product else "",
+            AuditAction.CHANGED,
+            audit.diff(_dump(current.policy) if current else None, _dump(policy)),
         )
         return await self._view(ws, product_id)

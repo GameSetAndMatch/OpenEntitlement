@@ -342,13 +342,15 @@ async def test_roles_scope_and_audit(store):
     async with store.transaction(other_ws.id) as repos:
         assert list(await repos.tiers.list(product)) == []
     async with store.transaction(ws) as repos:
-        changes = list(await repos.tiers.changes(product))
-    assert [(c.target, c.key, c.action) for c in changes] == [("tier", "pro", "created"), ("tier", "pro", "changed")]
+        entries = [e for _, e in reversed(await repos.audit.list(managed=None, limit=50))]
+    changes = [e for e in entries if e.product_id == product and e.target_kind == "Tier"]
+    assert [(c.target_id, c.target_name, c.action) for c in changes] == [("pro", "Pro", "created"), ("pro", "Pro", "changed")]
     created, changed = changes
     assert (created.actor_id, created.actor_email, created.product_id) == (owner.id, owner.email, product)
-    assert created.before is None and created.after["tier"]["name"] == "Pro"
-    assert created.after["variants"][0]["id"] == "pro_standard"
-    assert (changed.before["tier"]["name"], changed.after["tier"]["name"]) == ("Pro", "Pro plus")
+    assert [(c.field, c.before, c.after) for c in created.changes][0] == ("name", None, "Pro")
+    assert [(c.field, c.before, c.after) for c in changed.changes] == [
+        ("name", "Pro", "Pro plus"), ("gracePeriodDays", 0, 3)
+    ]
 
 
 async def test_catalog_required_privilege_and_new_variant_stay_complete(store):

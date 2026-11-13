@@ -14,9 +14,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
-from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationChange, OrganizationRecord
-from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
+from ...services.audit import AuditEntry
+from ...services.catalog import CatalogRecord, VariantValues
+from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationRecord
+from ...services.tiers import StatusPolicyRecord, TierRecord
 from ...services.models import (
     Account,
     Invitation,
@@ -24,7 +25,6 @@ from ...services.models import (
     Product,
     ProductMembership,
     Session,
-    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -37,14 +37,11 @@ class _Rows:
     variant_values: dict[tuple[UUID, UUID, str], VariantValues] = field(default_factory=dict)
     tiers: dict[tuple[UUID, UUID, str], TierRecord] = field(default_factory=dict)
     status_policies: dict[tuple[UUID, UUID], StatusPolicyRecord] = field(default_factory=dict)
-    tier_changes: list[TierChange] = field(default_factory=list)
     organizations: dict[tuple[UUID, str], OrganizationRecord] = field(default_factory=dict)
     #: (Workspace, Product, Organization) → the Organization's Tier variant in that Product.
     assignments: dict[tuple[UUID, UUID, str], AssignmentRecord] = field(default_factory=dict)
-    organization_changes: list[OrganizationChange] = field(default_factory=list)
     #: (Workspace, Product, Organization, Subject ID) → the application user's record in that Product.
     users: dict[tuple[UUID, UUID, str, str], ApplicationUserRecord] = field(default_factory=dict)
-    catalog_changes: list[CatalogChange] = field(default_factory=list)
     catalog: dict[tuple[UUID, UUID, str, str], CatalogRecord] = field(default_factory=dict)
     workspaces: dict[UUID, Workspace] = field(default_factory=dict)
     products: dict[UUID, dict[UUID, Product]] = field(default_factory=dict)
@@ -56,7 +53,8 @@ class _Rows:
     sign_in_flows: dict[str, SignInFlow] = field(default_factory=dict)
     #: Workspace → token hash → Invitation.
     invitations: dict[UUID, dict[str, Invitation]] = field(default_factory=dict)
-    settings_changes: list[SettingsChange] = field(default_factory=list)
+    #: Every Workspace's Audit log entries, in write order.
+    audit: list[AuditEntry] = field(default_factory=list)
 
 
 class InMemoryWorkspacesRepository:
@@ -212,16 +210,25 @@ class InMemoryInvitationsRepository:
         return invitation if invitation and invitation.expires_at > now else None
 
 
-class InMemorySettingsChangesRepository:
+class InMemoryAuditRepository:
     def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
         self._rows, self._workspace_id = rows, workspace_id
 
-    async def add(self, change: SettingsChange) -> None:
-        ensure_bound_workspace(self._workspace_id, change.workspace_id)
-        self._rows.settings_changes.append(change)
+    async def add(self, entry: AuditEntry) -> None:
+        ensure_bound_workspace(self._workspace_id, entry.workspace_id)
+        self._rows.audit.append(entry)
 
-    async def list(self) -> Sequence[SettingsChange]:
-        return [c for c in self._rows.settings_changes if c.workspace_id == self._workspace_id]
+    async def list(
+        self, *, managed: frozenset[UUID] | None, limit: int, before: int | None = None
+    ) -> Sequence[tuple[int, AuditEntry]]:
+        found = [
+            (position, entry)
+            for position, entry in enumerate(self._rows.audit, start=1)
+            if entry.workspace_id == self._workspace_id
+            and (before is None or position < before)
+            and (managed is None or entry.visible_to(managed))
+        ]
+        return found[::-1][:limit]
 
 
 class InMemoryAccountsRepository:
@@ -329,12 +336,6 @@ class InMemoryCatalogRepository:
             raise StaleVersion(variant_id)
         del self.rows.variant_values[key]
 
-    async def audit(self, change: CatalogChange) -> None:
-        ensure_bound_workspace(self.workspace_id, change.workspace_id)
-        self.rows.catalog_changes.append(change)
-
-    async def changes(self, product_id: UUID) -> Sequence[CatalogChange]:
-        return [c for c in self.rows.catalog_changes if (c.workspace_id, c.product_id) == (self.workspace_id, product_id)]
 
     def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
         self.rows, self.workspace_id = rows, workspace_id
@@ -411,13 +412,6 @@ class InMemoryTiersRepository:
         if (current.version if current else 0) != expected_version:
             raise StaleVersion(str(policy.product_id))
         self.rows.status_policies[key] = policy
-
-    async def audit(self, change: TierChange) -> None:
-        ensure_bound_workspace(self.workspace_id, change.workspace_id)
-        self.rows.tier_changes.append(change)
-
-    async def changes(self, product_id: UUID) -> Sequence[TierChange]:
-        return [c for c in self.rows.tier_changes if (c.workspace_id, c.product_id) == (self.workspace_id, product_id)]
 
 
 class InMemoryOrganizationsRepository:
@@ -497,13 +491,6 @@ class InMemoryOrganizationsRepository:
             raise StaleVersion(user.subject_id)
         del self.rows.users[key]
 
-    async def audit(self, change: OrganizationChange) -> None:
-        ensure_bound_workspace(self.workspace_id, change.workspace_id)
-        self.rows.organization_changes.append(change)
-
-    async def changes(self) -> Sequence[OrganizationChange]:
-        return [c for c in self.rows.organization_changes if c.workspace_id == self.workspace_id]
-
 
 class InMemoryStore:
     def __init__(self) -> None:
@@ -528,7 +515,7 @@ class InMemoryStore:
                 organizations=InMemoryOrganizationsRepository(working, workspace_id),
                 directory=InMemoryDirectoryRepository(working, account_id),
                 invitations=InMemoryInvitationsRepository(working, workspace_id),
-                settings_changes=InMemorySettingsChangesRepository(working, workspace_id),
+                audit=InMemoryAuditRepository(working, workspace_id),
             )
             self._committed = working
 

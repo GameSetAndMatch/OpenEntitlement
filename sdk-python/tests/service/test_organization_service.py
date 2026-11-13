@@ -179,15 +179,18 @@ async def test_a_reason_is_required_exactly_when_organization_terms_change(scene
         await scene.assign(terms={"seats": 81, "sso": False}, version=4)
     assert _pointers(problem) == ["/reason"]
     async with scene.open("owner") as ws:
-        changes = await ws.repos.organizations.changes()
-    assert [(c.target, c.action, c.reason) for c in changes] == [
-        ("organization", "created", None),
-        ("assignment", "created", None),
-        ("assignment", "changed", None),
-        ("assignment", "changed", "Renewal"),
-        ("assignment", "changed", None),
+        entries = [e for _, e in reversed(await ws.repos.audit.list(managed=None, limit=100))]
+    changes = [e for e in entries if e.target_kind == "Organization"]
+    assert [(c.action, c.aspect, c.reason) for c in changes] == [
+        ("created", None, None),
+        ("changed", "tier", None),
+        ("changed", None, "Renewal"),  # its terms and its status
+        # The same terms in another order changed nothing, so nothing is recorded.
     ]
-    assert changes[3].actor_email == "owner@acme.test" and changes[3].product_id == scene.analytics
+    assert changes[2].actor_email == "owner@acme.test" and changes[2].product_id == scene.analytics
+    assert [(c.field, c.title, c.before, c.after) for c in changes[2].changes] == [
+        ("status", None, "ended", "active"), ("terms.seats", "Seats", None, 80), ("terms.sso", "SSO", None, False)
+    ]
 
 
 async def test_organization_terms_belong_to_the_variant(scene: Scene) -> None:

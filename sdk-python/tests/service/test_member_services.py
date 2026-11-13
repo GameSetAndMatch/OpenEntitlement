@@ -326,12 +326,17 @@ async def test_settings_changes_record_their_actor_and_product(scene: Scene) -> 
         await scene.members.set_role(ws, scene.people["user"].id, role=InvitedRole.OWNER)
         await scene.members.remove(ws, scene.people["storage_manager"].id)
     async with scene.store.transaction(scene.workspace_id) as repos:
-        changes = await repos.settings_changes.list()
-    assert [(c.actor_email, c.action, c.target_name, c.product_id, c.before, c.after) for c in changes] == [
-        ("manager@acme.test", "invitation.created", "newcomer@acme.test", scene.analytics.id, None, "User"),
-        ("owner@acme.test", "member.role_changed", "user@acme.test", scene.analytics.id, "User", "Manager"),
-        ("owner@acme.test", "member.role_changed", "user@acme.test", None, "Manager", "Owner"),
-        ("owner@acme.test", "member.removed", "storage_manager@acme.test", None, "Manager", None),
+        entries = [e for _, e in reversed(await repos.audit.list(managed=None, limit=100))]
+    changes = [e for e in entries if e.target_kind == "Member"]
+    assert [
+        (c.actor_email, c.action, c.target_name, c.product_id, c.owners_only, [(x.product_id, x.before, x.after) for x in c.changes])
+        for c in changes
+    ] == [
+        ("manager@acme.test", "invited", "newcomer@acme.test", scene.analytics.id, False, [(None, None, "User")]),
+        ("owner@acme.test", "changed", "user@acme.test", scene.analytics.id, False, [(None, "User", "Manager")]),
+        ("owner@acme.test", "changed", "user@acme.test", None, True, [(None, "Manager", "Owner")]),
+        # Removed from the Workspace: each Product's Role is that Product's Managers' to read.
+        ("owner@acme.test", "removed", "storage_manager@acme.test", None, False, [(scene.storage.id, "Manager", None)]),
     ]
 
 

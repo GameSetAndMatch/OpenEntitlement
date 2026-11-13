@@ -17,6 +17,7 @@ from ...services.sign_in import SignInPolicy, SignInService
 from ...services.members import MemberService
 from ...services.workspaces import Deployment, WorkspaceService, utcnow
 from . import auth, problems, workspaces, catalog, members, tiers, organizations
+from . import audit
 from .oidc import OidcClient
 
 
@@ -58,6 +59,7 @@ def create_app(
     app.include_router(tiers.router)
     app.include_router(organizations.router)
     app.include_router(members.router)
+    app.include_router(audit.router)
 
     @app.get("/healthz", tags=["health"])
     async def health() -> dict[str, str]:
