@@ -57,6 +57,7 @@ Your application asks through OEREP, an open remote evaluation protocol modeled 
 | [`sdk-python/`](sdk-python/README.md) | `openentitlement-sdk`: Pydantic is the only core dependency; optional `[postgres]` extra |
 | [`sdk-js/`](sdk-js/README.md) | `@openentitlement/core`: Zod is the only dependency; `/authoring` and optional `/postgres` entry points |
 | [`console/`](console/README.md) | The entitlement service, OEREP API and administrative console |
+| [`sdk-python/packages/service/`](sdk-python/packages/service/README.md) | The Python service replacing `console/server` ([ADR-0009](ADR-0009.md)); in development on `service/python` |
 | [`website/`](website/README.md) | openentitlement.dev: landing page and documentation |
 
 ## Status

@@ -37,11 +37,41 @@ jobs:
       - run: uv sync --locked --python ${{ matrix.python }}
       - run: uv run pre-commit run uv-lock-check --all-files
       - run: uv run pre-commit run deptry --all-files
-      - run: uv run ruff check packages scripts tests/test_catalog_contract.py
+      - run: uv run ruff check packages scripts tests/test_catalog_contract.py tests/service
+      - name: Python service type check
+        run: uv run mypy --strict packages/service/src
+      - name: Python service layers (the service layer imports neither FastAPI, FastMCP nor SQLAlchemy)
+        run: uv run lint-imports
+        working-directory: sdk-python/packages/service
       - name: Committed Privilege Catalog JSON Schema matches the Pydantic models
         run: uv run python scripts/export_schemas.py --check
-      # Includes tests/test_catalog_contract.py: shared fixtures against Pydantic and the JSON Schema.
+      # Includes tests/test_catalog_contract.py: shared fixtures against Pydantic and the JSON Schema,
+      # and tests/service: the Python service against in-memory stores and Postgres, including the
+      # check that its tables and Alembic migrations do not drift.
       - run: uv run pytest -q
+
+  python-service-image:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: oe, POSTGRES_USER: oe, POSTGRES_DB: oe }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f service.Dockerfile -t openentitlement-service:ci .
+      - name: The image migrates its database at startup and answers its health check
+        run: |
+          docker run -d --name oe --network host -e PORT=8787 \
+            -e DATABASE_URL=postgresql://oe:oe@127.0.0.1:5432/oe openentitlement-service:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8787/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8787/healthz
+          curl -fsS http://127.0.0.1:8787/ | grep -qi '<!doctype html'
+          test "$(curl -s -o /dev/null -w '%{content_type}' http://127.0.0.1:8787/api/missing)" = application/problem+json
+      - if: failure()
+        run: docker logs oe
 
   typescript:
     timeout-minutes: 20

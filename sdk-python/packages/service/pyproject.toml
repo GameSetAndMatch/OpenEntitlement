@@ -1,0 +1,60 @@
+[project]
+name = "openentitlement-service"
+version = "0.0.0"
+description = "OpenEntitlement reference service: HTTP API and console host, in three layers (ADR-0009)."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.12,<3",
+  "fastapi>=0.115",
+  "starlette>=0.40",
+  "uvicorn>=0.30",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30",
+  "alembic>=1.14",
+]
+
+[project.scripts]
+openentitlement-service = "openentitlement_service.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openentitlement_service"]
+
+[tool.deptry]
+known_first_party = ["openentitlement_service"]
+
+[tool.deptry.per_rule_ignores]
+# SQLAlchemy loads asyncpg by name from the postgresql+asyncpg:// URL.
+DEP002 = ["asyncpg"]
+
+# The service layer imports neither web frameworks nor the database toolkit (ADR-0009).
+[tool.importlinter]
+root_package = "openentitlement_service"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Interfaces -> repositories -> service layer"
+type = "layers"
+layers = [
+  "openentitlement_service.main",
+  "openentitlement_service.interfaces",
+  "openentitlement_service.repositories",
+  "openentitlement_service.services",
+]
+
+[[tool.importlinter.contracts]]
+name = "The service layer imports neither FastAPI, FastMCP nor SQLAlchemy"
+type = "forbidden"
+source_modules = ["openentitlement_service.services"]
+forbidden_modules = ["fastapi", "fastmcp", "starlette", "sqlalchemy", "asyncpg", "alembic", "uvicorn"]
+
+[[tool.importlinter.contracts]]
+name = "Repositories know nothing of the interfaces"
+type = "forbidden"
+source_modules = ["openentitlement_service.repositories"]
+forbidden_modules = ["fastapi", "fastmcp", "starlette", "uvicorn"]
