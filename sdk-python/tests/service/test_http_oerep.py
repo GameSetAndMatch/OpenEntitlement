@@ -1,5 +1,6 @@
 """API keys per Product and product-scoped OEREP 0.1 on the HTTP API (OPE-42, RFC-0005, spec §10)."""
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from test_http_organizations import _offer
@@ -44,6 +45,16 @@ async def test_api_keys_are_per_product_and_shown_once(store):
         listed = (await client.get(f"{product}/api-keys")).json()
         assert [(k["id"], k["name"], k["preview"]) for k in listed] == [(key["id"], "Billing app", key["preview"])]
         assert "secret" not in listed[0], "the secret is shown once"
+        async with store.transaction(UUID(product.split('/products/')[0].rsplit('/', 1)[-1])) as repos:
+            stored = await repos.api_keys.get(UUID(key['id']))
+            assert stored is not None and stored.token_hash != key['secret']
+            events = [e for e in await repos.settings_changes.list() if e.action == 'api-key.created']
+            assert len(events) == 1 and events[0].actor_email == 'alice@acme.test'
+            assert events[0].actor_id == stored.created_by and events[0].product_id == stored.product_id
+        # A transaction in another Workspace cannot find the key, even by its hash.
+        async with store.transaction(UUID(int=1)) as repos:
+            assert await repos.api_keys.get(stored.id) is None
+            assert await repos.api_keys.find(stored.token_hash) is None
 
         invalid = await client.post(f"{product}/api-keys", json={"name": "  "})
         assert invalid.status_code == 400 and _pointers(invalid) == ["/name"]
@@ -144,7 +155,7 @@ async def test_checks_run_in_order_401_then_403_then_404(store):
             bodies = set()
             for wrong in (path.replace(product_key, "storage"), path.replace(product_key, "missing"), path.replace(product_key, "Not A Key")):
                 problem = _problem(await client.post(wrong, json=CONTEXT, headers=app), 403, "product-forbidden")
-                bodies.add((problem["title"], problem["detail"]))
+                bodies.add(__import__("json").dumps(problem, sort_keys=True))
             assert len(bodies) == 1
         unknown = _oerep("storage", "nothing")
         _problem(await client.post(unknown, json=CONTEXT, headers=app), 403, "product-forbidden")
@@ -159,6 +170,8 @@ async def test_checks_run_in_order_401_then_403_then_404(store):
         _problem(big, 413, "request-too-large")
         broken = await client.post(_oerep(product_key, "seats"), content=b"{", headers=app | {"content-type": "application/json"})
         assert _problem(broken, 400, "validation-failed")["errors"] == [{"pointer": "", "detail": "Send valid JSON."}]
+        for body in ([], 1, "invalid"):
+            _problem(await client.post(_oerep(product_key, "seats", "upgrade"), json=body, headers=app), 400, "validation-failed")
         # The protocol before Products is gone.
         _problem(await client.post("/oerep/v1/resolve/seats", json=CONTEXT, headers=app), 404, "not-found")
         _problem(await client.get(_oerep(product_key, "seats"), headers=app), 405, "method-not-allowed")
@@ -182,3 +195,27 @@ async def test_the_same_privilege_key_in_two_products_never_mixes(store):
         assert (await client.post(_oerep("storage", "seats"), json=CONTEXT, headers=storage_app)).json()["reason"] == "DEFAULT"
         _problem(await client.post(_oerep("storage", "seats"), json=CONTEXT, headers=analytics_app), 403, "product-forbidden")
         _problem(await client.post(_oerep(analytics_key, "seats"), json=CONTEXT, headers=storage_app), 403, "product-forbidden")
+
+
+async def test_product_managers_can_manage_only_their_keys_and_users_cannot(store):
+    async with _client(store) as (owner, product):
+        workspace = product.split('/products/')[0]
+        product_id = product.rsplit('/', 1)[-1]
+        async with _client(store, 'bob') as (manager, _):
+            invitation = (await owner.post(workspace + '/invitations', json={
+                'email': 'bob@acme.test', 'role': 'Manager', 'productId': product_id
+            })).json()
+            assert (await manager.post('/api/invitations/accept', json={'token': invitation['token']})).status_code == 200
+            key = await _key(manager, product)
+            assert (await manager.delete(product + '/api-keys/' + key['id'])).status_code == 204
+            async with _client(store, 'carol') as (reader, _):
+                invitation = (await owner.post(workspace + '/invitations', json={
+                    'email': 'carol@acme.test', 'role': 'User', 'productId': product_id
+                })).json()
+                assert (await reader.post('/api/invitations/accept', json={'token': invitation['token']})).status_code == 200
+                for response in (
+                    await reader.get(product + '/api-keys'),
+                    await reader.post(product + '/api-keys', json={'name': 'forbidden'}),
+                    await reader.delete(product + '/api-keys/' + key['id']),
+                ):
+                    _problem(response, 403, 'permission-denied')

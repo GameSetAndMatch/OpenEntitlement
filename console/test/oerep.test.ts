@@ -1,3 +1,4 @@
+import { legacyOerepFetch } from "./legacy-oerep-adapter.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
@@ -9,7 +10,7 @@ const catalog = Catalog.fromJSON(JSON.parse(readFileSync(new URL("../../spec/ass
 let service: Awaited<ReturnType<typeof startServer>>;
 before(async () => { service = await startServer({ ...configFromEnv(), port: 0, provider: "memory", seedDemo: true, evalToken: "eval-test", adminToken: "admin-test" }); });
 after(async () => service?.close());
-const client = () => createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, token: "eval-test" }) });
+const client = () => createClient({ catalog, provider: new RemoteProvider({ product: "demo", fetch: legacyOerepFetch, baseUrl: service.url, token: "eval-test" }) });
 async function post(path: string, body: unknown, token = "eval-test") {
   return fetch(`${service.url}/oerep/v1/${path}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
 }
@@ -59,16 +60,16 @@ test("data plane enforces token separation, request validation and method errors
 });
 
 test("auth failures, outages, timeouts and malformed wire metadata fail closed", async () => {
-  const badAuth = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, token: "wrong" }) });
+  const badAuth = createClient({ catalog, provider: new RemoteProvider({ product: "demo", fetch: legacyOerepFetch, baseUrl: service.url, token: "wrong" }) });
   assert.equal((await badAuth.getDetails("seat_max", { organizationId: "acme" })).reason, Reason.ERROR);
-  const malformed = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 999, reason: "PLAN", grants: [{ id: "g", amount: -10 }], staleOverrides: [] })) }) });
+  const malformed = createClient({ catalog, provider: new RemoteProvider({ product: "demo", baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 999, reason: "PLAN", grants: [{ id: "g", amount: -10 }], staleOverrides: [] })) }) });
   const d = await malformed.getDetails("seat_max", { organizationId: "acme" });
   assert.equal(d.reason, Reason.ERROR); assert.equal(d.errorCode, ErrorCode.GENERAL); assert.equal(d.requiredPlan, undefined);
   const p = catalog.privilege("seat_max")!;
   assert.throws(() => decodeRemoteDetails({ privilege: "other", value: 10, reason: "PLAN", grants: [], staleOverrides: [] }, p));
-  const slow = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, timeoutMs: 1, fetch: async (_url, init) => { await new Promise((resolve) => setTimeout(resolve, 10)); init!.signal!.throwIfAborted(); throw new Error("unreachable"); } }) });
+  const slow = createClient({ catalog, provider: new RemoteProvider({ product: "demo", baseUrl: service.url, timeoutMs: 1, fetch: async (_url, init) => { await new Promise((resolve) => setTimeout(resolve, 10)); init!.signal!.throwIfAborted(); throw new Error("unreachable"); } }) });
   assert.equal((await slow.getDetails("seat_max", { organizationId: "acme" })).reason, Reason.ERROR);
-  const down = createClient({ catalog, provider: new RemoteProvider({ baseUrl: "http://127.0.0.1:1" }) });
+  const down = createClient({ catalog, provider: new RemoteProvider({ product: "demo", fetch: legacyOerepFetch, baseUrl: "http://127.0.0.1:1" }) });
   assert.equal((await down.getDetails("seat_max", { organizationId: "acme" })).reason, Reason.ERROR);
 });
 
@@ -87,7 +88,7 @@ test("Postgres service persists administrative changes across restart", { skip: 
     await admin(`organizations/${org}/plan`, { planId: plan, reason: "test" });
     await running.close();
     running = await startServer(cfg);
-    const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: running.url, token: "eval-test" }) });
+    const c = createClient({ catalog, provider: new RemoteProvider({ product: "demo", fetch: legacyOerepFetch, baseUrl: running.url, token: "eval-test" }) });
     assert.equal(await c.getLimit("seat_max", { organizationId: org }), 42);
   } finally {
     await running.close();
@@ -114,11 +115,11 @@ test("malformed requests return protocol errors without terminating the service"
 test("remote quota checks reject grants for another subject and never exceed the resolved value", async () => {
   // A personal grant above the resolved value is consistent once a base may be negative (-90 + 100 = 10),
   // but it still never allows more than the resolved value.
-  const personal = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants: [{ id: "g", amount: 100, subjectId: "alice" }], staleOverrides: [] })) }) });
+  const personal = createClient({ catalog, provider: new RemoteProvider({ product: "demo", baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants: [{ id: "g", amount: 100, subjectId: "alice" }], staleOverrides: [] })) }) });
   await personal.requireWithin("seat_max", 0, 10, { organizationId: "acme", subjectId: "alice" });
   await assert.rejects(personal.requireWithin("seat_max", 0, 11, { organizationId: "acme", subjectId: "alice" }));
   for (const grants of [[{ id: "g", amount: 100, subjectId: "bob" }], [{ id: "g", amount: 5 }, { id: "g", amount: 5 }]]) {
-    const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants, staleOverrides: [] })) }) });
+    const c = createClient({ catalog, provider: new RemoteProvider({ product: "demo", baseUrl: service.url, fetch: async () => new Response(JSON.stringify({ privilege: "seat_max", value: 10, reason: "GRANT", grants, staleOverrides: [] })) }) });
     const ctx = { organizationId: "acme", subjectId: "alice" };
     const details = await c.getDetails("seat_max", ctx);
     assert.equal(details.reason, Reason.ERROR);

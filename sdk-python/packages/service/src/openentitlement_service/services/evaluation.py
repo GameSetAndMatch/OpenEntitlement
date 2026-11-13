@@ -188,8 +188,8 @@ class Evaluation:
         Each candidate is judged by its standard variant's value; Tier variants are never candidates.
         """
         sdk = definition(privilege)
-        need = _need(sdk, body)
         ctx, facts, assignment, user = await self._load(body)
+        need = _need(sdk, body)
         details = self._resolve(privilege, ctx, facts, assignment, user)
         # A failed evaluation never suggests an upgrade (§10.2.2); no Tier lifts an environment veto.
         if details.reason in (Reason.ERROR, Reason.FIXED):

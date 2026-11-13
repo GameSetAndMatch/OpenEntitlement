@@ -13,7 +13,7 @@ Every API key evaluates one Product: the one it was created for. This problem an
   "title": "Product not allowed for this key",
   "status": 403,
   "detail": "This API key cannot evaluate this Product. Each key evaluates the one Product it was created for.",
-  "instance": "/oerep/v1/products/storage/privileges/seats/resolve"
+  "instance": "/oerep/v1"
 }
 ```
 

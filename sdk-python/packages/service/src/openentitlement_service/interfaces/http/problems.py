@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from ...services.problems import (
+    ProductForbidden,
     FieldError,
     InternalError,
     MethodNotAllowed,
@@ -73,10 +74,13 @@ async def problem_handler(request: Request, exc: Exception) -> JSONResponse:
         "title": problem.title,
         "status": problem.status,
         "detail": problem.detail,
-        "instance": request.url.path,
+        "instance": "/oerep/v1" if isinstance(problem, ProductForbidden) else request.url.path,
         **problem.params,
     }
-    return JSONResponse(body, status_code=problem.status, media_type=PROBLEM_JSON, headers=problem.headers)
+    headers = dict(problem.headers or {})
+    if request.url.path.startswith("/oerep/"):
+        headers["Cache-Control"] = "no-store"
+    return JSONResponse(body, status_code=problem.status, media_type=PROBLEM_JSON, headers=headers)
 
 
 def install(app: FastAPI) -> None:

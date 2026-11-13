@@ -18,6 +18,13 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # RFC-0005: retained Grants can exist without an assignment. Keep the Product and
+    # Organization boundaries as composite foreign keys rather than the assignment FK.
+    op.drop_constraint("fk_application_users_product_id_organization_products", "application_users", type_="foreignkey")
+    op.create_foreign_key("fk_application_users_workspace_id_products", "application_users", "products",
+                          ["workspace_id", "product_id"], ["workspace_id", "id"], ondelete="CASCADE")
+    op.create_foreign_key("fk_application_users_workspace_id_organizations", "application_users", "organizations",
+                          ["workspace_id", "organization_id"], ["workspace_id", "key"], ondelete="CASCADE")
     op.create_table(
         "api_keys",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -46,3 +53,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("api_keys")
+    # Retained facts must be exported or removed before reverting this amendment.
+    op.drop_constraint("fk_application_users_workspace_id_products", "application_users", type_="foreignkey")
+    op.drop_constraint("fk_application_users_workspace_id_organizations", "application_users", type_="foreignkey")
+    op.create_foreign_key("fk_application_users_product_id_organization_products", "application_users", "organization_products",
+                          ["product_id", "organization_id"], ["product_id", "organization_id"], ondelete="CASCADE")

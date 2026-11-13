@@ -80,6 +80,7 @@ def parse_key(secret: str) -> tuple[UUID, str] | None:
 class ApiKeyService:
     async def _product(self, ws: OpenWorkspace, product_id: UUID) -> Product:
         ws.actor.require(Permission.EDIT_PRODUCT, product_id)
+        await ws.repos.catalog.lock(product_id)
         product = await ws.repos.products.get(product_id)
         if product is None:
             raise NotFound("This Product does not exist or you have no Role in it.")

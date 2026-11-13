@@ -1,4 +1,4 @@
-/** Generic OEREP v1 HTTP provider with an opt-in short-lived decision cache and no vendor dependencies. */
+/** Generic OEREP 0.1 HTTP provider with an opt-in short-lived decision cache and no vendor dependencies. */
 import { validateValue, type PrivilegeDefinition } from "./catalog.ts";
 import { ErrorCode, Reason, type ResolvedContext, type ResolutionDetails } from "./details.ts";
 import type { Provider, ResolveOptions } from "./provider.ts";
@@ -7,6 +7,7 @@ import { decodeValue, isInt, isUnlimited } from "./values.ts";
 
 export interface RemoteProviderOptions {
   baseUrl: string;
+  product: string;
   token?: string;
   timeoutMs?: number;
   /**
@@ -59,6 +60,25 @@ export function decodeRemoteDetails(raw: unknown, p: PrivilegeDefinition, ctx?: 
   return out;
 }
 
+/** RFC 9457 transport failure. The HTTP status is authoritative. */
+export class OerepProblem extends Error {
+  readonly type: string;
+  readonly detail: string;
+  readonly title: string;
+  readonly members: Record<string, unknown>;
+  readonly status: number;
+  constructor(status: number, raw: unknown) {
+    const p = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    const type = typeof p.type === "string" ? p.type : "about:blank";
+    super(`OEREP ${status} ${type}`);
+    this.status = status;
+    this.type = type;
+    this.title = typeof p.title === "string" ? p.title : "";
+    this.detail = typeof p.detail === "string" ? p.detail : "";
+    this.members = { ...p };
+  }
+}
+
 export class RemoteProvider implements Provider {
   readonly metadata = { name: "oerep" };
   readonly capabilities = { overrides: true, grants: true, planCatalog: true, mutations: false, fixed: false };
@@ -70,6 +90,7 @@ export class RemoteProvider implements Provider {
   /** Insertion order is recency order: the first key is least recently used. */
   readonly #cache = new Map<string, { expiresAt: number; details: ResolutionDetails }>();
   constructor(options: RemoteProviderOptions) {
+    if (typeof options.product !== "string" || options.product.trim() !== options.product || !/^[a-z][a-z0-9_]*$/.test(options.product)) throw new Error("product must be a Product key");
     const url = new URL(options.baseUrl);
     if (!["http:", "https:"].includes(url.protocol) || url.search || url.hash || url.username || url.password)
       throw new Error("baseUrl must be an HTTP(S) URL without credentials, query or fragment");
@@ -95,7 +116,7 @@ export class RemoteProvider implements Provider {
   /** The entry key, or undefined when this request must bypass the cache. */
   #key(privilege: string, ctx: BulkContext): string | undefined {
     if (this.#ttl === undefined) return undefined;
-    return JSON.stringify([privilege, ctx.organizationId, ctx.subjectId ?? null, ctx.resourceId ?? null]);
+    return JSON.stringify([this.#options.product, privilege, ctx.organizationId, ctx.subjectId ?? null, ctx.resourceId ?? null]);
   }
   #get(key: string): ResolutionDetails | undefined {
     const entry = this.#cache.get(key);
@@ -118,12 +139,16 @@ export class RemoteProvider implements Provider {
     }
   }
   async #post(path: string, body: unknown): Promise<any> {
-    const response = await (this.#options.fetch ?? globalThis.fetch)(`${this.#url}/oerep/v1/${path}`, {
+    const response = await (this.#options.fetch ?? globalThis.fetch)(`${this.#url}/oerep/v1/products/${encodeURIComponent(this.#options.product)}/privileges/${path}`, {
       method: "POST", redirect: "error",
       headers: { "content-type": "application/json", ...(this.#options.token ? { authorization: `Bearer ${this.#options.token}` } : {}) },
       body: JSON.stringify(body), signal: AbortSignal.timeout(this.#options.timeoutMs ?? 5000),
     });
-    if (!response.ok) throw new Error(`OEREP HTTP ${response.status}`);
+    if (!response.ok) {
+      let problem: unknown;
+      try { problem = await response.json(); } catch { /* An invalid error body still fails closed. */ }
+      throw new OerepProblem(response.status, problem);
+    }
     return response.json();
   }
   /** `{ fresh: true }` skips a cached entry and refreshes it with the server's current value. */
@@ -132,12 +157,12 @@ export class RemoteProvider implements Provider {
     const hit = key === undefined || options?.fresh ? undefined : this.#get(key);
     if (hit) return hit;
     if (key !== undefined) this.#cache.delete(key);
-    const d = decodeRemoteDetails(await this.#post(`resolve/${encodeURIComponent(p.key)}`, { context: ctx }), p, ctx);
+    const d = decodeRemoteDetails(await this.#post(`${encodeURIComponent(p.key)}/resolve`, { context: ctx }), p, ctx);
     if (key !== undefined) this.#put([[key, d]]);
     return d;
   }
   /**
-   * Resolve every listed privilege with one bulk request (`POST /oerep/v1/resolve`); pass `catalog.privileges`.
+   * Resolve every listed privilege with one bulk request (`POST /oerep/v1/products/{product}/privileges/resolve`); pass `catalog.privileges`.
    * Results for privileges the local catalog does not declare are ignored; any invalid entry fails the call.
    * With a cache, results fill the per-privilege entries later single resolutions read.
    */
@@ -168,7 +193,7 @@ export class RemoteProvider implements Provider {
   }
   /** Upgrade suggestions are never cached. */
   async suggestPlan(p: PrivilegeDefinition, need: Need, ctx: ResolvedContext): Promise<string | undefined> {
-    const d = await this.#post(`suggest/${encodeURIComponent(p.key)}`, { context: ctx, need });
+    const d = await this.#post(`${encodeURIComponent(p.key)}/upgrade`, { context: ctx, need });
     if (!d || !(d.requiredPlan === null || (typeof d.requiredPlan === "string" && d.requiredPlan)))
       throw new Error("invalid OEREP suggestion");
     return d.requiredPlan ?? undefined;

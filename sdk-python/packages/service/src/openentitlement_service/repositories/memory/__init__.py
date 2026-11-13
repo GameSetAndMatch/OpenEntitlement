@@ -135,6 +135,8 @@ class InMemoryProductsRepository:
         invitations = self._rows.invitations.get(self._workspace_id, {}) if self._workspace_id else {}
         for token_hash in [k for k, i in invitations.items() if i.product_id == product_id]:
             del invitations[token_hash]
+        for user_key in [k for k in self._rows.users if k[:2] == (self._workspace_id, product_id)]:
+            del self._rows.users[user_key]
         keys = self._rows.api_keys.get(self._workspace_id, {}) if self._workspace_id else {}
         for key_id in [k for k, key in keys.items() if key.product_id == product_id]:
             del keys[key_id]
@@ -523,8 +525,10 @@ class InMemoryOrganizationsRepository:
 
     async def save_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
         ensure_bound_workspace(self.workspace_id, user.workspace_id)
-        if (user.workspace_id, user.product_id, user.organization_id) not in self.rows.assignments:
-            raise LookupError("the Organization has no Tier variant in this Product")
+        if user.product_id not in self.rows.products.get(user.workspace_id, {}):
+            raise LookupError("unknown Product")
+        if (user.workspace_id, user.organization_id) not in self.rows.organizations:
+            raise LookupError("unknown Organization")
         key = (user.workspace_id, user.product_id, user.organization_id, user.subject_id)
         current = self.rows.users.get(key)
         if current is not None and expected_version == 0:

@@ -26,8 +26,9 @@ async def list_keys(product_id: UUID, workspace: WorkspaceAccess) -> Sequence[Ap
 
 
 @router.post("", status_code=201)
-async def create_key(product_id: UUID, body: ApiKeyCreation, workspace: WorkspaceAccess) -> NewApiKey:
+async def create_key(product_id: UUID, body: ApiKeyCreation, workspace: WorkspaceAccess, response: Response) -> NewApiKey:
     """A new key that evaluates only this Product. Its secret is in this response and never again."""
+    response.headers["Cache-Control"] = "no-store"
     return await service.create(workspace, product_id, name=body.name)
 
 

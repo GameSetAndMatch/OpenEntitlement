@@ -1,6 +1,6 @@
 # RFC-0005: Product-scoped remote evaluation
 
-- **Status:** accepted direction (2026-11-12); all design questions answered. Not implemented. Follows [ADR-0008](../../ADR-0008.md).
+- **Status:** accepted direction (2026-11-12); all design questions answered. Implemented preview on `service/python` by OPE-42; not yet released. Follows [ADR-0008](../../ADR-0008.md).
 - **Version:** amends OEREP in the draft specification 0.1. It is not a new protocol version: the specification is pre-1.0 (minor versions may break compatibility) and has no production users.
 - **Date:** 2026-11-12
 - **Tracks:** [PRD.md](../../PRD.md)
@@ -78,7 +78,7 @@ The implementation must add Gherkin scenarios covering:
 
 ### Implementation handoff
 
-This RFC is accepted direction only. Before the change is described as implemented, these change together in one release:
+OPE-42 implements the following together on the `service/python` integration branch. The coordinated amendment is not a released contract until that branch ships:
 - §10 and the protocol name (OEREP 0.1), including the Problem Details error shape that replaces `{error, message}` in Requirement 10.1.2;
 - `spec/oerep.openapi.json`, including the new routes and 403 responses;
 - both SDKs' `RemoteProvider`, including reading Problem Details;
