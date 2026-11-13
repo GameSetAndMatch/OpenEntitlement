@@ -241,6 +241,9 @@ class MemberService:
             raise ValidationFailed([FieldError("/productId", "Choose the Product to remove this member from.")])
         if role is not None:
             _role_and_product(role, product_id)
+        # Serialize membership changes in the Workspace: every check below reads Roles that a
+        # concurrent change could otherwise make stale (last Owner, last Role, Owner promotion).
+        await ws.repos.workspaces.lock()
         if role is InvitedRole.OWNER:
             ws.actor.require(Permission.MANAGE_OWNERS)
             member = await self._member(ws, account_id)
@@ -255,8 +258,6 @@ class MemberService:
         assert product_id is not None
         ws.actor.require(Permission.MANAGE_MEMBERS, product_id)
         await self._existing_product(ws, product_id)
-        # Serialize membership changes, so concurrent clears cannot both see another Role remaining.
-        await ws.repos.workspaces.lock()
         member = await self._member(ws, account_id)
         before = await self._role(ws, member, product_id)
         if member.owner:

@@ -50,3 +50,44 @@ async def test_concurrently_clearing_a_members_last_roles_removes_them(postgres_
         assert (await member.get(base)).status_code == 404
         await member.aclose()
     await owner.aclose()
+
+
+async def test_promoting_an_owner_and_clearing_their_role_concurrently_never_loses_the_owner(postgres_store: PostgresStore) -> None:
+    issuer = FakeIssuer()
+    app = create_app(
+        postgres_store,
+        sign_in=SignInSettings(oidc=OidcSettings(app_url=APP, issuer=ISSUER, client_id=CLIENT_ID)),
+        oidc_transport=issuer.transport,
+    )
+
+    async def person(subject: str) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=APP)
+        login = await client.get("/auth/login")
+        assert (await client.get(issuer.authorize(login.headers["location"], subject))).status_code == 302
+        client.headers.update({"origin": APP, "x-oe-csrf": (await client.get("/api/session")).json()["csrf"]})
+        return client
+
+    async def join(client: httpx.AsyncClient, email: str, role: str) -> str:
+        link = (await owner.post(base + "/invitations", json={"email": email, "role": role, "productId": product})).json()
+        assert (await client.post("/api/invitations/accept", json={"token": link["token"]})).status_code == 200
+        account_id: str = (await client.get("/api/session")).json()["account"]["id"]
+        return account_id
+
+    owner = await person("alice")
+    workspace = (await owner.post("/api/workspaces", json={"name": "Acme"})).json()
+    base, product = f"/api/workspaces/{workspace['id']}", workspace["products"][0]["id"]
+    manager = await person("manager")
+    await join(manager, "manager@acme.test", "Manager")
+    members = [await join(await person(f"member{i}"), f"member{i}@acme.test", "User") for i in range(8)]
+    promoted, cleared = await asyncio.gather(
+        asyncio.gather(*(owner.put(f"{base}/members/{m}", json={"role": "Owner"}) for m in members)),
+        asyncio.gather(*(manager.put(f"{base}/members/{m}", json={"role": None, "productId": product}) for m in members)),
+    )
+    listed = {m["id"]: m for m in (await owner.get(base + "/members")).json()}
+    for account_id, promote, clear in zip(members, promoted, cleared, strict=True):
+        if promote.status_code == 204:
+            # Promoted first: the Manager may not change an Owner, and the Owner remains.
+            assert clear.status_code == 403 and listed[account_id]["owner"] is True
+        else:
+            # Cleared first: the member left, so there is nobody to promote.
+            assert (clear.status_code, promote.status_code) == (204, 404) and account_id not in listed
