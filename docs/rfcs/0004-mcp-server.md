@@ -87,7 +87,7 @@ Each tool call records a product event (`mcp_tool_called`, with `tool` and `work
 - **Opt-in:** an Account belonging to two Workspaces, one with MCP enabled, sees only that one in `list_workspaces`. Selecting the other is refused. When the Owner disables MCP, the next tool call in an existing session is refused.
 - **Boundary case:** a User-role Account calls `set_organization_terms` and is refused with the same Permission error as the console. A preview applied after another change to the Workspace fails with a conflict, and nothing changes.
 
-- **Manager authority:** a Manager may explain an Organization's decision but cannot preview or apply `set_organization_terms`; it receives the same Permission refusal as the console. This RFC does not expand the Manager Role.
+- **Manager authority:** *superseded by [ADR-0008](../../ADR-0008.md).* A Manager may preview and apply `set_organization_terms` for the Products they manage, exactly as in the console; for any other Product it receives the same Permission refusal as the console. MCP never grants more than the console.
 - **Preview identity:** another Account or OAuth client cannot apply a preview. Switching Workspaces invalidates the old preview; the change ID cannot be used to bypass selection.
 - **Revocation:** removing membership, demoting the Account or disabling MCP between preview and apply refuses the change, even when the Workspace revision is otherwise unchanged.
 - **Expiry and replay:** an expired preview makes no change. Two concurrent applications of a valid preview commit at most once; subsequent replay is refused and produces no second mutation audit entry.

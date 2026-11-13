@@ -10,10 +10,13 @@ Start with [VISION.md](../VISION.md) for purpose and boundaries, and [GLOSSARY.m
 | [ADR-0004](../ADR-0004.md) | Accepted: boolean-only restrictive environment prerequisites, separate visibility, usage/billing boundaries |
 | [ADR-0005](../ADR-0005.md) | Accepted: user-scoped inheritance and Cloud capability packaging; its optional typed authoring is superseded by ADR-0006 |
 | [ADR-0006](../ADR-0006.md) | Accepted: core SDK dependency rule (only Pydantic/Zod), Pydantic models everywhere in Python, camelCase JSON with language-idiomatic attributes, Python ≥ 3.11; supersedes parts of ADR-0001/0003/0005 |
+| [ADR-0007](../ADR-0007.md) | Accepted, not implemented: the Audit log is readable by Managers and Owners only, shows actor emails, and each entry records what it changed (kind, ID and name at that moment) |
+| [ADR-0008](../ADR-0008.md) | Accepted, not implemented: a Workspace sells one or more Products, each with its own Catalog and Tiers; Organizations get one Tier variant per Product; API keys belong to one Product; supersedes ADR-0005's one-Catalog sentence |
 | [RFC-0001](rfcs/0001-entitlements-v0.2.md) | Proposed historical contract refinement; retain unresolved parts explicitly, not as implemented requirements |
 | [RFC-0002](rfcs/0002-privilege-catalog.md) | Accepted reference authoring contract; not a normative OEREP version bump |
 | [RFC-0003](rfcs/0003-consumption-dashboard.md) | Proposed read-only consumption view; blocked on a real application/metering usage source |
 | [RFC-0004](rfcs/0004-mcp-server.md) | Accepted direction: MCP server for the Workspace control plane (per-Account sign-in, Workspace opt-in, same Permissions, previewed writes, no deletes); not implemented |
+| [RFC-0005](rfcs/0005-product-scoped-evaluation.md) | Accepted direction, not implemented: amends OEREP 0.1 so requests name the Product and Privilege in the path (`/oerep/v1/products/{product}/privileges/{privilege}/resolve`), `suggest` becomes `upgrade`, and keys are bound to one Product |
 | [Normative specification](../spec/README.md) | Released/draft version stated by the spec itself governs compatible SDK/wire behavior |
 | [Revenera spike](research/revenera-connector-spike.md) | Research: read-only connector feasibility, API beta caveat and runtime allocation boundaries |
 | [Prior-art matrix](research/vendor-data-model-matrix.md) | Research evidence/inference, not product requirements or certified compatibility |
