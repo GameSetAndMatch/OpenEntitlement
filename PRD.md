@@ -110,6 +110,10 @@ Primary users:
 | GitHub organization `open-entitlement`, avatar, repository links | ✅ | #29 |
 | Trusted publishers on PyPI and npm moved to the `open-entitlement` owner | 👤 | `docs/maintainers/` |
 
+## Python service decision handoff
+
+[ADR-0010](ADR-0010.md) records Q1–Q14 as approved direction without marking implementation tickets Done. Q13 (delete-user reason from URL to body) is 📋 a focused follow-up pending tracker reconciliation. Q14 / OPE-52 is 👤 pending research with 3–5 unfamiliar developers; participants are unnamed and no outreach is authorized. Linear updates were unavailable in this session.
+
 ## Open owner actions
 
 1. On PyPI and npm, change the trusted publisher owner from `GameSetAndMatch` to `open-entitlement` before the next release.
