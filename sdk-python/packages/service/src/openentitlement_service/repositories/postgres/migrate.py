@@ -12,6 +12,7 @@ import asyncio
 import os
 import sys
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from alembic import command
@@ -30,9 +31,8 @@ def alembic_config(url: str) -> Config:
     return config
 
 
-def _run(fn: object) -> None:
+def _run(fn: Callable[[], object]) -> None:
     """Run an Alembic command, on its own thread when an event loop is already running here."""
-    assert callable(fn)
     try:
         asyncio.get_running_loop()
     except RuntimeError:

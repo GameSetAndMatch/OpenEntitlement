@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from ...services.models import Product, Workspace
-from ...services.repositories import Repositories
+from ...services.repositories import Repositories, ensure_bound_workspace
 
 
 @dataclass
@@ -28,8 +28,7 @@ class InMemoryWorkspacesRepository:
         self._rows, self._workspace_id = rows, workspace_id
 
     async def add(self, workspace: Workspace) -> None:
-        if workspace.id != self._workspace_id:
-            raise PermissionError("a transaction can only write its own Workspace")
+        ensure_bound_workspace(self._workspace_id, workspace.id)
         self._rows.workspaces[workspace.id] = workspace
 
     async def get(self) -> Workspace | None:
@@ -41,8 +40,7 @@ class InMemoryProductsRepository:
         self._rows, self._workspace_id = rows, workspace_id
 
     async def add(self, product: Product) -> None:
-        if product.workspace_id != self._workspace_id:
-            raise PermissionError("a transaction can only write its own Workspace")
+        ensure_bound_workspace(self._workspace_id, product.workspace_id)
         self._rows.products.setdefault(self._workspace_id, {})[product.id] = product
 
     async def list(self) -> Sequence[Product]:

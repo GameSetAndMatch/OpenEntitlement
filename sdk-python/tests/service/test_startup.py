@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import psycopg
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import make_url
 
@@ -27,14 +28,31 @@ def test_settings_come_from_the_environment(tmp_path) -> None:  # type: ignore[n
     )
 
 
-def test_defaults_listen_locally_without_a_database() -> None:
+def test_defaults_listen_locally() -> None:
     settings = Settings.from_env({})
-    assert (settings.port, settings.host, settings.database_url, settings.transaction_pooler) == (
+    assert (settings.port, settings.host, settings.database_url, settings.in_memory, settings.transaction_pooler) == (
         8787,
         "127.0.0.1",
         None,
         False,
+        False,
     )
+
+
+def test_refuses_to_start_without_a_database_unless_memory_is_chosen() -> None:
+    with pytest.raises(SystemExit, match="DATABASE_URL"):
+        build_app(Settings.from_env({}))
+    with TestClient(build_app(Settings.from_env({"OE_IN_MEMORY": "true"}))) as client:
+        assert client.get("/healthz").json() == {"status": "ok"}
+
+
+def test_warns_when_the_database_role_could_bypass_row_level_security(
+    migrated_postgres_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    # The test role is a superuser, like the default role of the postgres image.
+    with TestClient(build_app(Settings(database_url=migrated_postgres_url))):
+        pass
+    assert "bypass row-level security" in caplog.text
 
 
 def test_service_applies_its_migrations_at_startup(fresh_database_url: str) -> None:

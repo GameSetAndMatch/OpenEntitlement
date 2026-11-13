@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 
 from ...services.models import Product, Workspace
 from ...services.problems import ServiceUnavailable
-from ...services.repositories import Repositories
+from ...services.repositories import Repositories, ensure_bound_workspace
 from .migrate import migrate
 from .rls import SERVICE_ROLE, WORKSPACE_SETTING
 from .tables import products, workspaces
@@ -54,9 +54,8 @@ class PostgresWorkspacesRepository:
         self.connection, self._workspace_id = connection, workspace_id
 
     async def add(self, workspace: Workspace) -> None:
-        if workspace.id != self._workspace_id:
-            raise PermissionError("a transaction can only write its own Workspace")
-        await self.connection.execute(workspaces.insert().values(**workspace.model_dump()))
+        ensure_bound_workspace(self._workspace_id, workspace.id)
+        await self.connection.execute(workspaces.insert().values(**workspace.model_dump(by_alias=False)))
 
     async def get(self) -> Workspace | None:
         row = (await self.connection.execute(select(workspaces))).mappings().first()
@@ -68,9 +67,8 @@ class PostgresProductsRepository:
         self.connection, self._workspace_id = connection, workspace_id
 
     async def add(self, product: Product) -> None:
-        if product.workspace_id != self._workspace_id:
-            raise PermissionError("a transaction can only write its own Workspace")
-        await self.connection.execute(products.insert().values(**product.model_dump()))
+        ensure_bound_workspace(self._workspace_id, product.workspace_id)
+        await self.connection.execute(products.insert().values(**product.model_dump(by_alias=False)))
 
     async def list(self) -> Sequence[Product]:
         rows = (await self.connection.execute(select(products).order_by(products.c.key))).mappings()
@@ -101,6 +99,12 @@ class PostgresStore:
                 products=PostgresProductsRepository(connection, workspace_id),
                 connection=connection,
             )
+
+    async def role_bypasses_row_level_security(self) -> bool:
+        """Whether the connecting role is a superuser or has BYPASSRLS, and could leave the service role."""
+        async with self.engine.connect() as connection:
+            query = text("select rolsuper or rolbypassrls from pg_roles where rolname = current_user")
+            return bool((await connection.execute(query)).scalar())
 
     async def ping(self) -> None:
         try:

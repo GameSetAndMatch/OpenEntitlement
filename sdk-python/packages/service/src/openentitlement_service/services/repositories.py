@@ -15,6 +15,16 @@ from uuid import UUID
 from .models import Product, Workspace
 
 
+def ensure_bound_workspace(bound: UUID, record_workspace: UUID) -> None:
+    """Refuse a record of another Workspace.
+
+    A programming error, not a client error: callers build records for the Workspace they are
+    bound to. It therefore surfaces as ``internal-error``. Row-level security is the second net.
+    """
+    if record_workspace != bound:
+        raise PermissionError("a transaction can only write its own Workspace")
+
+
 class WorkspacesRepository(Protocol):
     async def add(self, workspace: Workspace) -> None: ...
 

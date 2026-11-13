@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 PROBLEM_TYPE_BASE = "https://openentitlement.dev/problems/"
+RESERVED_MEMBERS = frozenset({"type", "title", "status", "detail", "instance"})
 
 
 class Problem(Exception):
@@ -20,7 +21,10 @@ class Problem(Exception):
     status: ClassVar[int]
     title: ClassVar[str]
 
-    def __init__(self, detail: str, **params: Any) -> None:
+    def __init__(self, detail: str, /, **params: Any) -> None:
+        clashes = RESERVED_MEMBERS & params.keys()
+        if clashes:
+            raise ValueError(f"problem parameters cannot replace standard members: {sorted(clashes)}")
         super().__init__(detail)
         self.detail = detail
         self.params: Mapping[str, Any] = params

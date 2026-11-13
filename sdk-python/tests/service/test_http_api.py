@@ -2,10 +2,17 @@
 from __future__ import annotations
 
 import pytest
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
+
+from fastapi import Depends, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from openentitlement_service.interfaces.http import create_app
+from openentitlement_service.interfaces.http import create_app, workspace_transaction
+from openentitlement_service.services.models import Product, Workspace
+from openentitlement_service.services.problems import NotFound
+from openentitlement_service.services.repositories import Repositories
 from openentitlement_service.repositories.memory import InMemoryStore
 
 PROBLEM = "application/problem+json"
@@ -20,6 +27,7 @@ class ProductInput(BaseModel):
     tiers: list[TierInput]
 
 PROBLEMS = "https://openentitlement.dev/problems/"
+NOW = datetime(2026, 11, 12, 9, 30, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -58,6 +66,27 @@ def probe_client() -> TestClient:
     @app.get("/api/probe/page")
     async def page(limit: int = 10) -> dict[str, int]:
         return {"limit": limit}
+
+    @app.get("/api/probe/teapot")
+    async def teapot() -> None:
+        raise HTTPException(status_code=418, detail="internal hint")
+
+    @app.post("/api/probe/workspaces/{workspace_id}/products")
+    async def add_product(
+        workspace_id: UUID, product: ProductInput, repos: Repositories = Depends(workspace_transaction)
+    ) -> dict[str, str]:
+        if not await repos.workspaces.get():
+            await repos.workspaces.add(Workspace(id=workspace_id, name="ACME", created_at=NOW))
+        await repos.products.add(
+            Product(id=uuid4(), workspace_id=workspace_id, key=product.key, name=product.key, created_at=NOW)
+        )
+        if product.key == "fail-after-writing":
+            raise NotFound("The Tier does not exist.")
+        return {"key": product.key}
+
+    @app.get("/api/probe/workspaces/{workspace_id}/products")
+    async def list_products(repos: Repositories = Depends(workspace_transaction)) -> list[str]:
+        return [p.key for p in await repos.products.list()]
 
     @app.get("/api/probe/boom")
     async def boom() -> None:
@@ -156,3 +185,33 @@ def test_unknown_api_address_is_not_found_for_any_method(console_client: TestCli
     response = console_client.post("/api/nothing", json={})
     assert response.status_code == 404
     assert response.json()["type"] == PROBLEMS + "not-found"
+
+
+def test_other_http_errors_are_plain_problems_not_internal_errors(probe_client: TestClient) -> None:
+    response = probe_client.get("/api/probe/teapot")
+    assert response.status_code == 418
+    assert response.headers["content-type"] == PROBLEM
+    assert response.json() == {
+        "type": "about:blank",
+        "title": "I'm a Teapot",
+        "status": 418,
+        "instance": "/api/probe/teapot",
+    }
+    assert "internal hint" not in response.text
+
+
+def test_a_request_commits_its_workspace_transaction(probe_client: TestClient) -> None:
+    workspace = uuid4()
+    url = f"/api/probe/workspaces/{workspace}/products"
+    assert probe_client.post(url, json={"key": "analytics", "tiers": []}).status_code == 200
+    assert probe_client.get(url).json() == ["analytics"]
+    assert probe_client.get(f"/api/probe/workspaces/{uuid4()}/products").json() == []
+
+
+def test_a_failed_request_leaves_nothing_behind(probe_client: TestClient) -> None:
+    workspace = uuid4()
+    url = f"/api/probe/workspaces/{workspace}/products"
+    response = probe_client.post(url, json={"key": "fail-after-writing", "tiers": []})
+    assert response.status_code == 404
+    assert response.json()["detail"] == "The Tier does not exist."
+    assert probe_client.get(url).json() == []

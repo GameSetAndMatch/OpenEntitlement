@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from collections.abc import Mapping
 from typing import Any
 
@@ -37,8 +38,11 @@ def _pointer(error: Mapping[str, Any]) -> str:
     return prefix + "".join("/" + t for t in tokens)
 
 
-def as_problem(request: Request, exc: Exception) -> Problem:
-    """Translate any exception into a typed problem. Unknown exceptions become ``internal-error``."""
+def as_problem(request: Request, exc: Exception) -> Problem | HTTPException:
+    """Translate any exception into a typed problem. Unknown exceptions become ``internal-error``.
+
+    An HTTP error from the framework that no problem type describes is returned as is.
+    """
     if isinstance(exc, Problem):
         return exc
     if isinstance(exc, RequestValidationError):
@@ -49,12 +53,18 @@ def as_problem(request: Request, exc: Exception) -> Problem:
         if exc.status_code == 405:
             allowed = (exc.headers or {}).get("Allow", "")
             return MethodNotAllowed(request.method, [m.strip() for m in allowed.split(",") if m.strip()])
+        return exc
     logger.exception("Unexpected error on %s %s", request.method, request.url.path, exc_info=exc)
     return InternalError()
 
 
 async def problem_handler(request: Request, exc: Exception) -> JSONResponse:
     problem = as_problem(request, exc)
+    if isinstance(problem, HTTPException):
+        # Another HTTP error raised by the framework itself: RFC 9457's untyped problem.
+        status = problem.status_code
+        plain = {"type": "about:blank", "title": HTTPStatus(status).phrase, "status": status, "instance": request.url.path}
+        return JSONResponse(plain, status_code=status, media_type=PROBLEM_JSON, headers=problem.headers)
     body: dict[str, Any] = {
         "type": problem.type,
         "title": problem.title,
