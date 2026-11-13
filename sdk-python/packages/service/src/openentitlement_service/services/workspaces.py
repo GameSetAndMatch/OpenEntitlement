@@ -185,6 +185,8 @@ class WorkspaceService:
 
     async def delete_product(self, ws: OpenWorkspace, product_id: UUID, *, version: int) -> None:
         """Delete a Product that no customer uses, unless it is the Workspace's last one."""
+        ws.actor.require(Permission.MANAGE_PRODUCTS, product_id)
+        await ws.repos.products.lock_deletion()
         await self._managed(ws, product_id, version)
         if await ws.repos.products.in_use(product_id):
             raise ProductInUse(id=str(product_id))

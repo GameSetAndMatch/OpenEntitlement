@@ -61,6 +61,8 @@ Routes take `CurrentAccount` (the signed-in Account) or `WorkspaceAccess` (one t
 
 Every error is a typed exception in `services/problems.py` with a stable `type` URI, a status, a title and parameters. One handler (`interfaces/http/problems.py`) renders it as `application/problem+json` (RFC 9457). An HTTP error raised by the framework itself that no problem type describes (for example 413) becomes RFC 9457's untyped `about:blank` problem. Anything else becomes a generic [`internal-error`](https://openentitlement.dev/problems/internal-error/) and is logged, never returned. A new problem type needs a page in `website/src/content/docs/problems/`.
 
+Product deletions serialize within their Workspace before checking the remaining count, so concurrent deletions cannot remove its last Product. Edits to different Products remain independent.
+
 ## Data and row-level security
 
 Each table is a SQLAlchemy Core `Table` in `repositories/postgres/tables.py`. Each record has its own `version` for optimistic concurrency.

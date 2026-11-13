@@ -56,6 +56,10 @@ class InMemoryWorkspacesRepository:
 
 
 class InMemoryProductsRepository:
+    async def lock_deletion(self) -> None:
+        # InMemoryStore already serializes entire transactions.
+        pass
+
     def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
         self._rows, self._workspace_id = rows, workspace_id
 

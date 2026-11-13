@@ -93,6 +93,12 @@ class PostgresWorkspacesRepository:
 
 
 class PostgresProductsRepository:
+    async def lock_deletion(self) -> None:
+        # Lock only lifecycle deletions; edits to different Products remain independent.
+        await self.connection.execute(
+            select(workspaces.c.id).where(workspaces.c.id == self._workspace_id).with_for_update()
+        )
+
     def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
         self.connection, self._workspace_id = connection, workspace_id
 

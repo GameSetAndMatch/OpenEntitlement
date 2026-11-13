@@ -135,3 +135,13 @@ async def test_an_unreachable_database_is_service_unavailable() -> None:
             await PostgresStore(engine).ping()
     finally:
         await engine.dispose()
+
+
+def test_sign_in_migration_can_roll_back_and_reapply(clean_postgres_url: str) -> None:
+    from alembic import command
+
+    from openentitlement_service.repositories.postgres.migrate import alembic_config
+
+    command.downgrade(alembic_config(clean_postgres_url), "0001_baseline")
+    migrate(clean_postgres_url)
+    check(clean_postgres_url)

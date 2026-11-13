@@ -56,6 +56,13 @@ class WorkspacesRepository(Protocol):
 
 
 class ProductsRepository(Protocol):
+    async def lock_deletion(self) -> None:
+        """Serialize Product deletions in this Workspace until the transaction ends.
+
+        Acquire before checking the remaining count, so concurrent deletes keep one Product.
+        """
+        ...
+
     async def add(self, product: Product) -> None:
         """Raise ``AlreadyExists`` when the Workspace already has a Product with this key."""
         ...
