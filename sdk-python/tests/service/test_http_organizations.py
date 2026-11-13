@@ -148,7 +148,7 @@ async def test_application_users_over_http(store):
         }
         stale = await client.put(alice, json=saved | {"reason": "Pilot"})
         assert stale.status_code == 409 and stale.json()["type"].endswith("/revision-conflict")
-        # The removal reason travels in the body, never in the address, so access logs never hold it (ADR-0010 Q13).
+        # The removal reason travels in the body, never in the address, which access logs record (ADR-0010 Q13).
         for body in (None, {}, {"reason": "  "}):
             missing = await client.request("DELETE", alice, params={"version": 1}, json=body)
             assert missing.status_code == 400 and _pointers(missing) == ["/reason"], body

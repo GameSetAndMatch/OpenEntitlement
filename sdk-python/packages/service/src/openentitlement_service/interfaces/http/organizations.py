@@ -154,7 +154,7 @@ async def remove_user(
 ) -> OrganizationsView:
     """Remove an application user's record in the Product: it inherits the Organization's values again.
 
-    The reason travels in the JSON body, never in the address, so access logs never hold it (ADR-0010 Q13).
+    The reason travels in the JSON body, not the address, which access logs record (ADR-0010 Q13). A reason in the address is refused.
     """
     if "reason" in request.query_params:
         raise ValidationFailed([FieldError("/query/reason", "Send the reason in the request body, not the address.")])
