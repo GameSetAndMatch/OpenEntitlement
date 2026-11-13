@@ -38,7 +38,7 @@ const settingsPages=[
 ];
 const allPages=[...pages,...settingsPages];
 // The pages the Python service serves so far; the others arrive with their tickets.
-const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","Service","Audit log"]);
+const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","Service","Configuration","Audit log"]);
 // Links from before Settings had its own sidebar.
 const legacy:Record<string,string>={settings:"Members",configuration:"Configuration",audit:"Audit log"};
 // The last workspace this browser used. A convenience only: the list from the server decides access.
@@ -129,8 +129,10 @@ export function WorkspaceApp(){
   function refreshTiers(workspaceId:string,productId:string){const token=++tiersToken.current;return request<ProductTiers>(`/api/workspaces/${workspaceId}/products/${productId}/tiers`).then(view=>{if(token===tiersToken.current)setProductTiers({workspace:workspaceId,product:productId,view});}).catch(e=>{if(token===tiersToken.current)setError(e.message);});}
   useEffect(()=>{if(!workspace?.products||!product)return;setProductTiers(undefined);void refreshTiers(workspace.id,product);return()=>{tiersToken.current++;};},[workspace,product]);
   function refreshOrganizations(workspaceId:string){const token=++organizationsToken.current;return request<ProductOrganizations>(`/api/workspaces/${workspaceId}/organizations`).then(view=>{if(token===organizationsToken.current)setOrganizations({workspace:workspaceId,view});}).catch(e=>{if(token===organizationsToken.current)setError(e.message);});}
-  // Values depend on the Catalog and Tiers too: read them again each time the page opens.
-  useEffect(()=>{if(!workspace?.products||page!=="Organizations")return;void refreshOrganizations(workspace.id);return()=>{organizationsToken.current++;};},[workspace,product,page]);
+  // Values depend on the Catalog and Tiers too: read them again each time the page (or the configuration export) opens.
+  useEffect(()=>{if(!workspace?.products||(page!=="Organizations"&&page!=="Configuration"))return;void refreshOrganizations(workspace.id);return()=>{organizationsToken.current++;};},[workspace,product,page]);
+  // The export reads the selected Product as it is now, including changes made elsewhere, and shows nothing older meanwhile.
+  useEffect(()=>{if(!workspace?.products||!product||page!=="Configuration")return;setProductCatalog(undefined);setProductTiers(undefined);refreshCatalog(workspace.id,product);void refreshTiers(workspace.id,product);},[workspace,product,page]);
   useEffect(()=>{if(!workspace?.products||!product)return;const token=++catalogToken.current;setProductCatalog(undefined);void request<ProductCatalog>(`/api/workspaces/${workspace.id}/products/${product}/catalog`).then(view=>{if(token===catalogToken.current)setProductCatalog({workspace:workspace.id,product,view});}).catch(e=>{if(token===catalogToken.current)setError(e.message);});return()=>{catalogToken.current++;};},[workspace,product]);
   const save:Save=(...args)=>trackWrite(write(...args));
   const write:Save=async(section,entry,title,method="PUT",extra,contractChange)=>{
@@ -218,6 +220,7 @@ export function WorkspaceApp(){
       {workspace.products&&shown.name==='Privilege Catalog'&&(catalogWorkspace?<Catalog key={workspace.id+product} workspace={catalogWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Catalog…</p>)}
       {workspace.products&&shown.name==='Tiers'&&(tiersWorkspace?<Tiers key={workspace.id+product} workspace={tiersWorkspace} save={save} canEdit={catalogEditable} busy={busy} leave={leave}/>:<p role="status">Loading Tiers…</p>)}
       {workspace.products&&shown.name==='Organizations'&&(organizationsWorkspace?<Organizations key={workspace.id+product} workspace={organizationsWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Organizations…</p>)}
+      {workspace.products&&shown.name==='Configuration'&&(organizationsWorkspace&&selectedProduct?<WorkspaceConfiguration key={workspace.id+product} workspace={organizationsWorkspace} product={selectedProduct}/>:<p role="status">Loading configuration…</p>)}
       {workspace.data===undefined&&(shown.name==="Members"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
       {workspace.data===undefined&&!PYTHON_PAGES.has(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
       {shown.name==="Audit log"&&workspace&&canAudit&&<AuditLog key={workspace.id} workspaceId={workspace.id} language={session.account?.language??session.language??'en'}/>}

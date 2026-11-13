@@ -273,6 +273,21 @@ await page.getByRole('heading',{name:'Define your first privilege',exact:true}).
  organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
  assert.deepEqual(organizationsView.map(o=>[o.name,o.version,o.products.length]),[['Acme Corp',2,1]]);
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();
+ // Settings → Configuration exports the selected Product only. Both Products define seats; a hidden Privilege never appears.
+ const storageId=(await (await page.request.get(app+`/api/workspaces/${workspaceId}`)).json()).products.find(p=>p.key==='storage').id;
+ const define=(path,entry)=>page.request.put(path,{headers:csrf,data:{kind:'privileges',entry:{description:'',tags:[],...entry},version:0}});
+ const csrf=await csrfHeaders(page);
+ assert.equal((await define(app+`/api/workspaces/${workspaceId}/products/${storageId}/catalog`,{key:'seats',title:'Seats',type:'integer',visibility:'editable',default:100})).status(),200);
+ assert.equal((await define(catalogPath,{key:'internal_beta',title:'Internal beta',type:'boolean',visibility:'hidden',default:true})).status(),200);
+ await page.getByRole('link',{name:'Settings',exact:true}).click();await page.getByRole('link',{name:'Configuration',exact:true}).click();
+ const storageYaml=await page.getByLabel('Storage YAML',{exact:true}).innerText();
+ assert.match(storageYaml,/key: storage\n/);assert.match(storageYaml,/default: 100\n/);assert.doesNotMatch(storageYaml,/pro_standard|default: 11\n/);
+ await selector.selectOption({label:'Acme product'});
+ const acmeYaml=await page.getByLabel('Acme product YAML',{exact:true}).innerText();
+ assert.match(acmeYaml,/key: acme_product\n/);assert.match(acmeYaml,/pro_standard/);assert.match(acmeYaml,/id: acme\n/);assert.doesNotMatch(acmeYaml,/default: 100\n|internal_beta/);
+ const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Download YAML',exact:true}).click()]);
+ assert.equal(download.suggestedFilename(),'acme_product.yaml');
+ await page.getByRole('link',{name:'Back to workspace',exact:false}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
  // A change without the CSRF token is refused as a Problem Details response.
  const refused=await page.request.post(app+'/api/workspaces',{headers:{origin:app},data:{name:'No token'}});assert.equal(refused.status(),403);assert.equal((await refused.json()).type,'https://openentitlement.dev/problems/csrf-rejected');

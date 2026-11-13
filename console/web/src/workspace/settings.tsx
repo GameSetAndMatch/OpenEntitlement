@@ -1,8 +1,7 @@
 import { useEffect,useRef,useState } from "react";
 import { trackWrite,useUnsavedChanges } from "./unsaved.ts";
 import { Field,Group,Item,Row } from "./settings-group.tsx";
-import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
-import { stringify } from "yaml";
+import { configurationYaml,type SnapshotProduct } from "./configuration.ts";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
 import { useConfirm,useToast } from "../ui.tsx";
@@ -80,10 +79,9 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     </Group>}
   </div>;
 }
-export function WorkspaceConfiguration({workspace:w}:{workspace:Workspace}){
-  const hidden=new Set(w.data.privileges.filter(p=>p.hidden||w.data.features.find(f=>f.id===p.featureId)?.hidden).map(p=>p.key));
-  const visibleValues=(values:Record<string,unknown>)=>Object.fromEntries(Object.entries(values).filter(([key])=>!hidden.has(key)));
-  const yaml=stringify({format:"openentitlement-workspace-snapshot",formatVersion:1,workspace:{id:w.id,name:w.name},...w.data,hostedTier:undefined,subjects:w.data.subjects.map(s=>({...s,terms:visibleValues(s.terms),grants:visibleValues(s.grants)})),features:undefined,groups:w.data.groups.map(({legacyFeatureId:_legacy,...g})=>({id:g.id,title:g.name,description:g.description,...(g.parentId?{parentId:g.parentId}:{})})),tags:w.data.tags.map(t=>({id:t.id,title:t.name,description:t.description})),privileges:w.data.privileges.filter(p=>!hidden.has(p.key)).map(p=>catalogDefinition(p,w.data)),variants:w.data.variants.map(v=>({...v,values:visibleValues(v.values)})),organizations:w.data.organizations.map(o=>({...o,terms:visibleValues(o.terms)}))});
-  function download(){const url=URL.createObjectURL(new Blob([yaml],{type:"application/yaml"})),a=document.createElement("a");a.href=url;a.download="workspace.yaml";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  return <section className="panel configuration-panel"><div className="section-title"><h2>Workspace YAML</h2><button className="btn" onClick={download}>Download YAML</button></div><p>Includes the catalog, tiers and variants, Organization terms, and application users’ personal terms and grants. Excludes hidden privileges, environment values, members and API keys.</p><pre className="configuration-code" tabIndex={0} aria-label="Workspace YAML"><code>{yaml}</code></pre></section>;
+/** The read-only YAML snapshot. On the Python service it covers the selected Product. */
+export function WorkspaceConfiguration({workspace:w,product}:{workspace:Workspace;product?:SnapshotProduct}){
+  const yaml=configurationYaml(w,product),name=product?`${product.name} YAML`:"Workspace YAML";
+  function download(){const url=URL.createObjectURL(new Blob([yaml],{type:"application/yaml"})),a=document.createElement("a");a.href=url;a.download=product?`${product.key}.yaml`:"workspace.yaml";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  return <section className="panel configuration-panel"><div className="section-title"><h2>{name}</h2><button className="btn" onClick={download}>Download YAML</button></div><p>Includes the catalog, tiers and variants, Organization terms, and application users’ personal terms and grants{product?` in ${product.name}`:""}. Excludes hidden privileges, environment values, members and API keys.</p><pre className="configuration-code" tabIndex={0} aria-label={name}><code>{yaml}</code></pre></section>;
 }
