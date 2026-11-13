@@ -145,3 +145,29 @@ def test_sign_in_migration_can_roll_back_and_reapply(clean_postgres_url: str) ->
     command.downgrade(alembic_config(clean_postgres_url), "0001_baseline")
     migrate(clean_postgres_url)
     check(clean_postgres_url)
+
+
+def test_migrations_have_one_head() -> None:
+    from alembic.script import ScriptDirectory
+
+    from openentitlement_service.repositories.postgres.migrate import MIGRATIONS, alembic_config
+
+    script = ScriptDirectory.from_config(alembic_config("postgresql://unused"))
+    assert script.get_heads() == ["0009_merge_audit_api_keys"], MIGRATIONS
+
+
+@pytest.mark.parametrize("first", ["0008_audit_log", "0008_api_keys"])
+def test_either_0008_migration_upgrades_to_the_single_head(clean_postgres_url: str, first: str) -> None:
+    """A database at either 0008 revision, or still at 0007, reaches the same head with no drift."""
+    from alembic import command
+
+    from openentitlement_service.repositories.postgres.migrate import alembic_config
+
+    config = alembic_config(clean_postgres_url)
+    command.downgrade(config, "0007_application_users")
+    command.upgrade(config, first)
+    migrate(clean_postgres_url)
+    check(clean_postgres_url)
+    command.downgrade(config, "0007_application_users")
+    migrate(clean_postgres_url)
+    check(clean_postgres_url)

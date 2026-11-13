@@ -48,9 +48,14 @@ async def test_api_keys_are_per_product_and_shown_once(store):
         async with store.transaction(UUID(product.split('/products/')[0].rsplit('/', 1)[-1])) as repos:
             stored = await repos.api_keys.get(UUID(key['id']))
             assert stored is not None and stored.token_hash != key['secret']
-            events = [e for e in await repos.settings_changes.list() if e.action == 'api-key.created']
-            assert len(events) == 1 and events[0].actor_email == 'alice@acme.test'
+            events = [e for _, e in await repos.audit.list(managed=None, limit=100) if e.target_kind == 'API key']
+            assert [(e.action, e.target_id, e.target_name) for e in events] == [('created', key['id'], 'Billing app')]
+            assert events[0].actor_email == 'alice@acme.test'
             assert events[0].actor_id == stored.created_by and events[0].product_id == stored.product_id
+            # The Audit log never holds the secret or its hash.
+            snapshot = events[0].model_dump_json()
+            assert key['secret'] not in snapshot and stored.token_hash not in snapshot
+            assert key['secret'].split('.', 1)[1] not in snapshot
         # A transaction in another Workspace cannot find the key, even by its hash.
         async with store.transaction(UUID(int=1)) as repos:
             assert await repos.api_keys.get(stored.id) is None
@@ -219,3 +224,31 @@ async def test_product_managers_can_manage_only_their_keys_and_users_cannot(stor
                     await reader.delete(product + '/api-keys/' + key['id']),
                 ):
                     _problem(response, 403, 'permission-denied')
+
+
+async def test_a_revoked_key_is_refused_and_its_revocation_is_audited(store):
+    async with _client(store) as (client, product):
+        await _offer(client, product)
+        await _assign(client, product, "acme", "basic_standard")
+        product_key = (await client.get(product)).json()["key"]
+        key = await _key(client, product)
+        app = {"authorization": f"Bearer {key['secret']}"}
+        paths = [
+            (_oerep(product_key, "seats"), CONTEXT),
+            (_oerep(product_key), CONTEXT),
+            (_oerep(product_key, "sso", "upgrade"), CONTEXT | {"need": True}),
+        ]
+        for path, body in paths:
+            assert (await client.post(path, json=body, headers=app)).status_code == 200
+        assert (await client.delete(f"{product}/api-keys/{key['id']}")).status_code == 204
+        for path, body in paths:
+            _problem(await client.post(path, json=body, headers=app), 401, "api-key-invalid")
+
+        audit = (await client.get(product.split("/products/")[0] + "/audit", params={"limit": 200})).json()
+        revoked = [e for e in audit["entries"] if e["targetKind"] == "API key" and e["action"] == "revoked"]
+        assert len(revoked) == 1
+        assert revoked[0]["actorEmail"] == "alice@acme.test"
+        assert revoked[0]["targetId"] == key["id"] and revoked[0]["targetName"] == "Billing app"
+        assert revoked[0]["productId"] == product.rsplit("/", 1)[1]
+        page = __import__("json").dumps(audit)
+        assert key["secret"] not in page and key["secret"].split(".", 1)[1] not in page

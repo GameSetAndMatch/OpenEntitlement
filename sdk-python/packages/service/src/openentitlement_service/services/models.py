@@ -119,24 +119,3 @@ class Invitation(OpenEntitlementModel):
     invited_by: UUID
     created_at: datetime
     expires_at: datetime
-
-
-class SettingsChange(OpenEntitlementModel):
-    """An authenticated audit fact about members, invitations or the Cloud service tier (ADR-0007).
-
-    ``product_id`` is the Product the change concerns, or ``None`` for a Workspace-wide change
-    (Owners, the Cloud service tier). The target's name is recorded as it was at that moment.
-    """
-
-    id: UUID
-    workspace_id: UUID
-    product_id: UUID | None = None
-    actor_id: UUID
-    actor_email: str
-    at: datetime
-    action: str
-    target_kind: str
-    target_id: str
-    target_name: str
-    before: str | None = None
-    after: str | None = None

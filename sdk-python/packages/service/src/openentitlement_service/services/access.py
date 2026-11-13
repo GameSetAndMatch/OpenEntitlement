@@ -37,6 +37,8 @@ class Permission(StrEnum):
     MANAGE_OWNERS = "owners:manage"
     #: Change the Workspace's Cloud service tier. Platform administrators only.
     SET_SERVICE_TIER = "service-tier:set"
+    #: Read the Audit log: Owners in full, a Product's Managers for the Products they manage (ADR-0007).
+    READ_AUDIT_LOG = "audit-log:read"
 
 
 #: What each Product Role allows within its Product.
@@ -56,6 +58,7 @@ _DENIED = {
     Permission.MANAGE_MEMBERS: "Only this Product's Managers and the Workspace's Owners can manage its members.",
     Permission.MANAGE_OWNERS: "Only the Workspace's Owners can invite, appoint, change or remove Owners.",
     Permission.SET_SERVICE_TIER: "Only a Platform administrator can change the Cloud service tier.",
+    Permission.READ_AUDIT_LOG: "Only the Workspace's Owners and its Products' Managers can read the Audit log.",
 }
 
 
@@ -96,8 +99,8 @@ class Actor:
             return self.account.platform_admin
         if self.administers_workspace:
             return True
-        if permission is Permission.MANAGE_ORGANIZATIONS:
-            # Organizations are Workspace-wide: a Manager of any Product may add one.
+        if permission in (Permission.MANAGE_ORGANIZATIONS, Permission.READ_AUDIT_LOG):
+            # Organizations and the Audit log are Workspace-wide: a Manager of any Product may add one or read it.
             return ProductRole.MANAGER in self.roles.values()
         if product_id is None:
             return False

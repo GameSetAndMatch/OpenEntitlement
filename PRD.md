@@ -64,7 +64,7 @@ Primary users:
 | Application-user entitlements: personal terms and grants | ✅ | #27 |
 | Workspace API keys and evaluation endpoint | ✅ preview | #22 |
 | Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 🚧 Products, per-Product roles and Product archiving on `service/python` (OPE-38), per-Product Catalog (OPE-39), Tiers and Tier archiving (OPE-40), Organizations with one Tier variant per Product (OPE-41), Cloud limits (OPE-44) · accepted (ADR-0008) | OPE-38 |
-| Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 📋 accepted (ADR-0007) | — |
+| Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 🚧 on `service/python` | OPE-43; Product-projected snapshots and paginated console read side |
 | Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, glossary names for value sources, standard user form | 📋 | — |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |

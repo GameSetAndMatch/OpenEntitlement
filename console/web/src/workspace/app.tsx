@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { request,setCsrf } from "./client.ts";
 import { identify, resetIdentity } from "../telemetry.ts";
 import {catalogData,catalogEntry,tiersData,tierRequest,tierSections,organizationsData,organizationRequests,changesOrganizationTerms,resolvedValues,subjectsData,userValues,changesPersonalExceptions,userRequest,type ProductCatalog,type ProductTiers,type ProductOrganizations,type OrganizationProduct,type ApplicationUser} from "./product-catalog.ts";
+import { AuditLog } from "./audit-log.tsx";
 import { Catalog } from "./catalog.tsx";
 import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
@@ -32,7 +33,7 @@ const settingsPages=[
 ];
 const allPages=[...pages,...settingsPages];
 // The pages the Python service serves so far; the others arrive with their tickets.
-const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","Service"]);
+const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","Service","Audit log"]);
 // Links from before Settings had its own sidebar.
 const legacy:Record<string,string>={settings:"Members",configuration:"Configuration",audit:"Audit log"};
 // The last workspace this browser used. A convenience only: the list from the server decides access.
@@ -68,7 +69,7 @@ export function WorkspaceApp(){
   const [organizations,setOrganizationsState]=useState<{workspace:string;view:ProductOrganizations}>();
   const organizationsRef=useRef(organizations),organizationsToken=useRef(0);
   const setOrganizations=(next:typeof organizations)=>{organizationsRef.current=next;setOrganizationsState(next);};
-  const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false),[audit,setAudit]=useState<any[]>([]);
+  const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false);
   const [invite,setInvite]=useState(()=>{const incoming=location.hash.startsWith("#invite=")?location.hash.slice(8):"";if(incoming){sessionStorage.setItem("oe.invite",incoming);history.replaceState(null,"","/app/");}return incoming||sessionStorage.getItem("oe.invite")||"";});
   const savingRef=useRef(false);
   const selectedRef=useRef(selected);selectedRef.current=selected;
@@ -95,7 +96,7 @@ export function WorkspaceApp(){
   useEffect(()=>{if(!navigated.current)return;navigated.current=false;if(document.activeElement&&document.activeElement!==document.body)return;document.querySelector<HTMLElement>('aside nav a[aria-current="page"]')?.focus();},[page]);
   useEffect(()=>{const changed=()=>{if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(workspace?.products)setProduct(pickProduct(workspace.products,rememberedProduct(workspace.id)));},[workspace]);
-  useEffect(()=>{if(page!=="Audit log"||!workspace||workspace.data===undefined)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[page,workspace]);
+
   // Catalog and Tier saves both change Tier variants (values and versions): each refreshes the other view.
   function refreshCatalog(workspaceId:string,productId:string){const token=++catalogToken.current;void request<ProductCatalog>(`/api/workspaces/${workspaceId}/products/${productId}/catalog`).then(view=>{if(token===catalogToken.current)setProductCatalog({workspace:workspaceId,product:productId,view});}).catch(e=>{if(token===catalogToken.current)setError(e.message);});}
   function refreshTiers(workspaceId:string,productId:string){const token=++tiersToken.current;return request<ProductTiers>(`/api/workspaces/${workspaceId}/products/${productId}/tiers`).then(view=>{if(token===tiersToken.current)setProductTiers({workspace:workspaceId,product:productId,view});}).catch(e=>{if(token===tiersToken.current)setError(e.message);});}
@@ -166,8 +167,9 @@ export function WorkspaceApp(){
   const catalogEditable=selectedProduct?.role==='Manager'||selectedProduct?.role==='Owner'||selectedProduct?.role==='Platform administrator';
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
   // API keys are an Owner's page; anyone else lands on Members instead.
-  const visibleSettings=settingsPages.filter(p=>p.name!=="API keys"||canEdit);
-  const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canEdit))??settingsPages[0]!;
+  const canAudit=canEdit||workspace?.role==="Manager"||workspace?.products?.some(p=>p.role==="Manager");
+  const visibleSettings=settingsPages.filter(p=>(p.name!=="API keys"||canEdit)&&(p.name!=="Audit log"||canAudit));
+  const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canEdit)&&(p.name!=="Audit log"||canAudit))??settingsPages[0]!;
   const inSettings=settingsPages.includes(shown);
   const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
   return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>{setSelected(id);setError("");}} onCreate={()=>{setCreating(true);setError("");}}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
@@ -187,13 +189,13 @@ export function WorkspaceApp(){
       {workspace.products&&shown.name==='Organizations'&&(organizationsWorkspace?<Organizations key={workspace.id+product} workspace={organizationsWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Organizations…</p>)}
       {workspace.data===undefined&&(shown.name==="Members"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
       {workspace.data===undefined&&!PYTHON_PAGES.has(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
+      {shown.name==="Audit log"&&workspace&&canAudit&&<AuditLog key={workspace.id} workspaceId={workspace.id} language={session.account?.language??session.language??'en'}/>}
       {workspace.data!==undefined&&<>
       {shown.name==="Privilege Catalog"&&!workspace.products&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
       {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
-      {shown.name==="Audit log"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason||"—"}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
       </>}
       </>}
     </main></div>;

@@ -69,7 +69,7 @@ Every error is a typed exception in `services/problems.py` with a stable `type` 
 
 Product deletions serialize within their Workspace before checking the remaining count, so concurrent deletions cannot remove its last Product. Edits to different Products remain independent. Membership changes, Product creation on Cloud Pro and Cloud service tier changes lock the Workspace row, so "one Owner remains", "a member keeps a Role or leaves" and "Cloud Pro has one Product" hold under concurrent requests.
 
-An invitation token is `<workspace id>.<secret>`: accepting it opens a transaction bound to that Workspace only, so invitations stay under row-level security. Only the token's SHA-256 hash is stored. Member, invitation and Cloud service tier changes write authenticated audit facts (`settings_changes`), with the Product they concern or none for Workspace-wide changes; OPE-43 supplies the filtered read side.
+An invitation token is `<workspace id>.<secret>`: accepting it opens a transaction bound to that Workspace only, so invitations stay under row-level security. Only the token's SHA-256 hash is stored. Member, invitation and Cloud service tier changes record Audit log entries (`audit_entries`, OPE-43) with the authenticated actor and the Product they concern, or none for Workspace-wide changes.
 
 ## Data and row-level security
 
@@ -133,9 +133,8 @@ variant values are neither validated nor accepted in `variantValues`, and stored
 unchanged with no effect. They are validated again if the Privilege becomes editable. Clearing
 them, with a console confirmation, is the separate OPE-54 policy. `catalog_variant_values` is the Catalog-facing value storage seam for
 OPE-40's Tier lifecycle, which must take the same Product lock before creating/changing
-variants. No Tier creation API is introduced here. Write audit facts include the real Account,
-Product, target name, before/after definition and variant values; the repositories read them back
-per Product (`changes`); the filtered audit view is OPE-43.
+variants. No Tier creation API is introduced here. Writes record Audit log entries (`audit_entries`, OPE-43) with the real Account,
+Product, target name and the changed definition and variant values.
 
 Run `uv run pytest -q tests/service/test_catalog_service.py tests/service/test_http_catalog.py`
 from `sdk-python` for the shared memory/Postgres behavior tests. Set `OE_PG_DSN` for Postgres.
@@ -162,8 +161,8 @@ and the same type and bound rules as Catalog defaults. A Read-only Privilege use
 default: a variant cannot set or change its value; a stored value is kept unchanged with no
 effect (the OPE-39 policy). Archived Tiers keep their variants, are never upgrade candidates
 (`services/tiers.upgrade_candidates`, spec §3.4) and cannot be a status-policy fallback; they can
-be restored. A Tier that an Organization has cannot be deleted. Writes record the real
-Account, Product, target and before/after state (`tier_changes`); the filtered audit view is OPE-43.
+be restored. A Tier that an Organization has cannot be deleted. Writes record Audit log
+entries (`audit_entries`, OPE-43) with the real Account, Product, target and changed values.
 
 `npm run test:python-service` from `console` runs guided creation, trial and grace, grace days,
 the status policy and archive/restore in Chromium against the service.
@@ -219,7 +218,7 @@ Cloud Enterprise has user-level entitlements: on Cloud Pro, records are kept wit
 
 ## Product evaluation (OPE-42 integration preview)
 
-Owners and Product Managers create keys with `POST /api/workspaces/{workspace_id}/products/{product_id}/api-keys` and `{"name":"Application"}`. The `secret` appears only in that response; list returns safe previews and DELETE `…/api-keys/{key_id}` revokes a key. Archived Products keep existing keys and reject new ones.
+Owners and Product Managers create keys with `POST /api/workspaces/{workspace_id}/products/{product_id}/api-keys` and `{"name":"Application"}`. The `secret` appears only in that response; list returns safe previews and DELETE `…/api-keys/{key_id}` revokes a key. Creating and revoking a key records a Product-scoped Audit log entry naming the key and its actor, never its secret or hash. Archived Products keep existing keys and reject new ones.
 
 Configure `RemoteProvider(base_url, product="analytics", token=secret)` in Python or `new RemoteProvider({baseUrl, product: "analytics", token: secret})` in TypeScript. Each provider evaluates one Product; use another provider and key for another Product. The new routes, RFC 9457 failures and binding order are in [spec §10](../../../../spec/sections/10-remote-evaluation.md). These changes are an unreleased integration preview.
 

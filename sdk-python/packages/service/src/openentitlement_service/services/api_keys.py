@@ -20,7 +20,9 @@ from .access import Permission
 from .models import Product
 from .problems import FieldError, NotFound, ValidationFailed
 from .sign_in import digest, new_secret
-from .workspaces import OpenWorkspace, audit_settings
+from . import audit
+from .audit import AuditAction, TargetKind
+from .workspaces import OpenWorkspace
 
 #: Marks an OpenEntitlement API key, so secret scanners and people recognize one.
 KEY_PREFIX = "oek_"
@@ -113,8 +115,10 @@ class ApiKeyService:
             created_at=ws.now,
         )
         await ws.repos.api_keys.add(key)
-        await audit_settings(
-            ws, action="api-key.created", target_kind="API key", target_id=str(key.id), target_name=name, product_id=product_id
+        # Its name and ID only: never the secret or its hash.
+        await audit.record(
+            ws, action=AuditAction.CREATED, target_kind=TargetKind.API_KEY, target_id=str(key.id), target_name=name,
+            product_id=product_id,
         )
         return NewApiKey(**_view(key).model_dump(), secret=secret)
 
@@ -125,6 +129,7 @@ class ApiKeyService:
         if key is None or key.product_id != product_id:
             raise NotFound("This API key does not exist. It may have been revoked already.")
         await ws.repos.api_keys.delete(key_id)
-        await audit_settings(
-            ws, action="api-key.revoked", target_kind="API key", target_id=str(key.id), target_name=key.name, product_id=product_id
+        await audit.record(
+            ws, action=AuditAction.REVOKED, target_kind=TargetKind.API_KEY, target_id=str(key.id), target_name=key.name,
+            product_id=product_id,
         )

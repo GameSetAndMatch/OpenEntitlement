@@ -21,10 +21,14 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import JsonValue
+
 from openentitlement.model import OpenEntitlementModel
 
+from . import audit
 from .access import PLATFORM_ADMINISTRATOR, Actor, Permission, highest, OWNER
-from .models import Account, Member, Product, ServiceTier, SettingsChange, Workspace
+from .audit import Aspect, AuditAction, TargetKind
+from .models import Account, Member, Product, ServiceTier, Workspace
 from .problems import (
     AlreadyTaken,
     FieldError,
@@ -142,33 +146,23 @@ def _view(product: Product, actor: Actor) -> ProductView:
     )
 
 
-async def audit_settings(
-    ws: OpenWorkspace,
-    *,
-    action: str,
-    target_kind: str,
-    target_id: str,
-    target_name: str,
-    product_id: UUID | None = None,
-    before: str | None = None,
-    after: str | None = None,
+
+async def _audit_product(
+    ws: OpenWorkspace, action: AuditAction, product: Product, before: Product | None, after: Product | None
 ) -> None:
-    """Record who changed members, invitations or the Cloud service tier, in the same transaction."""
-    await ws.repos.settings_changes.add(
-        SettingsChange(
-            id=uuid4(),
-            workspace_id=ws.actor.workspace_id,
-            product_id=product_id,
-            actor_id=ws.actor.account.id,
-            actor_email=ws.actor.account.email,
-            at=ws.now,
-            action=action,
-            target_kind=target_kind,
-            target_id=target_id,
-            target_name=target_name,
-            before=before,
-            after=after,
-        )
+    """Products are Workspace-wide: only Owners read their entries (ADR-0007)."""
+
+    def fields(p: Product | None) -> dict[str, JsonValue] | None:
+        return {"name": p.name, "key": p.key, "archivedAt": p.archived_at.isoformat() if p.archived_at else None} if p else None
+
+    await audit.record(
+        ws,
+        action=action,
+        target_kind=TargetKind.PRODUCT,
+        target_id=str(product.id),
+        target_name=(before or product).name,
+        owners_only=True,
+        changes=audit.diff(fields(before), fields(after)),
     )
 
 
@@ -285,14 +279,15 @@ class WorkspaceService:
                 await ws.repos.workspaces.update(changed, expected_version=version)
             except StaleVersion as exc:
                 raise RevisionConflict(kind="Workspace", id=str(workspace.id)) from exc
-            await audit_settings(
+            await audit.record(
                 ws,
-                action="service_tier.changed",
-                target_kind="Workspace",
+                action=AuditAction.CHANGED,
+                target_kind=TargetKind.WORKSPACE,
                 target_id=str(workspace.id),
                 target_name=workspace.name,
-                before=workspace.service_tier.value,
-                after=tier.value,
+                aspect=Aspect.SERVICE_TIER,
+                owners_only=True,
+                changes=audit.diff({"serviceTier": workspace.service_tier.value}, {"serviceTier": tier.value}),
             )
         return await self.view(ws)
 
@@ -315,18 +310,19 @@ class WorkspaceService:
             await ws.repos.products.add(product)
         except AlreadyExists as exc:
             raise AlreadyTaken(f"Another Product already uses the key {key}.", kind="Product", key=key) from exc
+        await _audit_product(ws, AuditAction.CREATED, product, None, product)
         return _view(product, ws.actor)
 
     async def rename_product(self, ws: OpenWorkspace, product_id: UUID, *, name: str, version: int) -> ProductView:
-        return await self._change(ws, product_id, version, name=_name(name, "/name"))
+        return await self._change(ws, product_id, version, AuditAction.CHANGED, name=_name(name, "/name"))
 
     async def archive_product(self, ws: OpenWorkspace, product_id: UUID, *, version: int) -> ProductView:
         """Archive: current customers keep the Product; it cannot be given to a new one (ADR-0008)."""
         current = await self._managed(ws, product_id, version)
-        return await self._persist_change(ws, current, archived_at=current.archived_at or ws.now)
+        return await self._persist_change(ws, current, AuditAction.ARCHIVED, archived_at=current.archived_at or ws.now)
 
     async def restore_product(self, ws: OpenWorkspace, product_id: UUID, *, version: int) -> ProductView:
-        return await self._change(ws, product_id, version, archived_at=None)
+        return await self._change(ws, product_id, version, AuditAction.RESTORED, archived_at=None)
 
     async def delete_product(self, ws: OpenWorkspace, product_id: UUID, *, version: int) -> None:
         """Delete a Product that no customer uses, unless it is the Workspace's last one."""
@@ -334,7 +330,7 @@ class WorkspaceService:
         await ws.repos.products.lock_deletion()
         # The Product lock that Organization assignments take: none can be added between the check and the delete.
         await ws.repos.catalog.lock(product_id)
-        await self._managed(ws, product_id, version)
+        current = await self._managed(ws, product_id, version)
         if await ws.repos.products.in_use(product_id):
             raise ProductInUse(id=str(product_id))
         if len(await ws.repos.products.list()) <= 1:
@@ -343,6 +339,7 @@ class WorkspaceService:
             await ws.repos.products.delete(product_id, expected_version=version)
         except StaleVersion as exc:
             raise RevisionConflict(kind="Product", id=str(product_id)) from exc
+        await _audit_product(ws, AuditAction.DELETED, current, current, None)
 
     async def _within_product_limit(self, ws: OpenWorkspace) -> None:
         """Refuse another Product beyond the Cloud service tier's limit. Self-hosted installs have none."""
@@ -376,15 +373,18 @@ class WorkspaceService:
             raise RevisionConflict(kind="Product", id=str(product_id))
         return product
 
-    async def _change(self, ws: OpenWorkspace, product_id: UUID, version: int, **changes: Any) -> ProductView:
+    async def _change(
+        self, ws: OpenWorkspace, product_id: UUID, version: int, action: AuditAction, **changes: Any
+    ) -> ProductView:
         current = await self._managed(ws, product_id, version)
-        return await self._persist_change(ws, current, **changes)
+        return await self._persist_change(ws, current, action, **changes)
 
-    async def _persist_change(self, ws: OpenWorkspace, current: Product, **changes: Any) -> ProductView:
+    async def _persist_change(self, ws: OpenWorkspace, current: Product, action: AuditAction, **changes: Any) -> ProductView:
         version, product_id = current.version, current.id
         changed = current.model_copy(update={**changes, "version": version + 1})
         try:
             await ws.repos.products.update(changed, expected_version=version)
         except StaleVersion as exc:
             raise RevisionConflict(kind="Product", id=str(product_id)) from exc
+        await _audit_product(ws, action, changed, current, changed)
         return _view(changed, ws.actor)

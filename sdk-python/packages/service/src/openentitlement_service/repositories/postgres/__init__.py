@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import ColumnElement, Text, and_, cast, func, select, text
+from sqlalchemy import ColumnElement, Text, and_, cast, func, or_, select, text
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import make_url
@@ -25,9 +25,10 @@ from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from ...services.api_keys import ApiKey
-from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
-from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationChange, OrganizationRecord
-from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
+from ...services.audit import AuditEntry
+from ...services.catalog import CatalogRecord, VariantValues
+from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationRecord
+from ...services.tiers import StatusPolicyRecord, TierRecord
 from ...services.models import (
     Account,
     Invitation,
@@ -35,7 +36,6 @@ from ...services.models import (
     Product,
     ProductMembership,
     Session,
-    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -44,11 +44,11 @@ from ...services.problems import ServiceUnavailable
 from ...services.repositories import AlreadyExists, Repositories, StaleVersion, ensure_bound_workspace
 from .migrate import migrate
 from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
-from .tables import catalog_variant_values, catalog_changes, catalog_groups, catalog_tags, catalog_privileges
-from .tables import status_policies, tier_changes, tiers
-from .tables import application_users, organization_changes, organization_products, organizations
+from .tables import catalog_variant_values, catalog_groups, catalog_tags, catalog_privileges
+from .tables import status_policies, tiers
+from .tables import application_users, organization_products, organizations
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
-from .tables import api_keys, invitations, settings_changes
+from .tables import api_keys, audit_entries, invitations
 
 
 UNIQUE_VIOLATION = "23505"
@@ -295,25 +295,36 @@ class PostgresApiKeysRepository:
         )
 
 
-class PostgresSettingsChangesRepository:
+class PostgresAuditRepository:
     def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
         self.connection, self._workspace_id = connection, workspace_id
 
-    async def add(self, change: SettingsChange) -> None:
-        ensure_bound_workspace(self._workspace_id, change.workspace_id)
+    async def add(self, entry: AuditEntry) -> None:
+        ensure_bound_workspace(self._workspace_id, entry.workspace_id)
         await self.connection.execute(
-            settings_changes.insert().values(
-                id=change.id, workspace_id=change.workspace_id, at=change.at, entry=change.model_dump(mode="json")
+            audit_entries.insert().values(
+                id=entry.id,
+                workspace_id=entry.workspace_id,
+                at=entry.at,
+                owners_only=entry.owners_only,
+                shared=entry.shared,
+                products=sorted(entry.products),
+                entry=entry.model_dump(mode="json"),
             )
         )
 
-    async def list(self) -> Sequence[SettingsChange]:
-        query = (
-            select(settings_changes.c.entry)
-            .where(settings_changes.c.workspace_id == self._workspace_id)
-            .order_by(settings_changes.c.seq)
-        )
-        return [SettingsChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
+    async def list(
+        self, *, managed: frozenset[UUID] | None, limit: int, before: int | None = None
+    ) -> Sequence[tuple[int, AuditEntry]]:
+        table = audit_entries
+        query = select(table.c.seq, table.c.entry).where(table.c.workspace_id == self._workspace_id)
+        if before is not None:
+            query = query.where(table.c.seq < before)
+        if managed is not None:
+            # AuditEntry.visible_to, in SQL.
+            query = query.where(~table.c.owners_only, or_(table.c.shared, table.c.products.overlap(sorted(managed))))
+        query = query.order_by(table.c.seq.desc()).limit(limit)
+        return [(row.seq, AuditEntry.model_validate(row.entry)) for row in await self.connection.execute(query)]
 
 
 class PostgresAccountsRepository:
@@ -431,15 +442,6 @@ class PostgresCatalogRepository:
         if (await self.connection.execute(statement)).rowcount != 1:
             raise StaleVersion(variant_id)
 
-    async def audit(self, change: CatalogChange) -> None:
-        ensure_bound_workspace(self.workspace_id, change.workspace_id)
-        await self.connection.execute(catalog_changes.insert().values(id=change.id, workspace_id=change.workspace_id, entry=change.model_dump(mode="json")))
-
-    async def changes(self, product_id: UUID) -> Sequence[CatalogChange]:
-        rows = (await self.connection.execute(select(catalog_changes.c.entry).where(catalog_changes.c.workspace_id == self.workspace_id))).scalars()
-        found = [CatalogChange.model_validate(row) for row in rows]
-        return sorted((c for c in found if c.product_id == product_id), key=lambda c: c.at)
-
     def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
         self.connection, self.workspace_id = connection, workspace_id
 
@@ -539,21 +541,6 @@ class PostgresTiersRepository:
         )
         if (await self.connection.execute(statement)).rowcount != 1:
             raise StaleVersion(str(policy.product_id))
-
-    async def audit(self, change: TierChange) -> None:
-        ensure_bound_workspace(self.workspace_id, change.workspace_id)
-        values = dict(
-            id=change.id, workspace_id=change.workspace_id, product_id=change.product_id, at=change.at, entry=change.model_dump(mode="json")
-        )
-        await self.connection.execute(tier_changes.insert().values(**values))
-
-    async def changes(self, product_id: UUID) -> Sequence[TierChange]:
-        query = (
-            select(tier_changes.c.entry)
-            .where(tier_changes.c.workspace_id == self.workspace_id, tier_changes.c.product_id == product_id)
-            .order_by(tier_changes.c.seq)
-        )
-        return [TierChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
 
 
 class PostgresOrganizationsRepository:
@@ -695,19 +682,6 @@ class PostgresOrganizationsRepository:
         if (await self.connection.execute(statement)).rowcount != 1:
             raise StaleVersion(user.subject_id)
 
-    async def audit(self, change: OrganizationChange) -> None:
-        ensure_bound_workspace(self.workspace_id, change.workspace_id)
-        values = dict(id=change.id, workspace_id=change.workspace_id, at=change.at, entry=change.model_dump(mode="json"))
-        await self.connection.execute(organization_changes.insert().values(**values))
-
-    async def changes(self) -> Sequence[OrganizationChange]:
-        query = (
-            select(organization_changes.c.entry)
-            .where(organization_changes.c.workspace_id == self.workspace_id)
-            .order_by(organization_changes.c.seq)
-        )
-        return [OrganizationChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
-
 
 @dataclass(frozen=True)
 class PostgresRepositories(Repositories):
@@ -747,7 +721,7 @@ class PostgresStore:
                 organizations=PostgresOrganizationsRepository(connection, workspace_id),
                 directory=PostgresDirectoryRepository(connection, account_id),
                 invitations=PostgresInvitationsRepository(connection, workspace_id),
-                settings_changes=PostgresSettingsChangesRepository(connection, workspace_id),
+                audit=PostgresAuditRepository(connection, workspace_id),
                 api_keys=PostgresApiKeysRepository(connection, workspace_id),
                 connection=connection,
             )

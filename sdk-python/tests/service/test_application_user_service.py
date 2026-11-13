@@ -119,14 +119,16 @@ async def test_a_reason_is_required_whenever_personal_terms_or_grants_change(use
     await users.remove(version=3, reason="Left the company")
     assert await users.get() is None
     async with users.scene.open("owner") as ws:
-        changes = [c for c in await ws.repos.organizations.changes() if c.target == "applicationUser"]
-    assert [(c.subject_id, c.action, c.reason) for c in changes] == [
-        ("idp|alice", "created", None),
-        ("idp|alice", "changed", None),
-        ("idp|alice", "changed", "Goodwill"),
-        ("idp|alice", "removed", "Left the company"),
+        entries = [e for _, e in reversed(await ws.repos.audit.list(managed=None, limit=100))]
+    changes = [c for c in entries if c.target_kind == "Application user"]
+    assert [(c.target_id, c.action, c.aspect, c.reason) for c in changes] == [
+        ("acme/idp|alice", "created", None, None),
+        ("acme/idp|alice", "changed", None, None),
+        ("acme/idp|alice", "changed", "terms", "Goodwill"),
+        ("acme/idp|alice", "removed", None, "Left the company"),
     ]
-    assert changes[2].product_id == users.scene.analytics and changes[2].key == "acme"
+    assert changes[2].product_id == users.scene.analytics
+    assert [(c.field, c.title, c.before, c.after) for c in changes[2].changes] == [("grants.seats", "Seats", None, 5)]
 
 
 async def test_subject_ids_are_what_the_application_sends(users: Users) -> None:
