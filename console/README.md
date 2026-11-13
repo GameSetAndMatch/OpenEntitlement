@@ -1,6 +1,6 @@
 # OpenEntitlement service and console
 
-Our open-source entitlement server owns plans, assignments, negotiated overrides, additive grants, and audit records. It exposes OEREP v1 for generic SDK clients and a separate administrative API and web console. No billing vendor is required.
+Our open-source entitlement server owns plans, assignments, negotiated overrides, additive grants, and audit records. It exposes OEREP 0.1 for generic SDK clients and a separate administrative API and web console. No billing vendor is required.
 
 For the multi-Workspace console and user scope, read the [Python-first ACME walkthrough](../docs/guides/acme-workspace.md) and [Workspace service guide](WORKSPACES.md). The standalone OEREP service below remains a separate entry point. Current source samples use flat keys; older released images and persisted installations may retain dotted keys. Use an explicit old Catalog or a pinned image until you migrate data and application checks together.
 
@@ -42,7 +42,7 @@ The server migrates its `oe_*` tables at startup. Set `OE_CATALOG` to a catalog 
 
 `OE_PROVIDER=fixed` supports embedded self-hosted policies (`OE_FIXED_VALUES` supplies required finite limits). It has no mutations or inspection.
 
-## OEREP v1
+## OEREP 0.1
 
 ```sh
 curl http://localhost:8787/oerep/v1/resolve/seat_max \
@@ -68,7 +68,7 @@ Both clients use the application's catalog and validate remote values against it
 
 `/api/*` requires `OE_ADMIN_TOKEN` when configured. `/oerep/*` independently requires `OE_EVAL_TOKEN` when configured. Local demos allow anonymous access by default. Evaluation tokens are backend service credentials covering the entire instance, not per-tenant/browser tokens; the calling application must authorize organization access. Use distinct tokens in deployments.
 
-The administrative API supports plans (`/api/plans`), organizations and plan assignments (`/api/organizations`), overrides and grants, evaluation (`/api/evaluate`, `/api/require`), and audit (`/api/audit`). Mutations go through SDK audit hooks and require a reason. `/api/meta` exposes the catalog and storage capabilities. Administration is not standardized by OEREP v1.
+The administrative API supports plans (`/api/plans`), organizations and plan assignments (`/api/organizations`), overrides and grants, evaluation (`/api/evaluate`, `/api/require`), and audit (`/api/audit`). Mutations go through SDK audit hooks and require a reason. `/api/meta` exposes the catalog and storage capabilities. Administration is not standardized by OEREP 0.1.
 
 ## Customer contracts
 

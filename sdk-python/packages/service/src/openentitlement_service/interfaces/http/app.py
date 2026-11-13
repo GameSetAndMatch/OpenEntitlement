@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
+import os
+
 import httpx
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -14,9 +16,10 @@ from starlette.types import Receive, Scope, Send
 from ...services.problems import NotFound
 from ...services.repositories import Store
 from ...services.sign_in import SignInPolicy, SignInService
+from ...services.evaluation import EvaluationService
 from ...services.members import MemberService
 from ...services.workspaces import Deployment, WorkspaceService, utcnow
-from . import auth, problems, workspaces, catalog, members, tiers, organizations
+from . import api_keys, auth, problems, workspaces, catalog, members, oerep, tiers, organizations
 from .oidc import OidcClient
 
 
@@ -46,6 +49,8 @@ def create_app(
     app.state.store = store
     app.state.workspaces = WorkspaceService(store, clock=clock, deployment=deployment)
     app.state.members = MemberService(store, clock=clock)
+    # Boolean environment prerequisites read the install's environment (ADR-0004).
+    app.state.evaluation = EvaluationService(store, environment=os.environ, clock=clock, deployment=deployment)
     # Without sign-in settings nobody can sign in; the policy then only names a placeholder issuer.
     policy = sign_in.policy() if sign_in else SignInPolicy(issuer="")
     app.state.authentication = auth.Authentication(
@@ -58,6 +63,8 @@ def create_app(
     app.include_router(tiers.router)
     app.include_router(organizations.router)
     app.include_router(members.router)
+    app.include_router(api_keys.router)
+    app.include_router(oerep.router)
 
     @app.get("/healthz", tags=["health"])
     async def health() -> dict[str, str]:

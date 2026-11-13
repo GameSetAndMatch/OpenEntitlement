@@ -30,14 +30,18 @@ The Python service returns these types. It is in development on the `service/pyt
 |---|---|---|
 | [`validation-failed`](/problems/validation-failed/) | 400 | The request body or parameters are not valid. |
 | [`sign-in-required`](/problems/sign-in-required/) | 401 | The request needs a signed-in session. |
+| [`api-key-invalid`](/problems/api-key-invalid/) | 401 | The OEREP request has no valid API key. |
 | [`sign-in-failed`](/problems/sign-in-failed/) | 401 | The OpenID Connect sign-in could not be completed. |
 | [`sign-in-refused`](/problems/sign-in-refused/) | 403 | The identity may not sign in here. |
 | [`csrf-rejected`](/problems/csrf-rejected/) | 403 | A change did not come from the console. |
 | [`permission-denied`](/problems/permission-denied/) | 403 | The Role does not allow this action. |
+| [`product-forbidden`](/problems/product-forbidden/) | 403 | The API key belongs to another Product. |
 | [`invitation-for-another-email`](/problems/invitation-for-another-email/) | 403 | The invitation is for another verified email address. |
 | [`not-found`](/problems/not-found/) | 404 | Nothing exists at the requested address, or you cannot see it. |
 | [`invitation-invalid`](/problems/invitation-invalid/) | 404 | The invitation link does not exist, was used, or expired. |
 | [`method-not-allowed`](/problems/method-not-allowed/) | 405 | The address exists but does not accept this HTTP method. |
+| [`request-too-large`](/problems/request-too-large/) | 413 | The request body is over the limit. |
+| [`unsupported-media-type`](/problems/unsupported-media-type/) | 415 | The request body is not sent as JSON. |
 | [`already-exists`](/problems/already-exists/) | 409 | Another record already uses this unique key. |
 | [`revision-conflict`](/problems/revision-conflict/) | 409 | The record changed since it was read. |
 | [`product-in-use`](/problems/product-in-use/) | 409 | Customers use the Product, so it can only be archived. |

@@ -1,6 +1,6 @@
 # RFC-0005: Product-scoped remote evaluation
 
-- **Status:** accepted direction (2026-11-12); all design questions answered. Not implemented. Follows [ADR-0008](../../ADR-0008.md).
+- **Status:** accepted direction (2026-11-12); all design questions answered. Implemented preview on `service/python` by OPE-42; not yet released. Follows [ADR-0008](../../ADR-0008.md).
 - **Version:** amends OEREP in the draft specification 0.1. It is not a new protocol version: the specification is pre-1.0 (minor versions may break compatibility) and has no production users.
 - **Date:** 2026-11-12
 - **Tracks:** [PRD.md](../../PRD.md)
@@ -43,7 +43,7 @@ SDKs treat the 403 as a transport error: evaluation fails closed (§3.1.11), wit
 
 Under [ADR-0009](../../ADR-0009.md), every OEREP error response is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details object (`application/problem+json`) instead of `{error, message}` (§10.1.2). The problem `type` is the stable identifier SDKs branch on. The 403 above is the problem type `https://openentitlement.dev/problems/product-forbidden`, with the same body for every mismatch.
 
-Validation failures use HTTP 400 and the problem type `https://openentitlement.dev/problems/validation-failed`. [ADR-0010](../../ADR-0010.md) records accepted Product status/grace and uncapped additive Grant clarifications. This is direction, not evidence of released transport support.
+Validation failures use HTTP 400 and the problem type `https://openentitlement.dev/problems/validation-failed`. [ADR-0010](../../ADR-0010.md) records accepted Product status/grace and uncapped additive Grant clarifications. OPE-42's implementation is an integration preview, not a released contract.
 
 ### Resolution within a Product
 
@@ -80,7 +80,7 @@ The implementation must add Gherkin scenarios covering:
 
 ### Implementation handoff
 
-This RFC is accepted direction only. Before the change is described as implemented, these change together in one release:
+OPE-42 implements the following together on the `service/python` integration branch. The coordinated amendment is not a released contract until that branch ships:
 - §10 and the protocol name (OEREP 0.1), including the Problem Details error shape that replaces `{error, message}` in Requirement 10.1.2;
 - `spec/oerep.openapi.json`, including the new routes and 403 responses;
 - both SDKs' `RemoteProvider`, including reading Problem Details;

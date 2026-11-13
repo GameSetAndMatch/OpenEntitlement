@@ -21,7 +21,7 @@ It plays the role for entitlements that [OpenFeature](https://openfeature.dev/sp
 | 7 | [Hooks and audit](sections/07-hooks-and-audit.md) | evaluation hooks, mutation hooks, the audit event |
 | 8 | [Errors](sections/08-errors.md) | error shapes, HTTP mapping, upsell-friendly UIs |
 | 9 | [Layering and interoperability](sections/09-interoperability.md) | AuthN / RBAC / entitlement / flag separation, OpenFeature |
-| 10 | [Remote evaluation](sections/10-remote-evaluation.md) | OEREP v1 HTTP contract, requests, responses, security and locking |
+| 10 | [Remote evaluation](sections/10-remote-evaluation.md) | OEREP 0.1 HTTP contract, requests, responses, security and locking |
 | - | [Glossary](glossary.md) | terms |
 | - | [Conformance suite](assets/gherkin/README.md) | Gherkin features any provider can run |
 | - | [Privilege Catalog JSON Schema](schemas/privilege-catalog.schema.json) | generated authoring contract ([RFC-0002](../docs/rfcs/0002-privilege-catalog.md)), with [shared fixtures](assets/catalog-fixtures/README.md) |
@@ -66,6 +66,6 @@ The spec follows [SemVer](https://semver.org). Until 1.0.0, minor versions MAY b
 
 ## Roadmap
 
-- **Implemented (draft):** [OEREP v1](sections/10-remote-evaluation.md), generic Python/TypeScript HTTP providers, and our own [server and console](../console/README.md).
+- **Implemented (draft):** [OEREP 0.1](sections/10-remote-evaluation.md), generic Python/TypeScript HTTP providers, and our own [server and console](../console/README.md).
 - **0.2:** add-ons as first-class objects (in 0.1 they are modeled as grants or overrides, see [PRIOR_ART.md](../PRIOR_ART.md)).
 - **0.3:** events (`ENTITLEMENTS_CHANGED`), mirroring OpenFeature's provider events, so caches and UIs can refresh.

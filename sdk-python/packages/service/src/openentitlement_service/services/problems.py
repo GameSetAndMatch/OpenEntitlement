@@ -33,6 +33,11 @@ class Problem(Exception):
     def type(self) -> str:
         return PROBLEM_TYPE_BASE + self.slug
 
+    @property
+    def headers(self) -> Mapping[str, str] | None:
+        """Response headers the problem needs, such as ``Allow`` or ``WWW-Authenticate``."""
+        return None
+
 
 class NotFound(Problem):
     slug = "not-found"
@@ -50,6 +55,10 @@ class MethodNotAllowed(Problem):
 
     def __init__(self, method: str, allowed: Sequence[str]) -> None:
         super().__init__(f"This address does not accept {method}.", method=method, allowed=list(allowed))
+
+    @property
+    def headers(self) -> Mapping[str, str] | None:
+        return {"Allow": ", ".join(self.params["allowed"])}
 
 
 @dataclass(frozen=True)
@@ -272,6 +281,53 @@ class UserEntitlementsUnavailable(Problem):
             "Organization terms stay available on Cloud Pro.",
             serviceTier=service_tier,
         )
+
+
+# API keys and OEREP evaluation (OPE-42, RFC-0005).
+
+
+class ApiKeyInvalid(Problem):
+    """An OEREP request without a valid API key: missing, malformed, unknown or revoked. They are not told apart."""
+
+    slug = "api-key-invalid"
+    status = 401
+    title = "API key not valid"
+
+    def __init__(self) -> None:
+        super().__init__("Send a valid API key as a bearer token: Authorization: Bearer <key>.")
+
+    @property
+    def headers(self) -> Mapping[str, str] | None:
+        return {"WWW-Authenticate": "Bearer"}
+
+
+class ProductForbidden(Problem):
+    """The API key belongs to another Product. The same body whether or not the requested Product or Privilege exists."""
+
+    slug = "product-forbidden"
+    status = 403
+    title = "Product not allowed for this key"
+
+    def __init__(self) -> None:
+        super().__init__("This API key cannot evaluate this Product. Each key evaluates the one Product it was created for.")
+
+
+class UnsupportedMediaType(Problem):
+    slug = "unsupported-media-type"
+    status = 415
+    title = "Unsupported media type"
+
+    def __init__(self, *, accepted: str) -> None:
+        super().__init__(f"Send the request body as {accepted}.", accepted=accepted)
+
+
+class RequestTooLarge(Problem):
+    slug = "request-too-large"
+    status = 413
+    title = "Request too large"
+
+    def __init__(self, *, limit: int) -> None:
+        super().__init__(f"The request body is over {limit} bytes.", limit=limit)
 
 
 def escape_pointer_token(token: object) -> str:

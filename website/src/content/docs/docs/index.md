@@ -25,4 +25,4 @@ OpenEntitlement does not invoice customers, process payments, aggregate usage, o
 
 ## Draft status
 
-The specification is **v0.1.0, experimental**, and OEREP v1 is a draft protocol. These guides use the reference implementations from a source checkout. Read [project status](/docs/project/) before adopting the draft.
+The specification is **v0.1.0, experimental**, and OEREP 0.1 is a draft protocol. These guides use the reference implementations from a source checkout. Read [project status](/docs/project/) before adopting the draft.

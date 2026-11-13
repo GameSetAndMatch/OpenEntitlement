@@ -43,7 +43,7 @@ from .provider import (
     Provider,
     ProviderMetadata,
 )
-from .remote import RemoteProvider
+from .remote import OerepProblem, RemoteProvider
 from .resolver import check_within, resolve_from_facts, suggest_plan_from_facts
 from .values import UNLIMITED, Limit, Unlimited, Value, decode_value, encode_json, encode_value, fits, is_unlimited
 
@@ -100,6 +100,7 @@ __all__ = [
     "ProviderNotReady",
     "Reason",
     "RemoteProvider",
+    "OerepProblem",
     "ResolutionDetails",
     "SPEC_VERSION",
     "Scope",

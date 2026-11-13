@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "OpenEntitlement Remote Evaluation Protocol",
-    "version": "1.0.0-draft"
+    "version": "0.1.0-draft"
   },
   "security": [
     {
@@ -10,7 +10,7 @@
     }
   ],
   "paths": {
-    "/oerep/v1/resolve/{privilege}": {
+    "/oerep/v1/products/{product}/privileges/{privilege}/resolve": {
       "post": {
         "operationId": "resolvePrivilege",
         "requestBody": {
@@ -42,71 +42,81 @@
             }
           },
           "400": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "401": {
-            "description": "Transport or request error",
+            "description": "Missing or invalid evaluation key",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "404": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "405": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "413": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "415": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "500": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Product binding mismatch, independent of existence",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -118,13 +128,23 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          },
+          {
+            "name": "product",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
             }
           }
         ]
       }
     },
-    "/oerep/v1/resolve": {
+    "/oerep/v1/products/{product}/privileges/resolve": {
       "post": {
         "operationId": "resolveAll",
         "requestBody": {
@@ -156,79 +176,100 @@
             }
           },
           "400": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "401": {
-            "description": "Transport or request error",
+            "description": "Missing or invalid evaluation key",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "404": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "405": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "413": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "415": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "500": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Product binding mismatch, independent of existence",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "product",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          }
+        ]
       }
     },
-    "/oerep/v1/suggest/{privilege}": {
+    "/oerep/v1/products/{product}/privileges/{privilege}/upgrade": {
       "post": {
         "operationId": "suggestPlan",
         "requestBody": {
@@ -260,71 +301,81 @@
             }
           },
           "400": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "401": {
-            "description": "Transport or request error",
+            "description": "Missing or invalid evaluation key",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "404": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "405": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "413": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "415": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
           },
           "500": {
-            "description": "Transport or request error",
+            "description": "Problem Details",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Product binding mismatch, independent of existence",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -336,7 +387,17 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          },
+          {
+            "name": "product",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
             }
           }
         ]
@@ -555,20 +616,52 @@
           }
         }
       },
-      "Error": {
+      "Problem": {
         "type": "object",
         "required": [
-          "error",
-          "message"
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance"
         ],
         "properties": {
-          "error": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
             "type": "string"
           },
-          "message": {
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
             "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "pointer",
+                "detail"
+              ],
+              "properties": {
+                "pointer": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              }
+            }
           }
-        }
+        },
+        "additionalProperties": true
       }
     }
   }

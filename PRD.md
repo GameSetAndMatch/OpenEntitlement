@@ -21,11 +21,11 @@ Primary users:
 | Feature | Status | Where |
 |---|---|---|
 | Entitlement specification v0.1 (RFC 2119 requirements, Gherkin conformance suite) | ✅ | `spec/`, #1, #2 |
-| OEREP v1 remote evaluation protocol (single, bulk, upgrade suggestion) | ✅ | `spec/sections/10-remote-evaluation.md`, #1 |
+| OEREP 0.1 remote evaluation protocol (single, bulk, upgrade suggestion) | ✅ | `spec/sections/10-remote-evaluation.md`, #1 |
 | Entitlements v0.2 proposal: Tier variants, contracts, JSON Schema definitions | ✅ proposed (RFC-0001) | #20 |
 | Flat privilege identifiers only; nesting belongs to Groups, with cross-hierarchy Tags | ✅ | #40, merged on `main` |
 | Privilege Catalog authoring contract: Groups, Tags, visibility | ✅ accepted (RFC-0002) | #24 |
-| Product-scoped evaluation in OEREP 0.1: `/oerep/v1/products/{product}/privileges/{privilege}/resolve`, `upgrade` replaces `suggest`, keys bound to one Product | 📋 accepted (RFC-0005) | `docs/rfcs/0005-product-scoped-evaluation.md` |
+| Product-scoped evaluation in OEREP 0.1: `/oerep/v1/products/{product}/privileges/{privilege}/resolve`, `upgrade` replaces `suggest`, keys bound to one Product | 🚧 implemented preview on `service/python` (OPE-42); not released (RFC-0005) | `docs/rfcs/0005-product-scoped-evaluation.md` |
 | Read-only consumption dashboard | 📋 proposed (RFC-0003), blocked on a real usage source | `docs/rfcs/0003-consumption-dashboard.md` |
 | Generated JSON Schema as the shared cross-language contract | 🚧 | ADR-0006, #39; regenerated from #38 models, shared parity and serialization fixtures |
 

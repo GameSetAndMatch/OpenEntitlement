@@ -1,4 +1,4 @@
-Connect to our [entitlement service](../console/README.md) using the generic `RemoteProvider` (included in core). See [OEREP v1](../spec/sections/10-remote-evaluation.md). Embedded storage providers remain available.
+Connect to our [entitlement service](../console/README.md) using the generic `RemoteProvider` (included in core). See [OEREP 0.1](../spec/sections/10-remote-evaluation.md). Embedded storage providers remain available.
 
 # OpenEntitlement, Python SDK
 
