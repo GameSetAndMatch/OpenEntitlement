@@ -216,3 +216,11 @@ value and stay across variant changes. Grace and a status-policy fallback suspen
 Grants change, including their removal, and the writes take the Product row lock; a Catalog change
 that would make stored Personal terms or Grants invalid is refused. On OpenEntitlement Cloud only
 Cloud Enterprise has user-level entitlements: on Cloud Pro, records are kept without `values`.
+
+## Product evaluation (OPE-42 integration preview)
+
+Owners and Product Managers create keys with `POST /api/workspaces/{workspace_id}/products/{product_id}/api-keys` and `{"name":"Application"}`. The `secret` appears only in that response; list returns safe previews and DELETE `…/api-keys/{key_id}` revokes a key. Archived Products keep existing keys and reject new ones.
+
+Configure `RemoteProvider(base_url, product="analytics", token=secret)` in Python or `new RemoteProvider({baseUrl, product: "analytics", token: secret})` in TypeScript. Each provider evaluates one Product; use another provider and key for another Product. The new routes, RFC 9457 failures and binding order are in [spec §10](../../../../spec/sections/10-remote-evaluation.md). These changes are an unreleased integration preview.
+
+Run `uv run pytest tests/service/test_http_oerep.py tests/service/test_oerep_conformance.py tests/test_remote.py` from `sdk-python`. The shared transport scenarios live in `spec/assets/oerep-gherkin`; both SDKs call the Python service over HTTP. Install `sdk-js` dependencies and Node to exercise TypeScript. Set the test database DSN as documented above to run the same cases against Postgres and its RLS policies.

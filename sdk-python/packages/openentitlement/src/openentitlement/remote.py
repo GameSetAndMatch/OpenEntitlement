@@ -1,13 +1,15 @@
-"""Generic OEREP v1 provider using the Python standard library."""
+"""Generic OEREP 0.1 provider using the Python standard library (spec §10)."""
 from __future__ import annotations
 
 import json
 import math
+import re
 import threading
 import time
 from collections import OrderedDict
 from typing import Any, Iterable, Optional
 from urllib.parse import quote, urlsplit
+from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .catalog import PrivilegeDefinition, ValueType
@@ -15,6 +17,46 @@ from .details import ErrorCode, EvaluationContext, GrantApplied, Reason, Resolut
 from .provider import AbstractProvider, Capabilities, ProviderMetadata
 from .resolver import Need
 from .values import decode_value, is_int, is_unlimited
+
+
+PRODUCT_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
+PROBLEM_TYPES = "https://openentitlement.dev/problems/"
+
+
+class OerepProblem(Exception):
+    """An OEREP error response, read from its RFC 9457 Problem Details body (spec §10.1.2).
+
+    ``type`` is the stable identifier to branch on, for example
+    ``https://openentitlement.dev/problems/product-forbidden``. A response without a Problem
+    Details body has type ``about:blank``. The client turns it into a fail-closed resolution
+    (reason ``ERROR``) with no upgrade suggestion.
+    """
+
+    def __init__(self, status: int, type: str = "about:blank", title: str = "", detail: str = "",
+                 members: Optional[dict[str, Any]] = None) -> None:
+        self.status, self.type, self.title, self.detail = status, type, title, detail
+        self.members: dict[str, Any] = dict(members or {})
+        super().__init__(f"OEREP {status} {type}" + (f": {detail}" if detail else ""))
+
+    @property
+    def slug(self) -> Optional[str]:
+        """The OpenEntitlement problem name (``product-forbidden``), or None for another type."""
+        return self.type[len(PROBLEM_TYPES):] if self.type.startswith(PROBLEM_TYPES) else None
+
+    @classmethod
+    def from_response(cls, status: int, content_type: str, body: bytes) -> "OerepProblem":
+        if content_type.split(";", 1)[0].strip().lower() in ("application/problem+json", "application/json"):
+            try:
+                raw = json.loads(body)
+            except ValueError:
+                raw = None
+            if isinstance(raw, dict) and isinstance(raw.get("type", "about:blank"), str):
+                standard = {"type", "title", "status", "detail", "instance"}
+                return cls(status, raw.get("type", "about:blank"),
+                           raw["title"] if isinstance(raw.get("title"), str) else "",
+                           raw["detail"] if isinstance(raw.get("detail"), str) else "",
+                           {k: v for k, v in raw.items() if k not in standard})
+        return cls(status)
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -65,7 +107,13 @@ def decode_remote_details(raw: Any, p: PrivilegeDefinition, ctx: Optional[Evalua
 
 
 class RemoteProvider(AbstractProvider):
-    """Connect to an OEREP server. Timeout and ``cache_ttl`` are in seconds.
+    """Connect to an OEREP server to evaluate one Product. Timeout and ``cache_ttl`` are in seconds.
+
+    ``product`` is the key of the Product this provider evaluates, and ``token`` an API key for that
+    Product (RFC-0005). Both are fixed for the provider's lifetime, with the base URL; an
+    application that evaluates two Products uses two providers. An error response raises
+    ``OerepProblem`` with the server's Problem Details, which the client turns into a fail-closed
+    resolution.
 
     Decisions are not cached unless ``cache_ttl`` is set. With a TTL, successful validated resolutions
     are kept per privilege and context (organization, subject, resource) for at most ``cache_ttl``
@@ -80,8 +128,10 @@ class RemoteProvider(AbstractProvider):
     supports_fresh = True
     capabilities = Capabilities(overrides=True, grants=True, plan_catalog=True)
 
-    def __init__(self, base_url: str, *, token: Optional[str] = None, timeout: float = 5.0,
+    def __init__(self, base_url: str, *, product: str, token: Optional[str] = None, timeout: float = 5.0,
                  cache_ttl: Optional[float] = None, cache_max_entries: int = 10_000):
+        if not isinstance(product, str) or not PRODUCT_KEY.fullmatch(product):
+            raise ValueError("product must be a Product key such as 'analytics' (^[a-z][a-z0-9_]*$)")
         url = urlsplit(base_url)
         if url.scheme not in ("http", "https") or not url.netloc or url.query or url.fragment or url.username or url.password:
             raise ValueError("base_url must be an HTTP(S) URL without credentials, query or fragment")
@@ -92,7 +142,7 @@ class RemoteProvider(AbstractProvider):
             raise ValueError("cache_ttl must be a positive finite number of seconds or None")
         if isinstance(cache_max_entries, bool) or not isinstance(cache_max_entries, int) or cache_max_entries <= 0:
             raise ValueError("cache_max_entries must be a positive integer")
-        self._base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
+        self._base_url, self._token, self._product, self.timeout = base_url.rstrip("/"), token, product, timeout
         self.cache_ttl, self.cache_max_entries = cache_ttl, cache_max_entries
         self._opener = build_opener(_NoRedirect())
         self._cache: OrderedDict[tuple[Optional[str], ...], tuple[float, ResolutionDetails[Any]]] = OrderedDict()
@@ -108,6 +158,11 @@ class RemoteProvider(AbstractProvider):
     def token(self) -> Optional[str]:
         return self._token
 
+    @property
+    def product(self) -> str:
+        """The Product this provider evaluates, fixed for its lifetime."""
+        return self._product
+
     def clear_cache(self) -> None:
         """Drop every cached resolution."""
         with self._cache_lock:
@@ -120,7 +175,7 @@ class RemoteProvider(AbstractProvider):
         """The entry key, or None when this request must bypass the cache."""
         if self.cache_ttl is None:
             return None
-        return (key, ctx.organization_id, ctx.subject_id, ctx.resource_id)
+        return (self._product, key, ctx.organization_id, ctx.subject_id, ctx.resource_id)
 
     def _cache_get(self, ck: tuple[Optional[str], ...]) -> Optional[ResolutionDetails[Any]]:
         with self._cache_lock:
@@ -158,10 +213,14 @@ class RemoteProvider(AbstractProvider):
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        req = Request(f"{self.base_url}/oerep/v1/{path}",
-                      data=json.dumps({"context": context, **extra}).encode(), headers=headers, method="POST")
-        with self._opener.open(req, timeout=self.timeout) as response:
-            return json.load(response)
+        base = f"{self.base_url}/oerep/v1/products/{quote(self._product, safe='')}/privileges/"
+        req = Request(base + path, data=json.dumps({"context": context, **extra}).encode(), headers=headers, method="POST")
+        try:
+            with self._opener.open(req, timeout=self.timeout) as response:
+                return json.load(response)
+        except HTTPError as e:
+            with e:
+                raise OerepProblem.from_response(e.code, e.headers.get("Content-Type", ""), e.read()) from None
 
     def resolve(
         self, privilege: PrivilegeDefinition, ctx: EvaluationContext, *, fresh: bool = False, explicit_time: Optional[bool] = None
@@ -176,13 +235,13 @@ class RemoteProvider(AbstractProvider):
         if ck is not None:
             with self._cache_lock:
                 self._cache.pop(ck, None)
-        d = decode_remote_details(self._post(f"resolve/{quote(privilege.key, safe='')}", ctx), privilege, ctx)
+        d = decode_remote_details(self._post(f"{quote(privilege.key, safe='')}/resolve", ctx), privilege, ctx)
         if ck is not None:
             self._cache_put([(ck, d)])
         return d
 
     def resolve_all(self, privileges: Iterable[PrivilegeDefinition], ctx: EvaluationContext) -> dict[str, ResolutionDetails[Any]]:
-        """Resolve every listed privilege with one bulk request (``POST /oerep/v1/resolve``).
+        """Resolve every listed privilege with one bulk request (``POST …/products/{product}/privileges/resolve``).
 
         Pass ``catalog.privileges``. Results for privileges the server knows but the local catalog does
         not are ignored. Any invalid entry fails the whole call. With a cache, results fill the
@@ -193,7 +252,7 @@ class RemoteProvider(AbstractProvider):
         if ctx.now is None:
             with self._cache_lock:
                 for key in wanted:
-                    self._cache.pop((key, ctx.organization_id, ctx.subject_id, ctx.resource_id), None)
+                    self._cache.pop((self._product, key, ctx.organization_id, ctx.subject_id, ctx.resource_id), None)
         data = self._post("resolve", ctx)
         if not isinstance(data, dict) or not isinstance(data.get("privileges"), list):
             raise ValueError("invalid OEREP bulk response")
@@ -216,8 +275,8 @@ class RemoteProvider(AbstractProvider):
         return out
 
     def suggest_plan(self, privilege: PrivilegeDefinition, need: Need, ctx: EvaluationContext) -> Optional[str]:
-        """Upgrade suggestions are never cached."""
-        data = self._post(f"suggest/{quote(privilege.key, safe='')}", ctx, need=need)
+        """The lowest-ranked Tier of this Product that meets ``need`` (``…/{privilege}/upgrade``). Never cached."""
+        data = self._post(f"{quote(privilege.key, safe='')}/upgrade", ctx, need=need)
         if not isinstance(data, dict) or "requiredPlan" not in data:
             raise ValueError("invalid OEREP suggestion")
         plan = data["requiredPlan"]

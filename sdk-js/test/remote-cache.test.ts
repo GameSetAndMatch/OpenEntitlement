@@ -17,9 +17,9 @@ function fakeServer() {
     const path = new URL(String(url)).pathname;
     state.requests.push({ path, body: JSON.parse(String(init!.body)) });
     if (state.fail) return new Response(JSON.stringify({ error: "internal", message: "down" }), { status: 500 });
-    if (path === "/oerep/v1/resolve") return Response.json({ privileges: Object.keys(state.values).map(details) });
-    if (path.startsWith("/oerep/v1/suggest/")) return Response.json({ requiredPlan: "pro" });
-    return Response.json(details(decodeURIComponent(path.split("/").at(-1)!)));
+    if (path === "/oerep/v1/products/demo/privileges/resolve") return Response.json({ privileges: Object.keys(state.values).map(details) });
+    if (path.endsWith("/upgrade")) return Response.json({ requiredPlan: "pro" });
+    return Response.json(details(decodeURIComponent(path.split("/").at(-2)!)));
   };
   return { state, fetch };
 }
@@ -27,7 +27,7 @@ function fakeServer() {
 function cached(extra: Partial<RemoteProviderOptions> = {}) {
   const server = fakeServer();
   const clock = { t: 0 };
-  const provider = new RemoteProvider({ baseUrl: "http://oerep.test", fetch: server.fetch, cacheTtlMs: 10_000, monotonicClock: () => clock.t, ...extra });
+  const provider = new RemoteProvider({ product: "demo", baseUrl: "http://oerep.test", fetch: server.fetch, cacheTtlMs: 10_000, monotonicClock: () => clock.t, ...extra });
   return { ...server, clock, provider, client: createClient({ catalog, provider }) };
 }
 
@@ -36,7 +36,7 @@ const acme = { organizationId: "acme" };
 describe("RemoteProvider opt-in decision cache", () => {
   it("is off by default", async () => {
     const { state, fetch } = fakeServer();
-    const c = createClient({ catalog, provider: new RemoteProvider({ baseUrl: "http://oerep.test", fetch }) });
+    const c = createClient({ catalog, provider: new RemoteProvider({ product: "demo", baseUrl: "http://oerep.test", fetch }) });
     for (let i = 0; i < 3; i++) assert.equal(await c.getLimit("seat_max", acme), 10);
     assert.equal(state.requests.length, 3);
   });
@@ -86,7 +86,7 @@ describe("RemoteProvider opt-in decision cache", () => {
 
   it("still caches when the client clock is not wall time", async () => {
     const server = fakeServer();
-    const provider = new RemoteProvider({ baseUrl: "http://oerep.test", fetch: server.fetch, cacheTtlMs: 10_000, monotonicClock: () => 0 });
+    const provider = new RemoteProvider({ product: "demo", baseUrl: "http://oerep.test", fetch: server.fetch, cacheTtlMs: 10_000, monotonicClock: () => 0 });
     const client = createClient({ catalog, provider, clock: () => new Date("2020-01-01T00:00:00Z") });
     await client.getLimit("seat_max", acme);
     await client.getLimit("seat_max", acme);
@@ -108,7 +108,7 @@ describe("RemoteProvider opt-in decision cache", () => {
 
   it("never caches ERROR resolutions returned by the server", async () => {
     let calls = 0;
-    const provider = new RemoteProvider({ baseUrl: "http://oerep.test", cacheTtlMs: 10_000, fetch: async () => {
+    const provider = new RemoteProvider({ product: "demo", baseUrl: "http://oerep.test", cacheTtlMs: 10_000, fetch: async () => {
       calls++;
       return Response.json({ privilege: "seat_max", value: 1, reason: "ERROR", errorCode: "GENERAL", grants: [], staleOverrides: [] });
     } });
@@ -125,7 +125,7 @@ describe("RemoteProvider opt-in decision cache", () => {
     assert.equal(await client.getLimit("seat_max", acme), 10);
     assert.equal(await client.getEnum("report_retention", acme), "90d");
     assert.equal(await client.isEnabled("sso", acme), true);
-    assert.deepEqual(state.requests.map((r) => r.path), ["/oerep/v1/resolve"]);
+    assert.deepEqual(state.requests.map((r) => r.path), ["/oerep/v1/products/demo/privileges/resolve"]);
     await client.getLimit("seat_max", { organizationId: "globex" });
     assert.equal(state.requests.length, 2);
   });
@@ -158,7 +158,7 @@ describe("RemoteProvider opt-in decision cache", () => {
   it("never caches upgrade suggestions", async () => {
     const { state, client } = cached();
     for (let i = 0; i < 2; i++) assert.equal(await client.requiredPlan("report_retention", "365d", acme), "pro");
-    assert.equal(state.requests.filter((r) => r.path.startsWith("/oerep/v1/suggest/")).length, 2);
+    assert.equal(state.requests.filter((r) => r.path.endsWith("/upgrade")).length, 2);
   });
 
   it("guard, requireWithin and requireEnabled always fetch the current value and refresh the cache", async () => {
@@ -168,10 +168,10 @@ describe("RemoteProvider opt-in decision cache", () => {
     assert.equal(await client.getLimit("seat_max", acme), 10);
     assert.equal(state.requests.length, 1);
     await assert.rejects(client.requireWithin("seat_max", 3, 1, acme), EntitlementLimitExceeded);
-    assert.equal(state.requests[1]!.path, "/oerep/v1/resolve/seat_max");
+    assert.equal(state.requests[1]!.path, "/oerep/v1/products/demo/privileges/seat_max/resolve");
     let n = state.requests.length;
     await assert.rejects(client.guard("seat_max", 1, acme, { count: () => 3, act: () => "created" }), EntitlementLimitExceeded);
-    assert.equal(state.requests[n]!.path, "/oerep/v1/resolve/seat_max");
+    assert.equal(state.requests[n]!.path, "/oerep/v1/products/demo/privileges/seat_max/resolve");
     n = state.requests.length;
     assert.equal((await client.guard("seat_max", 1, acme, { count: () => 2, act: () => "ok" })).result, "ok");
     assert.equal(state.requests.length, n + 1);
@@ -193,7 +193,7 @@ describe("RemoteProvider opt-in decision cache", () => {
   it("rejects invalid cache options", () => {
     for (const bad of [{ cacheTtlMs: 0 }, { cacheTtlMs: -1 }, { cacheTtlMs: Infinity }, { cacheTtlMs: NaN }, { cacheTtlMs: "5" as unknown as number },
       { cacheMaxEntries: 0 }, { cacheMaxEntries: 1.5 }, { cacheMaxEntries: -3 }, { cacheMaxEntries: Infinity }])
-      assert.throws(() => new RemoteProvider({ baseUrl: "http://localhost:1", ...bad }), /cache/);
+      assert.throws(() => new RemoteProvider({ product: "demo", baseUrl: "http://localhost:1", ...bad }), /cache/);
   });
 });
 
@@ -228,7 +228,7 @@ describe("RemoteProvider cache provenance and refresh regressions", () => {
     it(`evicts previous success after ${bulk ? "bulk" : "single"} ${failure} refresh`, async () => {
       const server = fakeServer();
       let failing = false;
-      const provider = new RemoteProvider({ baseUrl: "http://oerep.test", cacheTtlMs: 10_000, fetch: async (url, init) => {
+      const provider = new RemoteProvider({ product: "demo", baseUrl: "http://oerep.test", cacheTtlMs: 10_000, fetch: async (url, init) => {
         if (failing && failure === "transport") return new Response("down", { status: 500 });
         const response = await server.fetch(url, init);
         if (!failing) return response;
@@ -260,7 +260,7 @@ describe("RemoteProvider cache provenance and refresh regressions", () => {
 
   it("snapshots caller-owned transport options", async () => {
     const requests: { url: string; authorization: string | null }[] = [];
-    const options: RemoteProviderOptions = { baseUrl: "http://authority-a.test", token: "authority-a", cacheTtlMs: 10_000,
+    const options: RemoteProviderOptions = { product: "demo", baseUrl: "http://authority-a.test", token: "authority-a", cacheTtlMs: 10_000,
       fetch: async (url, init) => {
         requests.push({ url: String(url), authorization: new Headers(init!.headers).get("authorization") });
         return Response.json({ privilege: "seat_max", value: requests.length * 10, reason: "PLAN", grants: [], staleOverrides: [] });
@@ -273,7 +273,7 @@ describe("RemoteProvider cache provenance and refresh regressions", () => {
     options.fetch = async () => { throw new Error("mutated fetch must not run"); };
     await client.requireWithin("seat_max", 0, 1, acme);
     assert.equal(await client.getLimit("seat_max", acme), 20);
-    assert.deepEqual(requests, Array(2).fill({ url: "http://authority-a.test/oerep/v1/resolve/seat_max", authorization: "Bearer authority-a" }));
+    assert.deepEqual(requests, Array(2).fill({ url: "http://authority-a.test/oerep/v1/products/demo/privileges/seat_max/resolve", authorization: "Bearer authority-a" }));
   });
 });
 

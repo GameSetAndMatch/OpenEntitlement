@@ -7,7 +7,7 @@ OpenEntitlement is an independent, Apache-2.0-licensed project developing a vend
 
 ## Compatibility
 
-The semantic specification is **v0.1.0, experimental**. OEREP v1 is a draft. Until the specification reaches 1.0, minor versions may introduce incompatible changes. Review the specification and pin a repository revision when evaluating the reference implementations.
+The semantic specification is **v0.1.0, experimental**. OEREP 0.1 is a draft. Until the specification reaches 1.0, minor versions may introduce incompatible changes. Review the specification and pin a repository revision when evaluating the reference implementations.
 
 The guides use a source checkout. They do not assume packages have been published to npm or PyPI.
 

@@ -69,7 +69,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Deployment** | Where and how software runs, independent of its commercial Tier. |
 | **Problem type** | The stable URI that identifies one kind of error in an RFC 9457 Problem Details response, such as `https://openentitlement.dev/problems/validation-failed`. Clients branch on it, not on the human-readable title or detail. |
 
-## OEREP v1 compatibility language
+## OEREP 0.1 compatibility language
 
 | Term | Definition |
 |---|---|

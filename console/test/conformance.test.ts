@@ -1,3 +1,4 @@
+import { legacyOerepFetch } from "./legacy-oerep-adapter.ts";
 import { ContractStore } from "../server/contracts-store.ts";
 /** Execute the shared semantic scenarios across an actual HTTP boundary. */
 import assert from "node:assert/strict";
@@ -24,7 +25,7 @@ for (const scenario of scenarios) {
     const target: Target = {
       name: "oerep", tags: new Set(["overrides", "grants", "plan-catalog"]),
       async setup(w) {
-        w.makeClient(new RemoteProvider({ baseUrl: `http://127.0.0.1:${port}` }));
+        w.makeClient(new RemoteProvider({ product: "demo", fetch: legacyOerepFetch, baseUrl: `http://127.0.0.1:${port}` }));
         const admin = createClient({ catalog, provider: storage.provider, clock: () => w.now });
         // The harness issues administrative steps through the separate server-side admin client.
         Object.defineProperty(w.client!, "admin", { value: admin.admin });

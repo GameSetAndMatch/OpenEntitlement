@@ -48,4 +48,4 @@ Flags come before RBAC and entitlements, so unreleased features stay invisible (
 
 ### 9.4. Remote evaluation
 
-[OEREP v1 (§10)](10-remote-evaluation.md) defines the remote contract, following [OFREP](https://github.com/open-feature/protocol)'s separation between generic SDK providers and compatible servers. OpenEntitlement supplies its own open-source entitlement server, backed by memory or Postgres, and a console for administration. The SDKs use a generic `RemoteProvider`; applications may also embed the reference storage providers.
+[OEREP 0.1 (§10)](10-remote-evaluation.md) defines the remote contract, following [OFREP](https://github.com/open-feature/protocol)'s separation between generic SDK providers and compatible servers. OpenEntitlement supplies its own open-source entitlement server, backed by memory or Postgres, and a console for administration. The SDKs use a generic `RemoteProvider`; applications may also embed the reference storage providers.

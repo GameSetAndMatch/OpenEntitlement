@@ -3,6 +3,9 @@ title: TypeScript SDK
 description: Connect a TypeScript application to an OEREP service with the reference SDK.
 ---
 
+The Product-bound RemoteProvider shown here is an unreleased `service/python` preview. It requires the Python service’s Product API key and does not connect directly to the historical Node demo.
+
+
 The core SDK uses the platform `fetch` API. Its one runtime dependency is [Zod](https://zod.dev), which validates Privilege Catalogs in `@openentitlement/core/authoring`; `npm install @openentitlement/core` installs it. Start from a source checkout; package publication is not assumed here.
 
 ## Use the repository workspace
@@ -25,7 +28,7 @@ const catalog = Catalog.fromJSON(JSON.parse(
 ));
 const client = createClient({
   catalog,
-  provider: new RemoteProvider({
+  provider: new RemoteProvider({ product: "analytics",
     baseUrl: 'http://localhost:8787',
     token: process.env.OE_EVAL_TOKEN,
     timeoutMs: 5000,
@@ -69,7 +72,7 @@ Timeouts, HTTP failures, malformed responses, and catalog mismatches become eval
 The remote provider makes one HTTP call per evaluation unless you opt in to a short-lived decision cache:
 
 ```ts
-const provider = new RemoteProvider({
+const provider = new RemoteProvider({ product: "analytics",
   baseUrl: 'http://localhost:8787',
   token: process.env.OE_EVAL_TOKEN,
   cacheTtlMs: 10_000,     // off when omitted; must be positive and finite
