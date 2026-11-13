@@ -5,12 +5,14 @@ import { Catalog } from "./catalog.tsx";
 import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
 import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
-import { changesContractTerms,STALE_REVISION,type WorkspaceData } from "../../../server/workspace/model.ts";
+import { changesContractTerms,type WorkspaceData } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
 import { FormField } from "../form.tsx";
 import "./style.css";
 export interface Workspace {hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+// The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
+const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
 // The workspace's daily pages. Administration lives in Settings, which swaps the sidebar (as in Linear).
 const pages=[

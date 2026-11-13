@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import {normalizeCatalog} from "./catalog-adapter.ts";
-import { emptyData, STALE_REVISION, WorkspaceError, type Action, type Role, type WorkspaceData } from "./model.ts";
+import { emptyData, WorkspaceError, type Action, type Role, type WorkspaceData } from "./model.ts";
 
 export interface Account { id: string; email: string; platformAdmin: boolean }
 export interface Session { account: Account; csrf: string }
@@ -97,7 +97,7 @@ export class WorkspaceStore {
     return this.transaction(id,async db => {
       await this.authorize(db,account,id,action);
       const row = (await db.query("SELECT data,revision FROM oe_cp_state WHERE workspace_id=$1 FOR UPDATE",[id])).rows[0];
-      if (Number(row.revision) !== revision) throw new WorkspaceError(STALE_REVISION,409);
+      if (Number(row.revision) !== revision) throw new WorkspaceError("Workspace changed elsewhere. Refresh before saving.",409);
       const before = structuredClone(row.data); row.data=normalizeCatalog(row.data);change(row.data);
       if (JSON.stringify(row.data).length > 900000) throw new WorkspaceError("Workspace configuration is too large",413);
       await db.query("UPDATE oe_cp_state SET data=$2,revision=revision+1 WHERE workspace_id=$1",[id,row.data]);
