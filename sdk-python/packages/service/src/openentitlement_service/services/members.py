@@ -255,6 +255,8 @@ class MemberService:
         assert product_id is not None
         ws.actor.require(Permission.MANAGE_MEMBERS, product_id)
         await self._existing_product(ws, product_id)
+        # Serialize membership changes, so concurrent clears cannot both see another Role remaining.
+        await ws.repos.workspaces.lock()
         member = await self._member(ws, account_id)
         before = await self._role(ws, member, product_id)
         if member.owner:
@@ -289,6 +291,7 @@ class MemberService:
         A member left without any Role after a Manager removes them leaves the Workspace.
         """
         actor = ws.actor
+        await ws.repos.workspaces.lock()
         member = await self._member(ws, account_id)
         email = await self._email_of(ws, member)
         if actor.administers_workspace:
