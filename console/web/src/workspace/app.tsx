@@ -38,7 +38,7 @@ const settingsPages=[
 ];
 const allPages=[...pages,...settingsPages];
 // The pages the Python service serves so far; the others arrive with their tickets.
-const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","Service","Configuration","Audit log"]);
+const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","API keys","Service","Configuration","Audit log"]);
 // Links from before Settings had its own sidebar.
 const legacy:Record<string,string>={settings:"Members",configuration:"Configuration",audit:"Audit log"};
 // The last workspace this browser used. A convenience only: the list from the server decides access.
@@ -198,10 +198,11 @@ export function WorkspaceApp(){
   const organizationsWorkspace=tiersWorkspace&&currentOrganizations?{...tiersWorkspace,data:{...tiersWorkspace.data,organizations:organizationsData(currentOrganizations,product),subjects:subjectsData(currentOrganizations,product)},organizationValues:(id:string)=>resolvedValues(currentOrganizations,id,product),userValues:(id:string,subject:string)=>userValues(currentOrganizations,id,subject,product)}:undefined;
   const catalogEditable=selectedProduct?.role==='Manager'||selectedProduct?.role==='Owner'||selectedProduct?.role==='Platform administrator';
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
-  // API keys are an Owner's page; anyone else lands on Members instead.
+  // API keys are the Owners' page; on the Python service also the selected Product's Managers'. Anyone else lands on Members instead.
+  const canKeys=canEdit||Boolean(workspace?.products&&selectedProduct?.role==="Manager");
   const canAudit=canEdit||workspace?.role==="Manager"||workspace?.products?.some(p=>p.role==="Manager");
-  const visibleSettings=settingsPages.filter(p=>(p.name!=="API keys"||canEdit)&&(p.name!=="Audit log"||canAudit));
-  const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canEdit)&&(p.name!=="Audit log"||canAudit))??settingsPages[0]!;
+  const visibleSettings=settingsPages.filter(p=>(p.name!=="API keys"||canKeys)&&(p.name!=="Audit log"||canAudit));
+  const shown=allPages.find(p=>p.name===page&&(p.name!=="API keys"||canKeys)&&(p.name!=="Audit log"||canAudit))??settingsPages[0]!;
   const inSettings=settingsPages.includes(shown);
   const link=(p:typeof allPages[number])=><a className={`nav ${shown===p?"active":""}`} aria-current={shown===p?"page":undefined} href={`#${p.hash}`} key={p.hash}>{p.name}</a>;
   return <div className="shell workspace-shell"><a className="skip-link" href="#workspace-main">Skip to workspace</a><aside>{!creating&&current?<WorkspaceSwitcher workspaces={list} current={current} disabled={busy} onSelect={id=>leave(()=>{setSelected(id);setError("");})} onCreate={()=>leave(()=>{setCreating(true);setError("");})}/>:<a className="brand" href="/app/"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="32" height="32"/></picture><span>OpenEntitlement</span></a>}
@@ -221,7 +222,7 @@ export function WorkspaceApp(){
       {workspace.products&&shown.name==='Tiers'&&(tiersWorkspace?<Tiers key={workspace.id+product} workspace={tiersWorkspace} save={save} canEdit={catalogEditable} busy={busy} leave={leave}/>:<p role="status">Loading Tiers…</p>)}
       {workspace.products&&shown.name==='Organizations'&&(organizationsWorkspace?<Organizations key={workspace.id+product} workspace={organizationsWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Organizations…</p>)}
       {workspace.products&&shown.name==='Configuration'&&(organizationsWorkspace&&selectedProduct?<WorkspaceConfiguration key={workspace.id+product} workspace={organizationsWorkspace} product={selectedProduct}/>:<p role="status">Loading configuration…</p>)}
-      {workspace.data===undefined&&(shown.name==="Members"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
+      {workspace.data===undefined&&(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} product={selectedProduct} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
       {workspace.data===undefined&&!PYTHON_PAGES.has(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
       {shown.name==="Audit log"&&workspace&&canAudit&&<AuditLog key={workspace.id} workspaceId={workspace.id} language={session.account?.language??session.language??'en'}/>}
       {workspace.data!==undefined&&<>

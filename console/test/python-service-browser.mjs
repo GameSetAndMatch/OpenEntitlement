@@ -287,6 +287,21 @@ await page.getByRole('heading',{name:'Define your first privilege',exact:true}).
  assert.match(acmeYaml,/key: acme_product\n/);assert.match(acmeYaml,/pro_standard/);assert.match(acmeYaml,/id: acme\n/);assert.doesNotMatch(acmeYaml,/default: 100\n|internal_beta/);
  const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Download YAML',exact:true}).click()]);
  assert.equal(download.suggestedFilename(),'acme_product.yaml');
+ // Settings → API keys: a key for the selected Product, its secret shown once; it evaluates that Product only, until revoked.
+ await page.getByRole('link',{name:'API keys',exact:true}).click();
+ const keys=page.getByRole('region',{name:'API keys for Acme product'});await keys.waitFor();
+ await keys.getByLabel('Key name').fill('Billing app');await keys.getByRole('button',{name:'Create API key',exact:true}).click();
+ const secret=await page.getByLabel('Save this secret securely').inputValue();assert.match(secret,/^oek_/);
+ await keys.getByText('Billing app',{exact:true}).waitFor();
+ const evaluate=(product,key=secret)=>page.request.post(app+`/oerep/v1/products/${product}/privileges/resolve`,{headers:{authorization:`Bearer ${key}`},data:{context:{organizationId:'acme'}}});
+ const evaluated=await evaluate('acme_product');assert.equal(evaluated.status(),200);
+ assert.equal((await evaluated.json()).privileges.find(p=>p.privilege==='seats').value,25);
+ assert.equal((await evaluate('storage')).status(),403,'A key evaluates its own Product only');
+ await page.reload();await keys.getByText('Billing app',{exact:true}).waitFor();assert.equal(await page.getByLabel('Save this secret securely').count(),0,'The secret is shown once');
+ await keys.getByRole('button',{name:'Revoke Billing app',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
+ await keys.getByText('Billing app',{exact:true}).waitFor({state:'hidden'});
+ assert.equal((await evaluate('acme_product')).status(),401,'A revoked key is refused');
  await page.getByRole('link',{name:'Back to workspace',exact:false}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
  // A change without the CSRF token is refused as a Problem Details response.
@@ -319,7 +334,11 @@ await page.getByRole('heading',{name:'Define your first privilege',exact:true}).
  await userPage.goto(app+'/app/#settings/members');await userPage.getByRole('button',{name:'Workspace: Acme product',exact:true}).waitFor();
  await userPage.getByLabel('Role for user@example.test').waitFor();assert.equal(await userPage.getByLabel('Role for admin@example.test').count(),0);
  assert.deepEqual(await userPage.locator('.member-email').allInnerTexts(),['admin@example.test','user@example.test']);
+ // As Storage's Manager, they administer Storage's API keys.
+ await userPage.getByRole('link',{name:'API keys',exact:true}).click();await userPage.getByRole('region',{name:'API keys for Storage'}).waitFor();
+ await userPage.getByRole('link',{name:'Members',exact:true}).click();
  await userPage.getByLabel('Role for user@example.test').selectOption('User');await userPage.getByText('Your role: User.',{exact:true}).waitFor();
+ assert.equal(await userPage.getByRole('link',{name:'API keys',exact:true}).count(),0,'A User has no API keys page');
  assert.equal(await userPage.getByLabel('Email address').count(),0);
  // Layout: the Members and Service pages never overflow, and role selects are not clipped, down to phone width.
  for(const width of [1280,768,390]){await page.setViewportSize({width,height:900});

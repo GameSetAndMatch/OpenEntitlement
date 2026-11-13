@@ -5,14 +5,19 @@ import { configurationYaml,type SnapshotProduct } from "./configuration.ts";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
 import { useConfirm,useToast } from "../ui.tsx";
+import { ProductApiKeys } from "./product-api-keys.tsx";
+import type { ProductSummary } from "./product-selector.tsx";
 import { ProductMembers,managesMembers,type MemberRoleChange,type NewInvitation,type ProductMember } from "./product-members.tsx";
-export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
+/** `product` is the Product the selector shows on the Python service: API keys belong to it. */
+export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess,product}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;product?:ProductSummary;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
   const sectionGeneration=useRef(0);
   // Leaving a section discards what was typed in it (the console asked first).
   useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");},[section]);
+  // A secret is shown once, for the Product it was created in.
+  useEffect(()=>setSecret(""),[section,product?.id]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
   useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier,section]);
@@ -22,16 +27,17 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const python=w.products!==undefined;
   const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||(python?w.products!.some(managesMembers):w.role==="Manager");
   const base=`/api/workspaces/${w.id}`;
+  // On the Python service, the selected Product's Managers and the Owners administer its API keys (OPE-42).
+  const keysPath=python&&product&&(owner||product.role==="Manager")?`${base}/products/${product.id}/api-keys`:undefined;
   // Every load takes a generation number; only the newest one may update the lists.
   const generation=useRef(0);
-  // API keys per Product arrive on the Python service with OPE-42.
-  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=owner&&!python?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
+  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=keysPath?await request(keysPath):owner&&!python?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
   async function reload(){await load();}
   useEffect(()=>{let active=true;const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
     // Stay current without a refresh button: reload when the person comes back to this window.
     const onFocus=()=>{if(document.visibilityState==="visible")void refresh();};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
-  },[base,manager,owner]); // load reads exactly base, manager and owner
+  },[base,manager,owner,keysPath]); // load reads exactly base, manager, owner and keysPath
   // Settings changes are audited with their actor; only removals ask to confirm.
   // A write already sent may still commit; leaving the section waits for it (see unsaved.ts).
   async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return false;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return false;setError("");const result=await trackWrite(action(""));if(result!=="access-changed")await reload();toast("Changes saved");return true;}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);return false;}finally{pendingRef.current=false;setPending(false);}}
@@ -60,7 +66,10 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
       </form>
       {link&&<Field label="Invitation link (expires in 7 days)" hint="Share it with the invited person. They must sign in with that verified email address."><input readOnly value={link} onFocus={e=>e.target.select()}/></Field>}
     </Group>}</>}
-    {section==="API keys"&&owner&&<><Group description="Your application evaluates entitlements in this workspace with these keys.">
+    {section==="API keys"&&keysPath&&product&&<ProductApiKeys product={product} keys={keys} name={name} secret={secret} locked={locked} onName={setName} onCopy={copy}
+      onCreate={()=>void mutate("Create API key",async()=>{const result=await request(keysPath,"POST",{name});setSecret(result.secret);setName("");})}
+      onRevoke={k=>void mutate(`Revoke ${k.name}? Applications using it stop working.`,async()=>{await request(`${keysPath}/${k.id}`,"DELETE");},true)}/>}
+    {section==="API keys"&&owner&&!python&&<><Group description="Your application evaluates entitlements in this workspace with these keys.">
       <Item label="Workspace ID" description="Identifies this workspace in the API and in support requests."><code className="settings-value">{w.id}</code><button className="btn-quiet" onClick={()=>copy(w.id,"Workspace ID copied")}>Copy</button></Item>
       {keys.map(k=><Item key={k.id} label={k.name} description={<><code>{k.prefix}…</code> · {k.revoked?"Revoked":k.scope}</>}>{!k.revoked&&<button className="btn-quiet danger" disabled={locked} aria-label={`Revoke ${k.name}`} onClick={()=>void mutate(`Revoke ${k.name}? Applications using it stop working.`,async reason=>{await request(base+"/keys/"+k.id,"DELETE",{reason});},true)}>Revoke</button>}</Item>)}
     </Group>
