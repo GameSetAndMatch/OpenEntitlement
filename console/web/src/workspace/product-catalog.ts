@@ -105,6 +105,7 @@ export function changesPersonalExceptions(view:ProductOrganizations,entry:UserEn
 export function userRequest(base:string,entry:UserEntry,view:ProductOrganizations,productId:string,method:string,reason?:string):{path:string;method:string;body?:unknown}{
  const version=userValues(view,entry.organizationId,entry.subjectId,productId)?.version??0;
  const path=`${base}/organizations/${entry.organizationId}/products/${productId}/users/${encodeURIComponent(entry.subjectId)}`;
- if(method==='DELETE')return {path:`${path}?${new URLSearchParams({version:String(version),...(reason?{reason}:{})})}`,method};
+ // The removal reason travels in the body, never in the address, which access logs record (ADR-0010 Q13).
+ if(method==='DELETE')return {path:`${path}?version=${version}`,method,body:reason?{reason}:{}};
  return {path,method:'PUT',body:{name:entry.name,terms:entry.terms??{},grants:entry.grants??{},version,...(reason?{reason}:{})}};
 }

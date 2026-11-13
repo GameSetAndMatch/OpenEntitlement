@@ -148,10 +148,31 @@ async def test_application_users_over_http(store):
         }
         stale = await client.put(alice, json=saved | {"reason": "Pilot"})
         assert stale.status_code == 409 and stale.json()["type"].endswith("/revision-conflict")
-        removed = await client.delete(alice, params={"version": 1})
-        assert removed.status_code == 400 and _pointers(removed) == ["/reason"]
-        removed = await client.delete(alice, params={"version": 1, "reason": "Pilot over"})
+        # The removal reason travels in the body, never in the address, which access logs record (ADR-0010 Q13).
+        for body in (None, {}, {"reason": "  "}):
+            missing = await client.request("DELETE", alice, params={"version": 1}, json=body)
+            assert missing.status_code == 400 and _pointers(missing) == ["/reason"], body
+        in_address = await client.request("DELETE", alice, params={"version": 1, "reason": "Pilot over"})
+        assert in_address.status_code == 400 and _pointers(in_address) == ["/query/reason"]
+        assert in_address.json()["type"].endswith("/validation-failed")
+        also_in_body = await client.request("DELETE", alice, params={"version": 1, "reason": "Pilot over"}, json={"reason": "Pilot over"})
+        assert also_in_body.status_code == 400 and _pointers(also_in_body) == ["/query/reason"]
+        too_long = await client.request("DELETE", alice, params={"version": 1}, json={"reason": "x" * 2001})
+        assert too_long.status_code == 400 and _pointers(too_long) == ["/reason"]
+        unknown = await client.request("DELETE", alice, params={"version": 1}, json={"reason": "Pilot over", "why": "x"})
+        assert unknown.status_code == 400 and _pointers(unknown) == ["/why"]
+        stale = await client.request("DELETE", alice, params={"version": 2}, json={"reason": "Pilot over"})
+        assert stale.status_code == 409 and stale.json()["type"].endswith("/revision-conflict")
+        async with _client(store, "bob") as (other, _):
+            outsider = await other.request("DELETE", alice, params={"version": 1}, json={"reason": "Pilot over"})
+            assert outsider.status_code in (403, 404)
+        assert len((await client.get(organizations)).json()["organizations"][0]["products"][0]["users"]) == 1
+        removed = await client.request("DELETE", alice, params={"version": 1}, json={"reason": "Pilot over"})
         assert removed.status_code == 200 and removed.json()["organizations"][0]["products"][0]["users"] == []
+        entry = (await client.get(organizations.replace("/organizations", "/audit"))).json()["entries"][0]
+        assert (entry["targetKind"], entry["targetId"], entry["action"], entry["actorEmail"], entry["reason"]) == (
+            "Application user", "acme/tenant/42|alice", "removed", "alice@acme.test", "Pilot over"
+        )
 
 
 async def test_cloud_pro_has_no_application_users(store):

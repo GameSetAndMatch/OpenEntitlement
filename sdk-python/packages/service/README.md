@@ -178,7 +178,7 @@ Under `/api/workspaces/{workspace_id}/organizations`:
 | `PATCH /{organization}` | `{name, version}`: rename. The ID, which applications send, never changes |
 | `PUT /{organization}/products/{product}` | `{variantId, status, terms, version, reason?}`: version `0` gives a first variant in the Product. That Product's Managers only |
 | `PUT /{organization}/products/{product}/users/{subject}` | `{name, terms, grants, version, reason?}`: adds an application user (version `0`) or changes its name, Personal terms or Grants. `subject` is the percent-encoded Subject ID the application sends. That Product's Managers only; [`user-entitlements-unavailable`](https://openentitlement.dev/problems/user-entitlements-unavailable/) on Cloud Pro |
-| `DELETE /{organization}/products/{product}/users/{subject}?version=&reason=` | Removes the application user's record: it inherits the Organization's values again. Allowed on Cloud Pro too |
+| `DELETE /{organization}/products/{product}/users/{subject}?version=` | Body `{reason?}`, required when the user has Personal terms or Grants. Removes the application user's record: it inherits the Organization's values again. A `reason` in the address is refused with `validation-failed`, so no client can rely on it there; the refused request's address may still be logged. Allowed on Cloud Pro too |
 
 One Tier variant per Organization per Product, never a grace variant. Organization terms belong to
 the variant: a save that changes the variant stores the terms sent with it, so the previous ones

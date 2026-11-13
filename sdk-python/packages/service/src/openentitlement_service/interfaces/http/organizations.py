@@ -13,6 +13,7 @@ from openentitlement.privileges import Identifier, Title
 from pydantic import Field, StrictInt
 
 from ...services.catalog import CatalogValue
+from ...services.problems import FieldError, ValidationFailed
 from ...services.organizations import (
     ApplicationUserInput,
     AssignmentInput,
@@ -67,6 +68,12 @@ class ApplicationUserSave(OpenEntitlementModel):
     version: int = Field(ge=0, strict=True, description="0 to add the user in this Product; otherwise the version you read.")
     reason: str | None = Field(
         default=None, max_length=2000, description="Why Personal terms or Grants change. Required exactly when they do."
+    )
+
+
+class ApplicationUserRemoval(OpenEntitlementModel):
+    reason: str | None = Field(
+        default=None, max_length=2000, description="Why Personal terms or Grants are removed. Required exactly when the user has some."
     )
 
 
@@ -143,9 +150,14 @@ async def remove_user(
     subject_id: str,
     workspace: WorkspaceAccess,
     version: int = Query(ge=1, description="The version you read."),
-    reason: str | None = Query(default=None, max_length=2000, description="Why Personal terms or Grants are removed."),
+    body: ApplicationUserRemoval | None = None,
 ) -> OrganizationsView:
-    """Remove an application user's record in the Product: it inherits the Organization's values again."""
+    """Remove an application user's record in the Product: it inherits the Organization's values again.
+
+    The reason travels in the JSON body, not the address, which access logs record (ADR-0010 Q13). A reason in the address is refused.
+    """
+    if "reason" in request.query_params:
+        raise ValidationFailed([FieldError("/query/reason", "Send the reason in the request body, not the address.")])
     return await _service(request).remove_user(
-        workspace, organization_id, product_id, subject_id, version=version, reason=reason
+        workspace, organization_id, product_id, subject_id, version=version, reason=body.reason if body else None
     )
