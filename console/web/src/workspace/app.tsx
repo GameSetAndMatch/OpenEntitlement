@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request,setCsrf } from "./client.ts";
 import { identify, resetIdentity } from "../telemetry.ts";
-import {catalogData,catalogEntry,tiersData,tierRequest,tierSections,organizationsData,organizationRequests,changesOrganizationTerms,resolvedValues,type ProductCatalog,type ProductTiers,type ProductOrganizations,type OrganizationProduct} from "./product-catalog.ts";
+import {catalogData,catalogEntry,tiersData,tierRequest,tierSections,organizationsData,organizationRequests,changesOrganizationTerms,resolvedValues,subjectsData,userValues,changesPersonalExceptions,userRequest,type ProductCatalog,type ProductTiers,type ProductOrganizations,type OrganizationProduct,type ApplicationUser} from "./product-catalog.ts";
 import { Catalog } from "./catalog.tsx";
 import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
@@ -13,7 +13,7 @@ import { ProductSelector, pickProduct, type ProductSummary } from "./product-sel
 import { FormField } from "../form.tsx";
 import "./style.css";
 // The Python service lists visible Products and loads their Catalog separately.
-export interface Workspace {/** On the Python service: each Organization's values in the selected Product, as the SDK resolved them. */organizationValues?:(organizationId:string)=>OrganizationProduct|undefined;products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean;productLimit?:number|null};version?:number;id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+export interface Workspace {/** On the Python service: each Organization's values in the selected Product, as the SDK resolved them. */organizationValues?:(organizationId:string)=>OrganizationProduct|undefined;/** On the Python service: an application user's record and values in the selected Product. */userValues?:(organizationId:string,subjectId:string)=>ApplicationUser|undefined;products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean;productLimit?:number|null};version?:number;id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
@@ -137,6 +137,17 @@ export function WorkspaceApp(){
       finally{if(view)setOrganizations({workspace:workspace.id,view});else void refreshOrganizations(workspace.id);}
       toast("Changes saved");return true;
     }
+    if(workspace.products&&section==='subjects'){
+      const current=organizationsRef.current;
+      if(!current||current.workspace!==workspace.id||!product)return false;
+      const user=entry as {organizationId:string;subjectId:string};
+      let reason:string|null="";if(changesPersonalExceptions(current.view,user,product,method)){reason=await ask(title);if(!reason)return false;}
+      const r=userRequest(`/api/workspaces/${workspace.id}`,user,current.view,product,method,reason||undefined);
+      let view:ProductOrganizations|undefined;
+      try{view=await request<ProductOrganizations>(r.path,r.method,r.body);}
+      finally{if(view)setOrganizations({workspace:workspace.id,view});else void refreshOrganizations(workspace.id);}
+      toast("Changes saved");return true;
+    }
     let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
     catch(e){if(generation===pageGeneration.current)failed(e);return false;}finally{savingRef.current=false;setBusy(false);}
   };
@@ -151,7 +162,7 @@ export function WorkspaceApp(){
   const currentTiers=workspace&&productTiers?.workspace===workspace.id&&productTiers.product===product?productTiers.view:undefined;
   const tiersWorkspace=catalogWorkspace&&currentCatalog&&currentTiers?{...catalogWorkspace,data:tiersData(currentCatalog,currentTiers)}:undefined;
   const currentOrganizations=workspace&&organizations?.workspace===workspace.id?organizations.view:undefined;
-  const organizationsWorkspace=tiersWorkspace&&currentOrganizations?{...tiersWorkspace,data:{...tiersWorkspace.data,organizations:organizationsData(currentOrganizations,product)},organizationValues:(id:string)=>resolvedValues(currentOrganizations,id,product)}:undefined;
+  const organizationsWorkspace=tiersWorkspace&&currentOrganizations?{...tiersWorkspace,data:{...tiersWorkspace.data,organizations:organizationsData(currentOrganizations,product),subjects:subjectsData(currentOrganizations,product)},organizationValues:(id:string)=>resolvedValues(currentOrganizations,id,product),userValues:(id:string,subject:string)=>userValues(currentOrganizations,id,subject,product)}:undefined;
   const catalogEditable=selectedProduct?.role==='Manager'||selectedProduct?.role==='Owner'||selectedProduct?.role==='Platform administrator';
   const canEdit=workspace?.role==="Owner"||workspace?.role==="Platform administrator";
   // API keys are an Owner's page; anyone else lands on Members instead.

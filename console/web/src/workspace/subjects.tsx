@@ -15,8 +15,11 @@ export function EffectiveEntitlements({
   subjectId?: string;
 }) {
   // On the Python service the SDK resolves every value; the console only shows them.
-  const resolved = w.organizationValues?.(organizationId);
-  if (resolved)
+  const organization = w.organizationValues?.(organizationId);
+  const user =
+    subjectId === undefined ? undefined : w.userValues?.(organizationId, subjectId);
+  const resolved = subjectId === undefined ? organization : user;
+  if (organization && resolved)
     return (
       <div className="overflow">
         <table>
@@ -58,8 +61,20 @@ export function EffectiveEntitlements({
                                 : "Disabled"
                               : String(d.value)}
                         </td>
-                        <td>{d.sourceName}</td>
-                        <td>{resolved.readOnly ? "Read-only" : "Standard"}</td>
+                        <td>
+                          {d.sourceName}
+                          {user?.state === "stale" && Object.hasOwn(user.terms, p.key) && (
+                            <small>
+                              Previous variant’s personal terms are inactive
+                            </small>
+                          )}
+                          {user?.state === "suspended" && (
+                            <small>
+                              Personal terms and grants are suspended by contract status
+                            </small>
+                          )}
+                        </td>
+                        <td>{organization.readOnly ? "Read-only" : "Standard"}</td>
                       </>
                     )}
                   </tr>
@@ -189,7 +204,12 @@ export function SubjectEntitlements({
       !p.hidden && !w.data.features.find((f) => f.id === p.featureId)?.hidden,
   );
   const base: Record<string, Value> = {};
-  for (const p of visible) {
+  const organizationValues = w.organizationValues?.(organizationId);
+  if (organizationValues)
+    for (const v of organizationValues.values) {
+      if (v.value !== null) base[v.privilege] = v.value;
+    }
+  else for (const p of visible) {
     try {
       base[p.key] = resolve(
         w.data,
@@ -338,6 +358,8 @@ export function SubjectEntitlements({
                             ...def,
                             key: `grant_${def.key}`,
                             minimum: 1,
+                            // A Grant adds to the value: the Privilege's maximum bounds authored values, not Grants.
+                            maximum: undefined,
                             unlimited: false,
                           }}
                           value={draft.grants[def.key]}
@@ -417,9 +439,12 @@ export function SubjectEntitlements({
               <strong>{row.name}</strong>
               <code>{row.subjectId}</code>
               <small>
-                {row.variantId === organization.variantId
-                  ? "Current variant"
-                  : "Previous variant’s terms inactive · grants retained"}
+                {w.userValues?.(organizationId, row.subjectId)?.state ===
+                "suspended"
+                  ? "Suspended by contract status"
+                  : row.variantId === organization.variantId
+                    ? "Current variant"
+                    : "Previous variant’s terms inactive · grants retained"}
               </small>
             </button>
           ))}

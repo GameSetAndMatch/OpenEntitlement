@@ -58,6 +58,11 @@ class Deployment(StrEnum):
 PRODUCT_LIMITS: dict[ServiceTier, int | None] = {ServiceTier.PRO: 1, ServiceTier.ENTERPRISE: None}
 
 
+def user_entitlements(deployment: Deployment, workspace: Workspace) -> bool:
+    """Whether application users can have Personal terms and Grants: Cloud Enterprise or self-hosted (ADR-0005)."""
+    return deployment is not Deployment.SAAS or workspace.service_tier is ServiceTier.ENTERPRISE
+
+
 class HostingView(OpenEntitlementModel):
     """How OpenEntitlement runs the Workspace: self-hosted, or Cloud with its service tier."""
 
@@ -182,7 +187,7 @@ class WorkspaceService:
         return HostingView(
             mode=self.deployment,
             tier=workspace.service_tier,
-            subject_entitlements=not cloud or workspace.service_tier is ServiceTier.ENTERPRISE,
+            subject_entitlements=user_entitlements(self.deployment, workspace),
             product_limit=PRODUCT_LIMITS[workspace.service_tier] if cloud else None,
         )
 

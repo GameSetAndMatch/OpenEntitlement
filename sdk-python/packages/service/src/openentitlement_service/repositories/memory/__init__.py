@@ -15,7 +15,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
-from ...services.organizations import AssignmentRecord, OrganizationChange, OrganizationRecord
+from ...services.organizations import ApplicationUserRecord, AssignmentRecord, OrganizationChange, OrganizationRecord
 from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
@@ -42,6 +42,8 @@ class _Rows:
     #: (Workspace, Product, Organization) → the Organization's Tier variant in that Product.
     assignments: dict[tuple[UUID, UUID, str], AssignmentRecord] = field(default_factory=dict)
     organization_changes: list[OrganizationChange] = field(default_factory=list)
+    #: (Workspace, Product, Organization, Subject ID) → the application user's record in that Product.
+    users: dict[tuple[UUID, UUID, str, str], ApplicationUserRecord] = field(default_factory=dict)
     catalog_changes: list[CatalogChange] = field(default_factory=list)
     catalog: dict[tuple[UUID, UUID, str, str], CatalogRecord] = field(default_factory=dict)
     workspaces: dict[UUID, Workspace] = field(default_factory=dict)
@@ -466,6 +468,34 @@ class InMemoryOrganizationsRepository:
         if (current.version if current else 0) != expected_version:
             raise StaleVersion(assignment.organization_id)
         self.rows.assignments[key] = assignment
+
+    async def users(self, product_id: UUID | None = None) -> Sequence[ApplicationUserRecord]:
+        found = (
+            u
+            for (w, p, _, _), u in self.rows.users.items()
+            if w == self.workspace_id and (product_id is None or p == product_id)
+        )
+        return sorted(found, key=lambda u: (str(u.product_id), u.organization_id, u.subject_id))
+
+    async def save_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, user.workspace_id)
+        if (user.workspace_id, user.product_id, user.organization_id) not in self.rows.assignments:
+            raise LookupError("the Organization has no Tier variant in this Product")
+        key = (user.workspace_id, user.product_id, user.organization_id, user.subject_id)
+        current = self.rows.users.get(key)
+        if current is not None and expected_version == 0:
+            raise AlreadyExists(user.subject_id)
+        if (current.version if current else 0) != expected_version:
+            raise StaleVersion(user.subject_id)
+        self.rows.users[key] = user
+
+    async def delete_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
+        ensure_bound_workspace(self.workspace_id, user.workspace_id)
+        key = (user.workspace_id, user.product_id, user.organization_id, user.subject_id)
+        current = self.rows.users.get(key)
+        if current is None or current.version != expected_version:
+            raise StaleVersion(user.subject_id)
+        del self.rows.users[key]
 
     async def audit(self, change: OrganizationChange) -> None:
         ensure_bound_workspace(self.workspace_id, change.workspace_id)

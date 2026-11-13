@@ -12,12 +12,13 @@ pytestmark = pytest.mark.anyio
 
 
 @asynccontextmanager
-async def _client(store, person="alice"):
+async def _client(store, person="alice", **options):
     issuer = FakeIssuer()
     app = create_app(
         store,
         sign_in=SignInSettings(oidc=OidcSettings(app_url=APP, issuer=ISSUER, client_id=CLIENT_ID)),
         oidc_transport=issuer.transport,
+        **options,
     )
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=APP) as client:
         yield client, await _sign_in(client, issuer, person)

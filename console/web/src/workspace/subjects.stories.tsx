@@ -13,6 +13,7 @@ data.privileges = [
     description: "Personal token allowance.",
     type: "integer",
     default: 100,
+    maximum: 5000,
   },
 ];
 data.tiers = [
@@ -120,6 +121,11 @@ export const FormOpen: Story = {
     await userEvent.click(c.getByRole("button", { name: "Add user" }));
     await userEvent.click(c.getByLabelText("Grant ai_tokens"));
     await expect(c.getByLabelText("grant_ai_tokens")).toBeVisible();
+    // A Grant is not bounded by the Privilege's maximum (spec §3.1.7): 6000 is a valid allowance.
+    const grant = c.getByLabelText("grant_ai_tokens") as HTMLInputElement;
+    await userEvent.clear(grant);
+    await userEvent.type(grant, "6000");
+    await expect(grant.checkValidity()).toBe(true);
     canvasElement.dataset.playComplete = "true";
   },
 };
@@ -131,5 +137,58 @@ export const CloudPro: Story = {
     await expect(
       c.queryByRole("button", { name: "Add user" }),
     ).not.toBeInTheDocument();
+  },
+};
+/** On the Python service the SDK resolves each value; the panel shows it with its source in glossary terms. */
+export const ResolvedByTheService: Story = {
+  render: () => {
+    const user = {
+      subjectId: "idp|alice",
+      name: "Alice",
+      variantId: "business",
+      terms: { ai_tokens: 40 },
+      grants: { ai_tokens: 5 },
+      version: 1,
+      state: "active" as const,
+      values: [
+        { privilege: "ai_tokens", value: 45, source: "grant" as const, sourceName: "Personal terms 40 + Grant 5" },
+      ],
+    };
+    const organization = {
+      productId: "analytics",
+      variantId: "business",
+      tierId: "business",
+      status: "active" as const,
+      terms: { ai_tokens: 2000 },
+      version: 1,
+      effectiveVariantId: "business",
+      grace: false,
+      fallback: false,
+      readOnly: false,
+      values: [
+        { privilege: "ai_tokens", value: 2000, source: "organizationTerms" as const, sourceName: "Organization terms" },
+      ],
+      users: [user],
+    };
+    const resolved: Workspace = {
+      ...structuredClone(workspace),
+      data: {
+        ...structuredClone(data),
+        subjects: [{ organizationId: "acme", subjectId: "idp|alice", name: "Alice", variantId: "business", terms: user.terms, grants: user.grants }],
+      },
+      organizationValues: () => organization,
+      userValues: () => user,
+    };
+    return (
+      <SubjectEntitlements workspace={resolved} organizationId="acme" canEdit busy={false} save={async () => true} />
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: /Alice/ }));
+    await expect(
+      c.getByRole("row", { name: /AI tokens.*45.*Personal terms 40 \+ Grant 5/ }),
+    ).toBeVisible();
+    canvasElement.dataset.playComplete = "true";
   },
 };

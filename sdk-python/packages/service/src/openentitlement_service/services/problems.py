@@ -256,6 +256,24 @@ class InvitationForAnotherEmail(Problem):
         super().__init__("This invitation is for another email address. Sign in with the invited email to accept it.")
 
 
+# Application users (OPE-60).
+
+
+class UserEntitlementsUnavailable(Problem):
+    """User-level entitlements need Cloud Enterprise; Cloud Pro has Organization entitlements (ADR-0005)."""
+
+    slug = "user-entitlements-unavailable"
+    status = 403
+    title = "User entitlements unavailable"
+
+    def __init__(self, *, service_tier: str) -> None:
+        super().__init__(
+            "Personal terms and Grants for application users need Cloud Enterprise. "
+            "Organization terms stay available on Cloud Pro.",
+            serviceTier=service_tier,
+        )
+
+
 def escape_pointer_token(token: object) -> str:
     return str(token).replace("~", "~0").replace("/", "~1")
 

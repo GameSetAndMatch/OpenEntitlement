@@ -30,7 +30,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from .catalog import CatalogRecord, CatalogChange, VariantValues
-    from .organizations import AssignmentRecord, OrganizationChange, OrganizationRecord
+    from .organizations import ApplicationUserRecord, AssignmentRecord, OrganizationChange, OrganizationRecord
     from .tiers import StatusPolicyRecord, TierChange, TierRecord
 
 
@@ -108,6 +108,22 @@ class OrganizationsRepository(Protocol):
 
         One per Organization per Product: a second insert raises ``AlreadyExists``.
         """
+        ...
+
+    async def users(self, product_id: UUID | None = None) -> Sequence[ApplicationUserRecord]:
+        """Application users' Personal terms and Grants, in one Product or in every Product."""
+        ...
+
+    async def save_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
+        """Insert (``expected_version`` 0) or replace an application user's record in its Product.
+
+        One per Organization, Subject ID and Product: a second insert raises ``AlreadyExists``;
+        a replacement raises ``StaleVersion`` unless the record is still at ``expected_version``.
+        """
+        ...
+
+    async def delete_user(self, user: ApplicationUserRecord, *, expected_version: int) -> None:
+        """Delete the record, raising ``StaleVersion`` unless it is still at ``expected_version``."""
         ...
 
     async def audit(self, change: OrganizationChange) -> None: ...

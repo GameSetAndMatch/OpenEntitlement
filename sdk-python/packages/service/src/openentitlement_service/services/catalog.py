@@ -7,7 +7,7 @@ from typing import Literal, cast
 from uuid import UUID, uuid4
 
 from openentitlement.model import OpenEntitlementModel
-from openentitlement.privileges import Group, Tag, Privilege, TypedPrivilege, PrivilegeCatalog, Unlimited, Identifier, Visibility
+from openentitlement.privileges import Group, Identifier, IntegerPrivilege, Privilege, PrivilegeCatalog, Tag, TypedPrivilege, Unlimited, Visibility
 from pydantic import Field, StrictBool, StrictInt, StrictStr, ValidationError, model_validator
 
 from .access import Permission
@@ -321,6 +321,16 @@ class CatalogService:
                     if problem:
                         organization = names.get(assignment.organization_id, assignment.organization_id)
                         errors.append(FieldError("/entry", f"{organization}'s Organization terms would become invalid: {problem}"))
+                # So must application users' Personal terms, stale ones included, and their Grants.
+                for user in await ws.repos.organizations.users(product_id):
+                    term = user.terms.get(key)
+                    problem = value_error(entry, term) if term is not None else None
+                    if problem is None and key in user.grants and not isinstance(entry, IntegerPrivilege):
+                        problem = "a Grant adds to an integer Privilege only."
+                    if problem:
+                        errors.append(
+                            FieldError("/entry", f"{user.name}'s Personal terms or Grants would become invalid: {problem}")
+                        )
             if errors:
                 raise ValidationFailed(errors)
         for changed in changes:
