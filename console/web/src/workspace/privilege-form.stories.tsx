@@ -105,3 +105,35 @@ export const BooleanForAdministrator:Story={args:{initial:mcp,editing:true,envEd
  await expect(canvas.getByRole('textbox',{name:'Key'})).toBeDisabled();
  done(canvasElement);
 }};
+
+// Read-only locks the value in tiers, Organizations and users. The Catalog default is the value everyone gets, so it stays editable here.
+const seats:Privilege={key:'seats',title:'Seats',description:'',type:'integer',visibility:'editable',tags:[]};
+export const ReadOnlyKeepsCatalogDefault:Story={args:{initial:seats},play:async({canvasElement,args})=>{
+ const canvas=within(canvasElement),require=canvas.getByRole('checkbox',{name:'Require a value in every Tier variant'});
+ await expect(require).toBeChecked();
+ await userEvent.selectOptions(canvas.getByRole('combobox',{name:'Visibility'}),'read_only');
+ // Choosing Read-only gives the Privilege a Catalog default, which can then be set.
+ await expect(require).not.toBeChecked();
+ await expect(require).toBeDisabled();
+ await expect(canvas.getByText('Read-only Privileges always use their Catalog default.')).toBeVisible();
+ const value=canvas.getByRole('spinbutton',{name:'seats'});
+ await expect(value).toBeEnabled();
+ await userEvent.clear(value);await userEvent.type(value,'5');
+ await userEvent.click(canvas.getByRole('button',{name:'Save privilege'}));
+ await expect(args.onSave).toHaveBeenCalledWith(expect.objectContaining({visibility:'read_only',default:5}));
+ done(canvasElement);
+}};
+
+// A Read-only Privilege saved before this rule existed, without a default, cannot be saved until it gets one.
+export const ReadOnlyWithoutDefault:Story={args:{initial:{...seats,visibility:'read_only'},editing:true},play:async({canvasElement,args})=>{
+ const canvas=within(canvasElement),require=canvas.getByRole('checkbox',{name:'Require a value in every Tier variant'});
+ await expect(canvas.getByRole('alert')).toHaveTextContent('A Read-only Privilege needs a Catalog default');
+ await userEvent.click(canvas.getByRole('button',{name:'Save changes'}));
+ await expect(args.onSave).not.toHaveBeenCalled();
+ await expect(require).toHaveFocus();
+ await userEvent.click(require);
+ await expect(canvas.queryByRole('alert')).not.toBeInTheDocument();
+ await userEvent.click(canvas.getByRole('button',{name:'Save changes'}));
+ await expect(args.onSave).toHaveBeenCalledWith(expect.objectContaining({visibility:'read_only',default:0}));
+ done(canvasElement);
+}};
