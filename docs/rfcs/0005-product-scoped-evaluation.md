@@ -43,7 +43,7 @@ SDKs treat the 403 as a transport error: evaluation fails closed (§3.1.11), wit
 
 Under [ADR-0009](../../ADR-0009.md), every OEREP error response is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details object (`application/problem+json`) instead of `{error, message}` (§10.1.2). The problem `type` is the stable identifier SDKs branch on. The 403 above is the problem type `https://openentitlement.dev/problems/product-forbidden`, with the same body for every mismatch.
 
-Validation failures use HTTP 400 and the `validation-failed` problem type. [ADR-0010](../../ADR-0010.md) records accepted Product status/grace and uncapped additive Grant clarifications. This is direction, not evidence of released transport support.
+Validation failures use HTTP 400 and the problem type `https://openentitlement.dev/problems/validation-failed`. [ADR-0010](../../ADR-0010.md) records accepted Product status/grace and uncapped additive Grant clarifications. This is direction, not evidence of released transport support.
 
 ### Resolution within a Product
 

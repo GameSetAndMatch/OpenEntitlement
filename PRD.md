@@ -112,7 +112,7 @@ Primary users:
 
 ## Python service decision handoff
 
-[ADR-0010](ADR-0010.md) records Q1–Q14 as approved direction without marking implementation tickets Done. Q13 (delete-user reason from URL to body) is 📋 a focused follow-up pending tracker reconciliation. Q14 / OPE-52 is 👤 pending research with 3–5 unfamiliar developers; participants are unnamed and no outreach is authorized. Linear updates were unavailable in this session.
+[ADR-0010](ADR-0010.md) records Q1–Q14 as approved direction without marking implementation tickets Done. Q13 (the application-user removal reason moves from the URL to the request body) is 📋 a small follow-up ticket. Q14 / OPE-52 is 👤 the owner's task: watching 3–5 developers who don't know the project try the quickstart.
 
 ## Open owner actions
 
