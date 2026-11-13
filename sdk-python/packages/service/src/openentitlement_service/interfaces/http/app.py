@@ -16,7 +16,7 @@ from ...services.repositories import Store
 from ...services.sign_in import SignInPolicy, SignInService
 from ...services.members import MemberService
 from ...services.workspaces import Deployment, WorkspaceService, utcnow
-from . import auth, problems, workspaces, catalog, members, tiers
+from . import auth, problems, workspaces, catalog, members, tiers, organizations
 from .oidc import OidcClient
 
 
@@ -56,6 +56,7 @@ def create_app(
     app.include_router(workspaces.router)
     app.include_router(catalog.router)
     app.include_router(tiers.router)
+    app.include_router(organizations.router)
     app.include_router(members.router)
 
     @app.get("/healthz", tags=["health"])

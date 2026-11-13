@@ -19,6 +19,8 @@ from openentitlement_service.services.problems import (
     RevisionConflict,
     ValidationFailed,
 )
+from openentitlement_service.services.organizations import AssignmentInput, OrganizationService
+from openentitlement_service.services.tiers import NewTier, TierService, VariantInput
 from openentitlement_service.services.workspaces import OpenWorkspace, ProductView, WorkspaceService
 
 pytestmark = pytest.mark.anyio
@@ -243,7 +245,12 @@ async def test_a_product_key_is_unique_and_well_formed(scene: Scene) -> None:
 
 
 async def test_a_product_that_customers_use_cannot_be_deleted(store: InMemoryStore, scene: Scene) -> None:
-    store.mark_product_used(scene.storage.id)
+    async with scene.service.open(scene.people["owner"], scene.workspace_id) as ws:
+        standard = VariantInput(id="small_standard", name="Small standard")
+        await TierService().create(ws, scene.storage.id, NewTier(id="small", name="Small"), standard)
+        await OrganizationService().create(
+            ws, id="acme", name="Acme", product_id=scene.storage.id, assignment=AssignmentInput(variant_id="small_standard")
+        )
     with pytest.raises(ProductInUse):
         async with scene.service.open(scene.people["owner"], scene.workspace_id) as ws:
             await scene.service.delete_product(ws, scene.storage.id, version=scene.storage.version)

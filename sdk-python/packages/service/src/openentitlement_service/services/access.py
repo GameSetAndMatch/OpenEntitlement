@@ -29,6 +29,8 @@ class Permission(StrEnum):
     EDIT_PRODUCT = "product:edit"
     #: Create, rename, archive, restore and delete Products.
     MANAGE_PRODUCTS = "products:manage"
+    #: Add or rename a Workspace-wide Organization: any Product's Manager (ADR-0008).
+    MANAGE_ORGANIZATIONS = "organizations:manage"
     #: Invite a Product's Managers and Users, change their Roles in it and remove them.
     MANAGE_MEMBERS = "members:manage"
     #: Make members Owners, change or remove Owners, and invite Owners.
@@ -50,6 +52,7 @@ _DENIED = {
     Permission.READ_PRODUCT: "Your Role does not allow reading this Product.",
     Permission.EDIT_PRODUCT: "Only this Product's Managers and the Workspace's Owners can change it.",
     Permission.MANAGE_PRODUCTS: "Only the Workspace's Owners can create, rename, archive, restore or delete Products.",
+    Permission.MANAGE_ORGANIZATIONS: "Only a Product's Managers and the Workspace's Owners can add or rename Organizations.",
     Permission.MANAGE_MEMBERS: "Only this Product's Managers and the Workspace's Owners can manage its members.",
     Permission.MANAGE_OWNERS: "Only the Workspace's Owners can invite, appoint, change or remove Owners.",
     Permission.SET_SERVICE_TIER: "Only a Platform administrator can change the Cloud service tier.",
@@ -93,6 +96,9 @@ class Actor:
             return self.account.platform_admin
         if self.administers_workspace:
             return True
+        if permission is Permission.MANAGE_ORGANIZATIONS:
+            # Organizations are Workspace-wide: a Manager of any Product may add one.
+            return ProductRole.MANAGER in self.roles.values()
         if product_id is None:
             return False
         role = self.roles.get(product_id)
