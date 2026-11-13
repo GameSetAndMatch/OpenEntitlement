@@ -77,7 +77,9 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
     const changeReason=reason();
     const changed=await store.change(account,id!,action,changeReason,body.revision,data => {
       let entry=body.entry;
-      if(!changeReason&&changesContractTerms(data,section!,entry))throw new WorkspaceError("Add a reason for changing contract terms");
+      // Compare the normalized Organization, so that an ID with spaces cannot skip the reason for changing its terms.
+      const validOrganization=section==="organizations"?organization(data,entry):undefined;
+      if(!changeReason&&changesContractTerms(data,section!,validOrganization??entry))throw new WorkspaceError("Add a reason for changing contract terms");
       if(section==='hosting'){
         if(mode!=='saas')throw new WorkspaceError('Cloud service tiers apply only to SaaS deployments');
         const b=object(entry);if(Object.keys(b).some(k=>k!=='tier')||!['pro','enterprise'].includes(b.tier))throw new WorkspaceError('Choose Cloud Pro or Enterprise');
@@ -107,7 +109,7 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
       }
       if (section === "tiers") upsert(data.tiers,tier(entry),v => v.id);
       if (section === "variants") upsert(data.variants,variant(data,entry),v => v.id);
-      if (section === "organizations") upsert(data.organizations,organization(data,entry),v => v.id);
+      if (section === "organizations") upsert(data.organizations,validOrganization!,v => v.id);
       if (section === "policy") {
         const b=object(entry); if(Object.keys(b).some(k=>!["past_due","ended"].includes(k)))throw new WorkspaceError("Unknown policy field"); const result={} as Record<"past_due"|"ended",StatusPolicy>;
         for (const status of ["past_due","ended"] as const) {

@@ -77,7 +77,7 @@ function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
 
 export const Value = ({ v }: { v: Json }) => <span className={`value ${isUnlimited(v) ? "value-unlimited" : ""}`}>{formatValue(v)}</span>;
 
-// ------------------------------------------------------------------ reason dialog (spec Req 6.3.2: contract terms need a reason) and plain confirmation
+// ------------------------------------------------------------------ reason dialog (console policy: contract terms need a reason) and plain confirmation
 
 type Ask = (title: string, detail?: ReactNode, options?: { reason?: boolean }) => Promise<string | null>;
 const ReasonCtx = createContext<Ask>(async () => null);

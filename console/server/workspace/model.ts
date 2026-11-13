@@ -170,7 +170,7 @@ export function catalogEnvironment(data:WorkspaceData,env:NodeJS.ProcessEnv):Env
  return result;
 }
 
-/** Only a customer's own contract terms need a written reason (spec Req 6.3.2: overrides and grants). Catalog, tier and access changes are audited with their actor alone. */
+/** Console policy: only a customer's own contract terms need a written reason. Catalog, tier and access changes are audited with their actor alone. (Spec Req 6.3.2 separately requires a reason for every SDK provider mutation; that contract is unchanged.) */
 export function changesContractTerms(data: Pick<WorkspaceData,"organizations">, section: string, entry: unknown): boolean {
   if (section === "subjects") return true;
   if (section !== "organizations" || !entry || typeof entry !== "object") return false;
