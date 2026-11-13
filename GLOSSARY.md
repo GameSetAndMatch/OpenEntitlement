@@ -26,7 +26,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Application user** | An Organization-scoped Subject whose entitlement values may inherit or have personal terms/grants. Not a console Account or membership Role. |
 | **Organization terms** | An Organization's own values that replace its Tier variant's values; they belong to that variant. Preferred over own terms. |
 | **Personal terms** | An Application user's own values that replace their Organization's values; they belong to the assigned Tier variant. Preferred over user terms. |
-| **Cloud service tier** | OpenEntitlement hosted capabilities (Pro or Enterprise), managed by the platform; distinct from customer-defined Tiers. |
+| **Cloud service tier** | OpenEntitlement hosted capabilities (Pro or Enterprise), set by a Platform administrator; distinct from customer-defined Tiers. Cloud Pro allows one Product, Enterprise any number. |
 | **Subject** | A person, service account or other actor to whom an entitlement may apply. |
 | **Resource** | An application object that may be subject to an entitlement. |
 | **Contract** | The link between agreed commercial terms and an Organization's entitled rights. |
@@ -46,6 +46,7 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Tenant** | A technical isolation context in shared infrastructure. Not the preferred name for a Workspace or an Organization. |
 | **Account** | A person's sign-in identity, which may participate in multiple Workspaces. |
 | **Member** | An Account's membership in a Workspace. |
+| **Invitation** | A single-use link, valid for seven days, that lets one verified email join a Workspace as Owner or with a Role in one Product. |
 | **Role** | A member's administrative authority within a Product, or the whole Workspace for an Owner. |
 | **Owner** | A Role with full administration of the whole Workspace and every Product. |
 | **Manager** | A Role that administers one Product and its members. |

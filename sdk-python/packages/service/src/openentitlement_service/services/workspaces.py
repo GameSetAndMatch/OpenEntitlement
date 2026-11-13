@@ -4,23 +4,37 @@ A Workspace starts with one Product, and its creator is its Owner. Members see o
 where they have a Role; Owners and Platform administrators see all of them. Only Owners (and
 Platform administrators) create, rename, archive, restore and delete Products. A Product's ID and
 key never change.
+
+On OpenEntitlement Cloud, a Workspace's Cloud service tier limits its Products: Cloud Pro allows one,
+Enterprise any number. Only a Platform administrator changes the tier, and a downgrade is refused
+while the Workspace has more than one Product. A self-hosted install has no limit.
 """
 from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 from openentitlement.model import OpenEntitlementModel
 
 from .access import PLATFORM_ADMINISTRATOR, Actor, Permission, highest, OWNER
-from .models import Account, Member, Product, Workspace
-from .problems import AlreadyTaken, FieldError, LastProduct, NotFound, ProductInUse, RevisionConflict, ValidationFailed
+from .models import Account, Member, Product, ServiceTier, SettingsChange, Workspace
+from .problems import (
+    AlreadyTaken,
+    FieldError,
+    LastProduct,
+    NotFound,
+    ProductInUse,
+    ProductLimit,
+    RevisionConflict,
+    ValidationFailed,
+)
 from .repositories import AlreadyExists, Repositories, StaleVersion, Store
 
 #: A Product's identifier in OEREP paths (RFC-0005).
@@ -31,6 +45,28 @@ MAX_KEY = 64
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+class Deployment(StrEnum):
+    """Where the service runs (``OE_DEPLOYMENT_MODE``). Only OpenEntitlement Cloud applies Cloud service tiers."""
+
+    SELF_HOSTED = "self_hosted"
+    SAAS = "saas"
+
+
+#: Products each Cloud service tier allows; ``None`` is unlimited (ADR-0008).
+PRODUCT_LIMITS: dict[ServiceTier, int | None] = {ServiceTier.PRO: 1, ServiceTier.ENTERPRISE: None}
+
+
+class HostingView(OpenEntitlementModel):
+    """How OpenEntitlement runs the Workspace: self-hosted, or Cloud with its service tier."""
+
+    mode: Deployment
+    tier: ServiceTier
+    #: Whether application users inside an Organization can have entitlements (Cloud Enterprise or self-hosted).
+    subject_entitlements: bool
+    #: How many Products the Workspace may have; ``None`` is unlimited.
+    product_limit: int | None
 
 
 class ProductView(OpenEntitlementModel):
@@ -51,6 +87,8 @@ class WorkspaceView(OpenEntitlementModel):
     name: str
     role: str
     products: tuple[ProductView, ...]
+    hosting: HostingView
+    version: int
 
 
 class WorkspaceSummary(OpenEntitlementModel):
@@ -99,9 +137,54 @@ def _view(product: Product, actor: Actor) -> ProductView:
     )
 
 
+async def audit_settings(
+    ws: OpenWorkspace,
+    *,
+    action: str,
+    target_kind: str,
+    target_id: str,
+    target_name: str,
+    product_id: UUID | None = None,
+    before: str | None = None,
+    after: str | None = None,
+) -> None:
+    """Record who changed members, invitations or the Cloud service tier, in the same transaction."""
+    await ws.repos.settings_changes.add(
+        SettingsChange(
+            id=uuid4(),
+            workspace_id=ws.actor.workspace_id,
+            product_id=product_id,
+            actor_id=ws.actor.account.id,
+            actor_email=ws.actor.account.email,
+            at=ws.now,
+            action=action,
+            target_kind=target_kind,
+            target_id=target_id,
+            target_name=target_name,
+            before=before,
+            after=after,
+        )
+    )
+
+
+def _product_list(products: Sequence[Product]) -> list[dict[str, str]]:
+    return [{"id": str(p.id), "key": p.key, "name": p.name} for p in products]
+
+
 class WorkspaceService:
-    def __init__(self, store: Store, *, clock: Callable[[], datetime] = utcnow) -> None:
-        self.store, self.clock = store, clock
+    def __init__(
+        self, store: Store, *, clock: Callable[[], datetime] = utcnow, deployment: Deployment = Deployment.SELF_HOSTED
+    ) -> None:
+        self.store, self.clock, self.deployment = store, clock, deployment
+
+    def hosting(self, workspace: Workspace) -> HostingView:
+        cloud = self.deployment is Deployment.SAAS
+        return HostingView(
+            mode=self.deployment,
+            tier=workspace.service_tier,
+            subject_entitlements=not cloud or workspace.service_tier is ServiceTier.ENTERPRISE,
+            product_limit=PRODUCT_LIMITS[workspace.service_tier] if cloud else None,
+        )
 
     # Workspaces.
 
@@ -116,7 +199,14 @@ class WorkspaceService:
             await repos.products.add(product)
             await repos.members.add(Member(workspace_id=workspace.id, account_id=account.id, owner=True, created_at=now))
             actor = Actor(account=account, workspace_id=workspace.id, owner=True)
-            return WorkspaceView(id=workspace.id, name=name, role=actor.role, products=(_view(product, actor),))
+            return WorkspaceView(
+                id=workspace.id,
+                name=name,
+                role=actor.role,
+                products=(_view(product, actor),),
+                hosting=self.hosting(workspace),
+                version=workspace.version,
+            )
 
     async def list_workspaces(self, account: Account) -> list[WorkspaceSummary]:
         """The Workspaces ``account`` is a member of, and every other one for a Platform administrator."""
@@ -150,7 +240,56 @@ class WorkspaceService:
         workspace = await ws.repos.workspaces.get()
         assert workspace is not None  # open() checked it in this transaction
         products = tuple(_view(p, ws.actor) for p in await ws.repos.products.list() if ws.actor.sees(p.id))
-        return WorkspaceView(id=workspace.id, name=workspace.name, role=ws.actor.role, products=products)
+        return WorkspaceView(
+            id=workspace.id,
+            name=workspace.name,
+            role=ws.actor.role,
+            products=products,
+            hosting=self.hosting(workspace),
+            version=workspace.version,
+        )
+
+    async def set_service_tier(self, ws: OpenWorkspace, *, tier: ServiceTier, version: int) -> WorkspaceView:
+        """Change the Cloud service tier. Platform administrators only; Cloud only (ADR-0008).
+
+        A downgrade to Cloud Pro is refused while the Workspace has more than one Product, archived
+        ones included: its customers' applications would break.
+        """
+        ws.actor.require(Permission.SET_SERVICE_TIER)
+        if self.deployment is not Deployment.SAAS:
+            raise ValidationFailed([FieldError("/tier", "A self-hosted install has no Cloud service tier.")])
+        await ws.repos.workspaces.lock()
+        workspace = await ws.repos.workspaces.get()
+        assert workspace is not None  # open() checked it in this transaction
+        if workspace.version != version:
+            raise RevisionConflict(kind="Workspace", id=str(workspace.id))
+        limit = PRODUCT_LIMITS[tier]
+        products = await ws.repos.products.list()
+        if limit is not None and len(products) > limit:
+            names = ", ".join(p.name for p in products)
+            raise ProductLimit(
+                f"Cloud {tier.value.title()} allows {limit} Product, and this Workspace has {len(products)}: {names}. "
+                "Keep one and delete the others. Archive a Product customers use and move them off it before deleting it.",
+                service_tier=tier.value,
+                limit=limit,
+                products=_product_list(products),
+            )
+        if tier is not workspace.service_tier:
+            changed = workspace.model_copy(update={"service_tier": tier, "version": version + 1})
+            try:
+                await ws.repos.workspaces.update(changed, expected_version=version)
+            except StaleVersion as exc:
+                raise RevisionConflict(kind="Workspace", id=str(workspace.id)) from exc
+            await audit_settings(
+                ws,
+                action="service_tier.changed",
+                target_kind="Workspace",
+                target_id=str(workspace.id),
+                target_name=workspace.name,
+                before=workspace.service_tier.value,
+                after=tier.value,
+            )
+        return await self.view(ws)
 
     # Products.
 
@@ -166,6 +305,7 @@ class WorkspaceService:
         product = Product(
             id=uuid4(), workspace_id=ws.actor.workspace_id, key=key, name=_name(name, "/name"), created_at=ws.now
         )
+        await self._within_product_limit(ws)
         try:
             await ws.repos.products.add(product)
         except AlreadyExists as exc:
@@ -198,6 +338,24 @@ class WorkspaceService:
             await ws.repos.products.delete(product_id, expected_version=version)
         except StaleVersion as exc:
             raise RevisionConflict(kind="Product", id=str(product_id)) from exc
+
+    async def _within_product_limit(self, ws: OpenWorkspace) -> None:
+        """Refuse another Product beyond the Cloud service tier's limit. Self-hosted installs have none."""
+        if self.deployment is not Deployment.SAAS:
+            return
+        await ws.repos.workspaces.lock()
+        workspace = await ws.repos.workspaces.get()
+        assert workspace is not None  # open() checked it in this transaction
+        limit = PRODUCT_LIMITS[workspace.service_tier]
+        products = await ws.repos.products.list()
+        if limit is not None and len(products) >= limit:
+            raise ProductLimit(
+                f"Cloud {workspace.service_tier.value.title()} allows {limit} Product. "
+                "A Platform administrator can move this Workspace to Cloud Enterprise for more.",
+                service_tier=workspace.service_tier.value,
+                limit=limit,
+                products=_product_list(products),
+            )
 
     async def _product(self, ws: OpenWorkspace, product_id: UUID) -> Product:
         product = await ws.repos.products.get(product_id)

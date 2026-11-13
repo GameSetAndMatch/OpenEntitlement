@@ -31,19 +31,31 @@ class Permission(StrEnum):
     MANAGE_PRODUCTS = "products:manage"
     #: Add or rename a Workspace-wide Organization: any Product's Manager (ADR-0008).
     MANAGE_ORGANIZATIONS = "organizations:manage"
+    #: Invite a Product's Managers and Users, change their Roles in it and remove them.
+    MANAGE_MEMBERS = "members:manage"
+    #: Make members Owners, change or remove Owners, and invite Owners.
+    MANAGE_OWNERS = "owners:manage"
+    #: Change the Workspace's Cloud service tier. Platform administrators only.
+    SET_SERVICE_TIER = "service-tier:set"
 
 
 #: What each Product Role allows within its Product.
 PRODUCT_ROLE_PERMISSIONS: Mapping[ProductRole, frozenset[Permission]] = {
     ProductRole.USER: frozenset({Permission.READ_PRODUCT}),
-    ProductRole.MANAGER: frozenset({Permission.READ_PRODUCT, Permission.EDIT_PRODUCT}),
+    ProductRole.MANAGER: frozenset({Permission.READ_PRODUCT, Permission.EDIT_PRODUCT, Permission.MANAGE_MEMBERS}),
 }
+
+#: Permissions only a Platform administrator has, even over a Workspace's Owners.
+PLATFORM_PERMISSIONS = frozenset({Permission.SET_SERVICE_TIER})
 
 _DENIED = {
     Permission.READ_PRODUCT: "Your Role does not allow reading this Product.",
     Permission.EDIT_PRODUCT: "Only this Product's Managers and the Workspace's Owners can change it.",
     Permission.MANAGE_PRODUCTS: "Only the Workspace's Owners can create, rename, archive, restore or delete Products.",
     Permission.MANAGE_ORGANIZATIONS: "Only a Product's Managers and the Workspace's Owners can add or rename Organizations.",
+    Permission.MANAGE_MEMBERS: "Only this Product's Managers and the Workspace's Owners can manage its members.",
+    Permission.MANAGE_OWNERS: "Only the Workspace's Owners can invite, appoint, change or remove Owners.",
+    Permission.SET_SERVICE_TIER: "Only a Platform administrator can change the Cloud service tier.",
 }
 
 
@@ -80,6 +92,8 @@ class Actor:
         return self.role_in(product_id) is not None
 
     def can(self, permission: Permission, product_id: UUID | None = None) -> bool:
+        if permission in PLATFORM_PERMISSIONS:
+            return self.account.platform_admin
         if self.administers_workspace:
             return True
         if permission is Permission.MANAGE_ORGANIZATIONS:
@@ -89,6 +103,10 @@ class Actor:
             return False
         role = self.roles.get(product_id)
         return role is not None and permission in PRODUCT_ROLE_PERMISSIONS[role]
+
+    def products_with(self, permission: Permission, product_ids: Iterable[UUID]) -> set[UUID]:
+        """Those of ``product_ids`` where the Actor has ``permission``."""
+        return {p for p in product_ids if self.can(permission, p)}
 
     def require(self, permission: Permission, product_id: UUID | None = None) -> None:
         """Refuse unless the Actor has ``permission``, for ``product_id`` when the action concerns one Product.

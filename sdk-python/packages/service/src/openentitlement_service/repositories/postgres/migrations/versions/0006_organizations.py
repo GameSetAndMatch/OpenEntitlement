@@ -4,8 +4,8 @@ from alembic import op
 import sqlalchemy as sa
 from openentitlement_service.repositories.postgres import rls
 
-revision = "0005_organizations"
-down_revision = "0004_tiers"
+revision = "0006_organizations"
+down_revision = "0005_members_invitations"
 branch_labels = None
 depends_on = None
 

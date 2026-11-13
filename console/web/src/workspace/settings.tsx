@@ -5,6 +5,7 @@ import { stringify } from "yaml";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
 import { useConfirm,useToast } from "../ui.tsx";
+import { ProductMembers,managesMembers,type MemberRoleChange,type NewInvitation,type ProductMember } from "./product-members.tsx";
 export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
@@ -15,11 +16,14 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
   useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
   const confirm=useConfirm(),toast=useToast();
-  const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||w.role==="Manager";
+  // The Python service has Roles per Product: a Manager of any Product manages its members.
+  const python=w.products!==undefined;
+  const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||(python?w.products!.some(managesMembers):w.role==="Manager");
   const base=`/api/workspaces/${w.id}`;
   // Every load takes a generation number; only the newest one may update the lists.
   const generation=useRef(0);
-  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=owner?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
+  // API keys per Product arrive on the Python service with OPE-42.
+  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=owner&&!python?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
   async function reload(){await load();}
   useEffect(()=>{let active=true;const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
     // Stay current without a refresh button: reload when the person comes back to this window.
@@ -27,12 +31,21 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
   },[base,manager,owner]); // load reads exactly base, manager and owner
   // Settings changes are audited with their actor; only removals ask to confirm.
-  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
+  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return false;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return false;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");return true;}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);return false;}finally{pendingRef.current=false;setPending(false);}}
+  // Changing your own access reloads your Workspace and Roles instead of this list.
+  const afterOwnChange=async(id:string)=>{if(id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed" as const;}};
+  const changeRole=(m:ProductMember,change:MemberRoleChange)=>void mutate("Change member role",async()=>{await request(base+"/members/"+m.id,"PUT",change);return afterOwnChange(m.id);});
+  const removeMember=(m:ProductMember)=>void mutate(`Remove ${m.email} from ${owner?"this workspace":"the Products you manage"}?`,async()=>{await request(base+"/members/"+m.id,"DELETE");return afterOwnChange(m.id);},true);
+  const invite=(invitation:NewInvitation)=>mutate("Invite member",async()=>{const result=await request(base+"/invitations","POST",invitation);setLink(location.origin+"/app/#invite="+result.token);});
+  const saveTier=()=>void mutate("Change Cloud service tier",async()=>{await request(base+"/service-tier","PUT",{tier:hostedTier,version:w.version});await refreshAccess();return "access-changed";});
   const tierChanged=hostedTier!==(w.hosting?.tier??"pro");
   const roleSelect=(m:{id:string;email:string;role:string})=><select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>;
   const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
   return <div className="settings-page">{error&&<p role="alert" className="notice error">{error}</p>}
-    {section==="Members"&&<><Group description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}>
+    {section==="Members"&&python&&(manager
+      ?<ProductMembers description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`} members={members} products={w.products!} viewer={account.id} owner={owner} locked={locked} link={link} onRole={changeRole} onRemove={removeMember} onInvite={invite}/>
+      :<Group description={`Your role: ${w.role}.`}>{null}</Group>)}
+    {section==="Members"&&!python&&<><Group description={account.platformAdmin?"As a Platform administrator, you can manage every workspace.":`Your role: ${w.role}.`}>
       {manager&&members.map(m=><Item key={m.id} label={<span className="member"><span className="member-mark" aria-hidden="true">{m.email.slice(0,1).toUpperCase()}</span><span className="member-email">{m.email}</span>{m.id===account.id&&<span className="member-you">You</span>}</span>}>
         {owner?roleSelect(m):<span className="settings-value">{m.role}</span>}
         {(owner||m.role!=="Owner")&&<button className="btn-quiet danger" disabled={locked} aria-label={`Remove ${m.email}`} onClick={()=>void mutate(`Remove ${m.email} from this workspace?`,async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:null,reason});if(m.id===account.id){await refreshAccess();return "access-changed";}},true)}>Remove</button>}
@@ -56,8 +69,8 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
       {secret&&<Item label="Copy the secret to your application’s configuration."><button className="btn" onClick={()=>copy(secret,"API key copied")}>Copy key</button></Item>}
     </Group></>}
     {section==="Service"&&<Group description="The OpenEntitlement service this workspace runs on. It is separate from the Tiers you sell to your customers.">
-      {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
-        <Row label="Cloud service tier" description="Enterprise adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
+      {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();if(python)saveTier();else void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
+        <Row label="Cloud service tier" description="Pro allows one Product. Enterprise allows any number and adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
         {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
       </form>:<Item label={w.hosting?.mode==="saas"?`Cloud ${w.hosting.tier==="enterprise"?"Enterprise":"Pro"}`:"Self-hosted"} description={w.hosting?.subjectEntitlements?"Entitlements for Organizations and their users.":"Entitlements for Organizations."}/>}
     </Group>}

@@ -13,7 +13,7 @@ import { ProductSelector, pickProduct, type ProductSummary } from "./product-sel
 import { FormField } from "../form.tsx";
 import "./style.css";
 // The Python service lists visible Products and loads their Catalog separately.
-export interface Workspace {/** On the Python service: each Organization's values in the selected Product, as the SDK resolved them. */organizationValues?:(organizationId:string)=>OrganizationProduct|undefined;products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
+export interface Workspace {/** On the Python service: each Organization's values in the selected Product, as the SDK resolved them. */organizationValues?:(organizationId:string)=>OrganizationProduct|undefined;products?:ProductSummary[];catalogVersions?:Record<string,Record<string,number>>;catalogVariants?:import("./product-catalog.ts").CatalogVariant[];hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean;productLimit?:number|null};version?:number;id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
 export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE")=>Promise<boolean>;
@@ -31,6 +31,8 @@ const settingsPages=[
   {name:"Audit log",hash:"settings/audit-log",about:"Every change records who made it. Changes to contract terms also record why."},
 ];
 const allPages=[...pages,...settingsPages];
+// The pages the Python service serves so far; the others arrive with their tickets.
+const PYTHON_PAGES=new Set(["Privilege Catalog","Tiers","Organizations","Members","Service"]);
 // Links from before Settings had its own sidebar.
 const legacy:Record<string,string>={settings:"Members",configuration:"Configuration",audit:"Audit log"};
 // The last workspace this browser used. A convenience only: the list from the server decides access.
@@ -172,7 +174,8 @@ export function WorkspaceApp(){
       {workspace.products&&shown.name==='Privilege Catalog'&&(catalogWorkspace?<Catalog key={workspace.id+product} workspace={catalogWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Catalog…</p>)}
       {workspace.products&&shown.name==='Tiers'&&(tiersWorkspace?<Tiers key={workspace.id+product} workspace={tiersWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Tiers…</p>)}
       {workspace.products&&shown.name==='Organizations'&&(organizationsWorkspace?<Organizations key={workspace.id+product} workspace={organizationsWorkspace} save={save} canEdit={catalogEditable} busy={busy}/>:<p role="status">Loading Organizations…</p>)}
-      {workspace.data===undefined&&!['Privilege Catalog','Tiers','Organizations'].includes(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
+      {workspace.data===undefined&&(shown.name==="Members"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
+      {workspace.data===undefined&&!PYTHON_PAGES.has(shown.name)&&<p className="notice">This page is not available on this service yet.</p>}
       {workspace.data!==undefined&&<>
       {shown.name==="Privilege Catalog"&&!workspace.products&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Tiers"&&<Tiers key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
