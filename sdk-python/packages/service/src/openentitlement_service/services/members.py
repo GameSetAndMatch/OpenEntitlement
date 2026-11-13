@@ -185,13 +185,15 @@ class MemberService:
             raise InvitationInvalid()
         now = self.clock()
         async with self.store.transaction(workspace_id) as repos:
+            # The Workspace lock comes first, as in every membership and Product change, so taking the
+            # invitation cannot deadlock with a Product deletion that cascades to it.
+            await repos.workspaces.lock()
             invitation = await repos.invitations.take(digest(token), now=now)
             if invitation is None or await repos.workspaces.get() is None:
                 raise InvitationInvalid()
             if invitation.email.casefold() != account.email.casefold():
                 # Raising rolls the transaction back, so the invited person can still use the link.
                 raise InvitationForAnotherEmail()
-            await repos.workspaces.lock()
             member = await repos.members.get(account.id)
             current = {r.product_id: r.role for r in await repos.members.product_roles(account.id)} if member else {}
             unchanged = member is not None and (member.owner or invitation.owner or invitation.product_id in current)

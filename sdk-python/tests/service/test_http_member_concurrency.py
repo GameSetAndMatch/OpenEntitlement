@@ -91,3 +91,38 @@ async def test_promoting_an_owner_and_clearing_their_role_concurrently_never_los
         else:
             # Cleared first: the member left, so there is nobody to promote.
             assert (clear.status_code, promote.status_code) == (204, 404) and account_id not in listed
+
+
+async def test_accepting_invitations_while_their_product_is_deleted_never_deadlocks(postgres_store: PostgresStore) -> None:
+    issuer = FakeIssuer()
+    app = create_app(
+        postgres_store,
+        sign_in=SignInSettings(oidc=OidcSettings(app_url=APP, issuer=ISSUER, client_id=CLIENT_ID)),
+        oidc_transport=issuer.transport,
+    )
+
+    async def person(subject: str) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=APP)
+        login = await client.get("/auth/login")
+        assert (await client.get(issuer.authorize(login.headers["location"], subject))).status_code == 302
+        client.headers.update({"origin": APP, "x-oe-csrf": (await client.get("/api/session")).json()["csrf"]})
+        return client
+
+    owner = await person("alice")
+    workspace = (await owner.post("/api/workspaces", json={"name": "Acme"})).json()
+    base = f"/api/workspaces/{workspace['id']}"
+    for round_ in range(5):
+        storage = (await owner.post(base + "/products", json={"key": f"storage_{round_}", "name": "Storage"})).json()
+        invited = []
+        for i in range(6):
+            link = (await owner.post(base + "/invitations", json={"email": f"m{round_}x{i}@acme.test", "role": "User", "productId": storage["id"]})).json()
+            invited.append((await person(f"m{round_}x{i}"), link["token"]))
+        deleted, *accepted = await asyncio.gather(
+            owner.delete(f"{base}/products/{storage['id']}?version=1"),
+            *(client.post("/api/invitations/accept", json={"token": token}) for client, token in invited),
+        )
+        assert deleted.status_code == 204, deleted.text
+        assert all(r.status_code in (200, 404) for r in accepted), [r.text for r in accepted if r.status_code not in (200, 404)]
+        for client, _ in invited:
+            await client.aclose()
+    await owner.aclose()
