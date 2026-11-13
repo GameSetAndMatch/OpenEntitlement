@@ -96,7 +96,7 @@ Primary users:
 | PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
 | PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |
 | Funnel dashboards: website acquisition (landing → docs → quickstart → install → GitHub/Docker) and console activation (sign-in → Workspace → Privilege → Tier → Organization → API key → first evaluation) | ✅ created in PostHog; 📋 hosted console must set `OE_POSTHOG_KEY` to feed the activation funnel | #34, `tools/posthog/dashboards.mjs` |
-| PostHog definitions kept in code: the dashboards script matches PostHog after the OPE-49 fixes (internal and test traffic left out of funnels, retention and console errors), writes only what differs, and has a diff mode; maintainers leave the website numbers with `?oe_internal=1` | ✅ | OPE-56; `tools/posthog/dashboards.mjs`, `website/scripts/check-analytics.mjs`, `docs/maintainers/analytics.md` |
+| PostHog definitions kept in code: the dashboards script matches PostHog after the OPE-49 fixes (internal and test traffic left out of funnels, retention and console errors), writes only what differs, and has a diff mode; maintainers leave the website numbers with `?oe_internal=1` | ✅ | #61 (OPE-56); `tools/posthog/dashboards.mjs`, `website/scripts/check-analytics.mjs`, `docs/maintainers/analytics.md` |
 
 ### Project
 
