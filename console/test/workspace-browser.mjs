@@ -79,7 +79,13 @@ try{
  await page.getByText('Simulated failure').first().waitFor();
  await review.getByRole('button',{name:'Create tier',exact:true}).click();
  const ready=page.getByRole('region',{name:'Pro is ready'});await ready.waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await noDialog();assert.equal(await ready.getByRole('button',{name:'Add a free trial',exact:true}).count(),1);
- await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro grace period');assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');await page.getByLabel('Grace period (days)').fill('5');await save('Save variant');
+ await ready.getByRole('button',{name:'Add a grace period',exact:true}).click();assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Pro grace period');assert.equal(await page.getByLabel('Purpose').inputValue(),'grace');
+ // Changing only the grace days is a change too: leaving asks, Keep editing keeps the days, and the saved days clear it.
+ {const holds=()=>page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),days=page.getByLabel('Grace period (days)'),leaving=page.getByRole('dialog',{name:'Discard your changes?'});
+  assert.equal(await holds(),false);await days.fill('6');assert.equal(await holds(),true,'Changed grace days hold the tab');
+  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await leaving.getByRole('button',{name:'Keep editing',exact:true}).click();await leaving.waitFor({state:'hidden'});
+  assert.equal(await days.inputValue(),'6');assert.equal(new URL(page.url()).hash,'#tiers');await days.fill('7');assert.equal(await holds(),false,'The opening days again are no change');}
+ await page.getByLabel('Grace period (days)').fill('5');await save('Save variant');
  await ready.getByText('Added: Pro grace period · 5 days').waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='Pro is ready');await ready.getByRole('button',{name:'Done',exact:true}).click();
  const proPanel=page.locator('.tier-panel').filter({has:page.getByRole('heading',{name:'Pro',exact:true})});await proPanel.getByText('Pro standard',{exact:true}).waitFor();await proPanel.getByText('5 days of past-due grace',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Edit tier',exact:true}).click();assert.equal(await page.getByLabel('Rank').inputValue(),'0');assert.equal(await page.getByLabel('Past-due grace period').inputValue(),'5');await page.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -150,8 +156,8 @@ try{
  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('External flag',{exact:true}).waitFor();
  // A validation error offers no refresh (refreshing cannot fix it), and it does not follow the person to another page.
  const pageError=page.locator('main > .notice.error');
- await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Seat limit');await page.getByLabel('Value type').selectOption('integer');await page.getByLabel('Require a value in every Tier variant',{exact:true}).check();await page.getByRole('button',{name:'Save privilege',exact:true}).click();
- await pageError.getByText('Set seat_limit in every existing variant before requiring tier values').waitFor();assert.equal(await pageError.getByRole('button',{name:'Refresh workspace'}).count(),0,'Refreshing cannot fix a validation error');
+ await page.getByRole('button',{name:'Edit Maximum exports',exact:true}).click();await page.getByLabel('Maximum',{exact:true}).fill('5');await page.getByRole('button',{name:'Save changes',exact:true}).click();
+ await pageError.getByText('Existing value would become invalid: max_exports: must be 5 or less').waitFor();assert.equal(await pageError.getByRole('button',{name:'Refresh workspace'}).count(),0,'Refreshing cannot fix a validation error');
  await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.equal(await pageError.count(),0,'An error does not follow the person to another page');
  // A save from an old revision is fixed by refreshing, so that error offers it.
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Late draft');
@@ -161,9 +167,12 @@ try{
  // A request that fails after the person left its page does not report its error on the new page.
  const delayedFailure=async route=>{await new Promise(ok=>setTimeout(ok,800));await route.fulfill({status:422,contentType:'application/json',body:JSON.stringify({error:'Late failure',message:'Late failure'})});};
  await page.route('**/catalog',delayedFailure,{times:1});await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Late save');
- {const failure=page.waitForResponse(r=>r.url().endsWith('/catalog')&&r.request().method()==='PUT');await page.getByRole('button',{name:'Save privilege',exact:true}).click();await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();await failure;await page.waitForTimeout(300);assert.equal(await page.getByText('Late failure').count(),0,'A save that fails after leaving its page reports nothing on the new page');}
+ // Leaving while it is in flight waits for the outcome: the failure is reported on its own page, and the form asks before it is discarded.
+ {const failure=page.waitForResponse(r=>r.url().endsWith('/catalog')&&r.request().method()==='PUT'),leaving=page.getByRole('dialog',{name:'Discard your changes?'});await page.getByRole('button',{name:'Save privilege',exact:true}).click();await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByText('Finishing your save before leaving…').waitFor();assert.equal(await leaving.count(),0,'No discard offer while the save is in flight');
+  await failure;await leaving.getByRole('button',{name:'Keep editing',exact:true}).click();await pageError.getByText('Late failure').waitFor();assert.equal(await page.getByLabel('Title',{exact:true}).inputValue(),'Late save');assert.equal(new URL(page.url()).hash,'#catalog');
+  await page.getByRole('link',{name:'Tiers',exact:true}).click();await leaving.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.equal(await page.getByText('Late failure').count(),0,'A failed save reports nothing on the next page');}
  await page.goto(running.url+'/app/#settings/members');await page.getByLabel('Email address').waitFor();await page.route('**/invitations',delayedFailure,{times:1});await page.getByLabel('Email address').fill('late@example.test');
- {const failure=page.waitForResponse(r=>r.url().endsWith('/invitations'));await page.getByRole('button',{name:'Create invitation link',exact:true}).click();await page.getByRole('link',{name:'Service',exact:true}).click();await page.getByRole('heading',{name:'Service',exact:true,level:1}).waitFor();await failure;await page.waitForTimeout(300);assert.equal(await page.getByText('Late failure').count(),0,'A settings action that fails after leaving its page reports nothing on the new page');}
+ {const failure=page.waitForResponse(r=>r.url().endsWith('/invitations'));await page.getByRole('button',{name:'Create invitation link',exact:true}).click();await page.getByRole('link',{name:'Service',exact:true}).click();await page.getByRole('dialog',{name:'Discard your changes?'}).getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('heading',{name:'Service',exact:true,level:1}).waitFor();await failure;await page.waitForTimeout(300);assert.equal(await page.getByText('Late failure').count(),0,'A settings action that fails after leaving its page reports nothing on the new page');}
  // After a failed workspace load, changing page retries the load instead of waiting forever.
  await page.route(`**/api/workspaces/${workspaceId}`,route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Load failure',message:'Load failure'})}),{times:1});
  await page.goto(running.url+'/app/#catalog');await page.reload();await pageError.getByText('Load failure').waitFor();await pageError.getByRole('button',{name:'Refresh workspace',exact:true}).waitFor();
@@ -176,6 +185,91 @@ try{
   await retry;await page.waitForTimeout(300);assert.equal(await page.getByText('Load failure').count(),0,'A late retry of another workspace reports nothing here');
   await page.getByRole('button',{name:'Workspace: Another business',exact:true}).click();await page.getByRole('menuitemradio',{name:/Acme product/}).click();await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).waitFor();}
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('heading',{name:'Privilege Catalog',exact:true,level:1}).waitFor();
+ // OPE-54. A second standard variant, so an Organization can switch variants.
+ const workspaceData=async()=>(await (await page.request.get(running.url+`/api/workspaces/${workspaceId}`)).json()).data;
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByRole('button',{name:'Add a variant to Legacy',exact:true}).click();await page.getByLabel('Name',{exact:true}).fill('Legacy standard');await page.getByLabel('Purpose').selectOption('standard');await save('Save variant');
+ // An Organization's terms belong to its Tier variant: the form names the terms saving will clear, and switching back restores them.
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();await page.locator('.workspace-card').filter({hasText:'Acme'}).click();
+ await page.getByRole('button',{name:'Edit organization',exact:true}).click();await page.getByLabel('Override max_exports').check();await page.getByLabel('max_exports',{exact:true}).fill('40');await save('Save organization',true);
+ await page.getByRole('button',{name:'Edit organization',exact:true}).click();const variantSelect=page.getByLabel('Tier variant',{exact:true});const originalVariant=await variantSelect.inputValue();
+ await variantSelect.selectOption({label:'Legacy standard'});await page.getByText('Saving clears 1 term: Maximum exports',{exact:true}).waitFor();assert.equal(await page.getByLabel('Override max_exports').isChecked(),false);
+ await variantSelect.selectOption(originalVariant);assert.equal(await page.getByText(/^Saving clears/).count(),0);assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'40','Switching back restores the terms');
+ // Leaving a form with unsaved changes asks first. Keeping the changes stays on the form.
+ const discard=page.getByRole('dialog',{name:'Discard your changes?'});
+ assert.equal(await page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),false,'An unchanged form does not hold the tab');
+ await page.getByLabel('max_exports',{exact:true}).fill('41');
+ assert.equal(await page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),true,'Closing or reloading the tab asks first');
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();await discard.waitFor();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await discard.waitFor({state:'hidden'});
+ assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'41');assert.equal(new URL(page.url()).hash,'#organizations');await page.getByRole('heading',{name:'Organizations',exact:true,level:1}).waitFor();
+ await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).click();await page.getByRole('menuitemradio',{name:/Another business/}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).waitFor();assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'41');
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();
+ assert.equal((await workspaceData()).organizations.find(o=>o.id==='acme').terms.max_exports,40,'Discarding saves nothing');
+ assert.equal(await page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),false,'A discarded form no longer holds the tab');
+ const holdsTab=()=>page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;});
+ // An action that fails, or keeps the form, keeps it protected: a form stays registered until it closes.
+ await page.getByRole('link',{name:'Organizations',exact:true}).click();await page.locator('.workspace-card').filter({hasText:'Acme'}).click();await page.getByRole('button',{name:'Edit organization',exact:true}).click();await page.getByLabel('max_exports',{exact:true}).fill('42');
+ await page.route('**/auth/logout',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({message:'Sign-out failed'})}),{times:1});
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await pageError.getByText('Sign-out failed').waitFor();
+ assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'42');assert.equal(await holdsTab(),true,'A failed sign-out keeps the form protected');
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'42');
+ // An invitation link offers to join without replacing the page: the form and its changes stay, and joining asks first.
+ await page.evaluate(()=>{location.hash='#invite=not-a-real-token';});await page.getByRole('heading',{name:'You have a workspace invitation'}).waitFor();
+ assert.equal(new URL(page.url()).hash,'#organizations');assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'42');assert.equal(await discard.count(),0);assert.equal(await holdsTab(),true);
+ await page.getByRole('button',{name:'Join workspace',exact:true}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await discard.waitFor({state:'hidden'});assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'42');
+ await page.getByRole('button',{name:'Join workspace',exact:true}).click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await pageError.waitFor();
+ assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'42');assert.equal(await holdsTab(),true,'A failed join keeps the form protected');
+ await page.route('**/api/invitations/accept',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({workspaceId,role:'Owner',alreadyMember:true})}),{times:1});
+ await page.getByRole('button',{name:'Join workspace',exact:true}).click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await page.getByText('Already a member. Your Owner role is unchanged.').waitFor();
+ assert.equal(await page.getByLabel('max_exports',{exact:true}).inputValue(),'42');assert.equal(await holdsTab(),true,'Joining a workspace you already belong to keeps the form, so it stays protected');
+ await page.getByRole('link',{name:'Tiers',exact:true}).click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.equal(await holdsTab(),false);
+ // The same on another page: an invitation arriving while a new tier is being named keeps the draft and the page.
+ await page.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByLabel('Name',{exact:true}).fill('Draft tier');assert.equal(await holdsTab(),true);
+ await page.evaluate(()=>{location.hash='#invite=another-token';});await page.getByRole('heading',{name:'You have a workspace invitation'}).waitFor();
+ assert.equal(new URL(page.url()).hash,'#tiers');assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Draft tier');assert.equal(await discard.count(),0);
+ await page.getByRole('button',{name:'Dismiss invitation',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await holdsTab(),false,'Cancel discards without asking');
+ // The contract-status policy is a form too.
+ {const policy=page.locator('.tier-policy select').first(),saved=await policy.inputValue();await policy.selectOption({index:1});assert.equal(await holdsTab(),true,'A changed status policy holds the tab');
+  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.notEqual(await policy.inputValue(),saved);
+  // Opening a tier or variant form replaces the policy, so it asks too: Keep editing keeps the policy change, Discard opens the form.
+  for(const open of [page.getByRole('button',{name:'Create tier',exact:true}),page.getByRole('button',{name:'Edit tier',exact:true}).first(),page.getByRole('button',{name:'Edit Legacy grace',exact:true}),page.getByRole('button',{name:'Add a variant to Legacy',exact:true})]){
+   await open.click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await discard.waitFor({state:'hidden'});assert.notEqual(await policy.inputValue(),saved,'Keep editing keeps the policy change');assert.equal(await holdsTab(),true);}
+  await page.getByRole('button',{name:'Edit tier',exact:true}).first().click();await discard.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('button',{name:'Save tier',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await policy.inputValue(),saved,'Discard dropped the policy change');assert.equal(await holdsTab(),false);
+  // An unchanged policy asks nothing.
+  await page.getByRole('button',{name:'Create tier',exact:true}).click();await page.getByLabel('Name',{exact:true}).waitFor();assert.equal(await discard.count(),0);await page.getByRole('button',{name:'Cancel',exact:true}).click();}
+ // So is creating a workspace: a typed name asks before signing out.
+ await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).click();await page.getByRole('menu',{name:'Workspaces'}).getByRole('menuitem',{name:'Create a workspace'}).click();await page.getByLabel('Workspace name').fill('Half-named');assert.equal(await holdsTab(),true);
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();await discard.getByRole('button',{name:'Keep editing',exact:true}).click();assert.equal(await page.getByLabel('Workspace name').inputValue(),'Half-named');
+ await page.locator('form.workspace-create').getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.equal(await holdsTab(),false);
+ // A save already sent cannot be discarded. Leaving waits for its outcome: Cancel is unavailable meanwhile, and a successful save closes the form, so the page changes without asking.
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('heading',{name:'Privilege Catalog',exact:true,level:1}).waitFor();
+ {let release;const gate=new Promise(ok=>{release=ok;});await page.route('**/catalog',async route=>{await gate;await route.continue();},{times:1});
+  await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Pending save');await page.getByRole('button',{name:'Save privilege',exact:true}).click();
+  await page.locator('form.privilege-form button:disabled',{hasText:'Cancel'}).waitFor();
+  await page.getByRole('link',{name:'Tiers',exact:true}).click();await page.getByText('Finishing your save before leaving…').waitFor();
+  assert.equal(await discard.count(),0,'No discard offer for a save already sent');assert.equal(new URL(page.url()).hash,'#catalog');
+  release();await page.getByRole('heading',{name:'Tiers',exact:true,level:1}).waitFor();assert.equal(await discard.count(),0,'A saved form has nothing to discard');
+  assert.ok((await workspaceData()).privileges.some(p=>p.key==='pending_save'));assert.equal(await holdsTab(),false);}
+ // Requiring a value when variants exist asks for their values in the same save: one value for every variant, or one per variant.
+ await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();const auditBefore=(await (await page.request.get(running.url+`/api/workspaces/${workspaceId}/audit`)).json()).length;
+ await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Seat limit');await page.getByLabel('Value type').selectOption('integer');await page.getByLabel('Require a value in every Tier variant',{exact:true}).check();
+ const variantNames=(await workspaceData()).variants.map(v=>v.name);
+ await page.getByLabel('Value for every variant',{exact:true}).fill('5');await page.getByLabel('Set per variant',{exact:true}).check();
+ for(const name of variantNames)assert.equal(await page.getByLabel(`Value for ${name}`,{exact:true}).inputValue(),'5');
+ await page.getByLabel('Value for Legacy standard',{exact:true}).fill('9');await assertFormLayout(page);await save('Save privilege');
+ {const data=await workspaceData();for(const v of data.variants)assert.equal(v.values.seat_limit,v.name==='Legacy standard'?9:5);}
+ assert.equal((await (await page.request.get(running.url+`/api/workspaces/${workspaceId}/audit`)).json()).length,auditBefore+1,'One change, one audit entry');
+ // Removing a default asks the same, starting from the old default.
+ await page.getByRole('button',{name:'Edit Second flag',exact:true}).click();await page.getByLabel('Require a value in every Tier variant',{exact:true}).check();assert.equal(await page.getByRole('switch',{name:'Value for every variant',exact:true}).getAttribute('aria-checked'),'false');await save('Save changes');
+ {const data=await workspaceData();for(const v of data.variants)assert.equal(v.values.second_flag,false);assert.equal(Object.hasOwn(data.privileges.find(p=>p.key==='second_flag'),'default'),false);}
+ // Making a Privilege Read-only when records set their own value confirms with the list, then removes those values in the same change.
+ await page.getByRole('button',{name:'Edit Maximum exports',exact:true}).click();await page.getByLabel('Visibility').selectOption('read_only');await page.getByRole('button',{name:'Save changes',exact:true}).click();
+ const readOnly=page.getByRole('dialog',{name:'Make Maximum exports Read-only?'});await readOnly.getByText('Pro standard and Acme set their own value; they will use the Catalog default instead.',{exact:true}).waitFor();
+ await readOnly.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Save changes',exact:true}).waitFor();assert.equal((await workspaceData()).privileges.find(p=>p.key==='max_exports').frozen,false);
+ // Acme's terms are contract terms, so the same dialog asks why; the reason is audited with the change.
+ await page.getByRole('button',{name:'Save changes',exact:true}).click();await readOnly.getByRole('textbox').fill('Exports are fixed for everyone');await readOnly.getByRole('button',{name:'Confirm',exact:true}).click();await page.getByRole('button',{name:'Save changes',exact:true}).waitFor({state:'hidden'});
+ assert.equal((await (await page.request.get(running.url+`/api/workspaces/${workspaceId}/audit`)).json())[0].reason,'Exports are fixed for everyone');
+ {const data=await workspaceData();assert.equal(data.privileges.find(p=>p.key==='max_exports').frozen,true);assert.deepEqual(data.variants.filter(v=>Object.hasOwn(v.values,'max_exports')).map(v=>v.name),[]);assert.equal(Object.hasOwn(data.organizations.find(o=>o.id==='acme').terms,'max_exports'),false);}
  // In a workspace without tiers, a Privilege without a default says so once.
  await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).click();await page.getByRole('menu',{name:'Workspaces'}).getByRole('menuitem',{name:'Create a workspace'}).click();await page.getByLabel('Workspace name').fill('Fresh product');await page.locator('form.workspace-create').getByRole('button',{name:'Create workspace'}).click();await page.getByRole('button',{name:'Workspace: Fresh product',exact:true}).waitFor();
  await page.getByRole('button',{name:'Define privilege',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('API calls');await page.getByLabel('Value type').selectOption('integer');await page.getByLabel('Require a value in every Tier variant',{exact:true}).check();await save('Save privilege');

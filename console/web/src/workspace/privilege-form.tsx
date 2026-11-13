@@ -9,6 +9,11 @@ import {storedDefinition} from '../../../server/workspace/catalog-adapter.ts';
 import type {Privilege} from '../../../server/workspace/privilege-definition.ts';
 import type {Group,Privilege as StoredPrivilege,Tag} from '../../../server/workspace/model.ts';
 import type {Workspace} from './app.tsx';
+import type {Value} from '../../../server/workspace/model.ts';
+import {useUnsavedChanges} from './unsaved.ts';
+
+/** A variant as the Privilege form needs it: requiring a value asks for the value of each variant that does not set its own. */
+export interface VariantValues {id:string;name:string;values:Record<string,unknown>}
 
 export const freshPrivilege=():Privilege=>({key:'',title:'',description:'',type:'boolean',visibility:'editable',tags:[],default:false});
 
@@ -19,20 +24,28 @@ function cleaned(draft:Privilege):Privilege{
  return {...draft,enum:choices,...(Object.hasOwn(draft,'default')?{default:choices.includes(draft.default??'')?draft.default:choices[0]}:{})};
 }
 
-export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environment,envEditable,busy,onSave,onCreateTag,onCreateGroup,onCancel}:{
- initial:Privilege;editing:boolean;groups:Group[];takenGroupIds?:readonly string[];tags:Tag[];environment?:Workspace['environment'];envEditable:boolean;busy:boolean;
- onSave:(privilege:Privilege)=>Promise<boolean>;onCreateTag:(tag:Tag)=>Promise<boolean>;onCreateGroup:(group:Group)=>Promise<boolean>;onCancel:()=>void;
+export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,variants=[],environment,envEditable,busy,onSave,onCreateTag,onCreateGroup,onCancel}:{
+ initial:Privilege;editing:boolean;groups:Group[];takenGroupIds?:readonly string[];tags:Tag[];variants?:readonly VariantValues[];environment?:Workspace['environment'];envEditable:boolean;busy:boolean;
+ /** `variantValues` holds the value of each existing variant when the Privilege has no Catalog default. Both save as one change. */
+ onSave:(privilege:Privilege,variantValues?:Record<string,Value>)=>Promise<boolean>;onCreateTag:(tag:Tag)=>Promise<boolean>;onCreateGroup:(group:Group)=>Promise<boolean>;onCancel:()=>void;
 }){
  const [draft,setDraft]=useState<Privilege>(initial),[keyEdited,setKeyEdited]=useState(false);
  const saved=cleaned(draft),binding=environment?.[draft.key];
  const requireValue=!Object.hasOwn(draft,'default');
+ // One value for every variant by default; "Set per variant" expands it. Requiring a value starts from the default it replaces.
+ const [shared,setShared]=useState<Value|undefined>(),[perVariant,setPerVariant]=useState<Record<string,Value|undefined>>();
+ const missing=variants.filter(v=>!Object.hasOwn(v.values,draft.key)),asksVariants=requireValue&&missing.length>0;
+ const variantValues=asksVariants?Object.fromEntries(missing.map(v=>[v.id,(perVariant?perVariant[v.id]:shared) as Value])):undefined;
+ useUnsavedChanges(true,{draft,variantValues});
  function changeType(type:Privilege['type']){
   const common={key:draft.key,title:draft.title,description:draft.description,visibility:draft.visibility,groupId:draft.groupId,tags:draft.tags};
+  setShared(undefined);setPerVariant(undefined);
   setDraft(type==='boolean'?{...common,type,default:false}:type==='integer'?{...common,type,default:0}:{...common,type,enum:['standard'],default:'standard'});
  }
  function setRequired(required:boolean){
   const next={...draft} as Privilege&{default?:unknown};
-  if(required)delete next.default;
+  // The value the variants used until now is the starting point for each of them.
+  if(required){setShared(next.default as Value|undefined);setPerVariant(undefined);delete next.default;}
   else next.default=next.type==='boolean'?false:next.type==='integer'?next.minimum??0:cleanChoices(next.enum)[0]??'';
   setDraft(next as Privilege);
  }
@@ -45,7 +58,7 @@ export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environ
   next.default=next.type==='boolean'?false:next.type==='integer'?next.minimum??0:cleanChoices(next.enum)[0]??'';
   setDraft(next as Privilege);
  }
- return <form className="panel form privilege-form" onSubmit={e=>{e.preventDefault();if(defaultError){e.currentTarget.querySelector<HTMLInputElement>('[data-require-value]')?.focus();return;}void onSave(saved);}}>
+ return <form className="panel form privilege-form" onSubmit={e=>{e.preventDefault();if(defaultError){e.currentTarget.querySelector<HTMLInputElement>('[data-require-value]')?.focus();return;}void (variantValues?onSave(saved,variantValues):onSave(saved));}}>
   <div className="form-header">
    <h2>{editing?`Edit ${initial.title}`:'Define a Privilege'}</h2>
    <p>A Privilege is one thing your product allows or limits, such as a feature or a quota.</p>
@@ -92,6 +105,13 @@ export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environ
     <input className="mono" disabled={!envEditable} value={draft.envOverride??''} pattern="[A-Z][A-Z0-9_]*" onChange={e=>setDraft({...draft,envOverride:e.target.value||undefined})}/>
    </FormField>}
    <Check data-require-value label="Require a value in every Tier variant" hint={<>{needsDefault?`${draft.visibility==='read_only'?'Read-only':'Hidden'} Privileges always use their Catalog default.`:'With no catalog default, each Tier variant must set its own value.'}{defaultError&&<span role="alert" className="field-error">{defaultError}</span>}</>} disabled={needsDefault&&!requireValue||draft.type==='boolean'&&Boolean(draft.envOverride)} checked={requireValue} onChange={e=>setRequired(e.target.checked)}/>
+   {asksVariants&&<div className="field variant-values">
+    <span className="field-label">Value in existing variants</span>
+    <small className="field-hint">{missing.length===1?`${missing[0]!.name} needs a value.`:`${missing.length} variants need a value. One value applies to every variant unless you set each one.`}</small>
+    {perVariant?missing.map(v=><div className="field" key={v.id}><span className="field-label">{v.name}</span><Field def={storedDefinition(saved) as unknown as StoredPrivilege} label={`Value for ${v.name}`} value={perVariant[v.id]} onChange={value=>setPerVariant({...perVariant,[v.id]:value})}/></div>)
+     :<Field def={storedDefinition(saved) as unknown as StoredPrivilege} label="Value for every variant" value={shared} onChange={setShared}/>}
+    {missing.length>1&&<Check label="Set per variant" checked={Boolean(perVariant)} onChange={e=>setPerVariant(e.target.checked?Object.fromEntries(missing.map(v=>[v.id,shared])):undefined)}/>}
+   </div>}
    {!requireValue&&<div className="field">
     <span className="field-label">Catalog default</span>
     {/* Read-only locks this value in tiers, Organizations and users, never here: it is the value everyone gets. */}
@@ -109,7 +129,7 @@ export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,environ
   </fieldset>
 
   <div className="form-actions">
-   <button type="button" className="btn" onClick={onCancel}>Cancel</button>
+   <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
    <button className="btn primary" disabled={busy}>{editing?'Save changes':'Save privilege'}</button>
   </div>
  </form>;

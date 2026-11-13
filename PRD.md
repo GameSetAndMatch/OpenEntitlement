@@ -59,7 +59,7 @@ Primary users:
 | Workspace API keys and evaluation endpoint | ✅ preview | #22 |
 | Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 📋 accepted (ADR-0008) | — |
 | Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 📋 accepted (ADR-0007) | — |
-| Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, standard user form | 📋 | — |
+| Console UX audit fixes: requiring a Privilege's value asks for the existing variants' values in the same save (one for every variant, or per variant); leaving a form with unsaved changes asks "Discard your changes?"; switching an Organization's variant names the terms saving will clear and switching back restores them; making a Privilege Read-only confirms which records set their own value and removes those values in the same change (with a reason when they include contract terms; API clients ask with `removeOwnValues`, otherwise values stay stored without effect); standard user form | ✅ preview | OPE-54 (Node preview service; the Python service follows in OPE-39/OPE-41); user form #58 |
 | Where each value comes from, in glossary terms: Catalog default, the Tier variant's name, Organization terms, Personal terms or Grace period, with a one-line sum when a Grant adds to it ("Personal terms 50 + Grant 5") | ✅ preview | OPE-55; `console/web/src/workspace/subjects.tsx` |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |

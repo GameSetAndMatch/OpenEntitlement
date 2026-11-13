@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {trackWrite,useUnsavedChanges} from "./unsaved.ts";
 import type {Workspace,Save} from "./app.tsx";
 import {tier as validTier,variant as validVariant,type Tier,type Value} from "../../../server/workspace/model.ts";
 import {ValuesEditor} from "./fields.tsx";
@@ -18,6 +19,7 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
   const [savedTier,setSavedTier]=useState<string>();
   // Creation spans two saves; nothing in the form changes until both have finished.
   const [submitting,setSubmitting]=useState(false);
+  useUnsavedChanges(true,{name,id,values});
   // Each step replaces the form, so focus moves to the new step's heading.
   const heading=useRef<HTMLHeadingElement>(null),moved=useRef(false);
   useEffect(()=>{if(!moved.current){moved.current=true;return;}heading.current?.focus();},[step]);
@@ -36,10 +38,11 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
     // Validate both records with the server's rules before saving either, so a tier is never left without its variant.
     try{validTier(tier);validVariant({...w.data,tiers:[...w.data.tiers.filter(t=>t.id!==id),tier]},standard);}catch(e){setError((e as Error).message);return;}
     setError("");setSubmitting(true);
-    try{
+    // Both saves are one write for leaving: it waits until the tier has its variant, or one of them failed.
+    await trackWrite((async()=>{try{
       if(savedTier!==id){if(!await save("tiers",tier,"Create tier"))return;setSavedTier(id);}
       if(await save("variants",standard,"Create standard variant"))onCreated(id);
-    }finally{setSubmitting(false);}
+    }finally{setSubmitting(false);}})());
   }
 
   if(step==="review")return <section className="panel form" aria-labelledby="tier-review-title">
@@ -63,6 +66,6 @@ export function TierCreate({workspace:w,save,busy,onCancel,onCreated}:{workspace
       <ValuesEditor environment={w.environment} frozenFeatures={w.data.features.filter(f=>f.frozen).map(f=>f.id)} definitions={definitions} base={{}} values={values} onChange={setValues}/>
     </fieldset>
     {error&&<div className="form-section"><p role="alert" className="notice error">{error}</p></div>}
-    <div className="form-actions"><button type="button" className="btn" onClick={onCancel}>Cancel</button><button className="btn primary">Review tier</button></div>
+    <div className="form-actions"><button type="button" className="btn" disabled={busy||submitting} onClick={onCancel}>Cancel</button><button className="btn primary">Review tier</button></div>
   </form>;
 }

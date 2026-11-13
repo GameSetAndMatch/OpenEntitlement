@@ -103,6 +103,54 @@ export function privilege(data: WorkspaceData, input: unknown): Privilege {
   for (const row of [...data.variants.map(v => v.values), ...data.organizations.map(o => o.terms), ...(data.subjects??[]).map(s=>s.terms)]) if (Object.hasOwn(row, key)) { const e = valueError(result, row[key]); if (e) throw new WorkspaceError(`Existing value would become invalid: ${e}`, 409); }
   return result;
 }
+/** Names of the records that set their own value for a Privilege: variants, Organizations, then application users. Grants are allowances, not values. */
+export function ownValueHolders(data: WorkspaceData, key: string): string[] {
+  const organizationName = (id: string) => data.organizations.find(o => o.id === id)?.name ?? id;
+  return [
+    ...data.variants.filter(v => Object.hasOwn(v.values, key)).map(v => v.name),
+    ...data.organizations.filter(o => Object.hasOwn(o.terms, key)).map(o => o.name),
+    ...(data.subjects ?? []).filter(s => Object.hasOwn(s.terms, key)).map(s => `${s.name} (${organizationName(s.organizationId)})`),
+  ];
+}
+/** Whether Organization terms or personal terms set their own value for a Privilege: removing them changes contract terms. */
+export function holdsContractTerms(data: WorkspaceData, key: string): boolean {
+  return data.organizations.some(o => Object.hasOwn(o.terms, key)) || (data.subjects ?? []).some(s => Object.hasOwn(s.terms, key));
+}
+/** What a Privilege change removed: the values records set themselves, when it became Read-only and the request asked for that. */
+export interface PrivilegeChange { privilege: Privilege; removed: string[]; removedContractTerms: boolean }
+/**
+ * Defines or updates a Privilege as one change. On error, the caller discards `data` (the service rolls back the transaction).
+ * Without a Catalog default, `variantValues` supplies the value of each existing variant that does not set its own.
+ * Read-only Privileges use their Catalog default everywhere. Values records set themselves stay stored and have no effect,
+ * unless `removeOwnValues` is true and the Privilege becomes Read-only in this change: then they are removed with it.
+ * Nothing is removed implicitly, by an edit of an already Read-only Privilege, or through the legacy `privileges` route.
+ */
+export function changePrivilege(data: WorkspaceData, input: unknown, variantValues?: unknown, removeOwnValues = false): PrivilegeChange {
+  const entry = object(input);
+  if (variantValues !== undefined) {
+    const supplied = object(variantValues);
+    if (Object.hasOwn(entry, "default")) throw new WorkspaceError("Variant values are only for a Privilege without a Catalog default");
+    const key = identifier(entry.key);
+    for (const [id, value] of Object.entries(supplied)) {
+      const target = data.variants.find(v => v.id === id);
+      if (!target) throw new WorkspaceError(`Variant not found: ${id}`, 422);
+      if (Object.hasOwn(target.values, key)) throw new WorkspaceError(`${target.name} already sets its own value for ${key}`, 409);
+      target.values[key] = structuredClone(value as Value);
+    }
+  }
+  let removed: string[] = [], removedContractTerms = false;
+  if (removeOwnValues) {
+    const key = identifier(entry.key), previous = data.privileges.find(p => p.key === key);
+    if (entry.frozen !== true || !previous || previous.frozen || data.features.find(f => f.id === previous.featureId)?.frozen) throw new WorkspaceError("Values are removed only when an existing Privilege becomes Read-only", 409);
+    removed = ownValueHolders(data, key); removedContractTerms = holdsContractTerms(data, key);
+    if (!removed.length) throw new WorkspaceError(`No record sets its own value for ${key}`, 409);
+    for (const row of [...data.variants.map(v => v.values), ...data.organizations.map(o => o.terms), ...(data.subjects ?? []).map(s => s.terms)]) delete row[key];
+  }
+  // Validates the definition against every remaining value, including the variant values supplied above.
+  const result = privilege(data, entry), index = data.privileges.findIndex(p => p.key === result.key);
+  if (index < 0) data.privileges.push(result); else data.privileges[index] = result;
+  return { privilege: result, removed, removedContractTerms };
+}
 export function tier(input: unknown): Tier {
   const b = object(input); only(b,["id","name","rank","gracePeriodDays"]);
   if (!Number.isSafeInteger(b.rank) || b.rank < 0 || !Number.isSafeInteger(b.gracePeriodDays ?? 0) || (b.gracePeriodDays ?? 0) < 0 || (b.gracePeriodDays ?? 0) > 365) throw new WorkspaceError("Rank and grace days must be non-negative integers (grace at most 365 days)");
