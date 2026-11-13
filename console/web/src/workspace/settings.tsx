@@ -14,10 +14,9 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
   const sectionGeneration=useRef(0);
-  // Leaving a section discards what was typed in it (the console asked first).
-  useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");},[section]);
-  // A secret is shown once, for the Product it was created in.
-  useEffect(()=>setSecret(""),[section,product?.id]);
+  // Leaving a section discards what was typed in it (the console asked first), and a secret is shown once.
+  // The page is keyed by Product, so changing Product starts it afresh.
+  useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");setSecret("");},[section]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
   useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier,section]);

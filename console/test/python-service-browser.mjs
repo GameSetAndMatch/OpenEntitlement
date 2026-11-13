@@ -302,6 +302,11 @@ await page.getByRole('heading',{name:'Define your first privilege',exact:true}).
  await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
  await keys.getByText('Billing app',{exact:true}).waitFor({state:'hidden'});
  assert.equal((await evaluate('acme_product')).status(),401,'A revoked key is refused');
+ // A key name typed for one Product is discarded with it, not carried into the next Product.
+ await keys.getByLabel('Key name').fill('Draft app');await selector.selectOption({label:'Storage'});
+ await page.getByRole('dialog').filter({hasText:'Discard your changes?'}).getByRole('button',{name:'Discard',exact:true}).click();
+ const storageKeys=page.getByRole('region',{name:'API keys for Storage'});await storageKeys.waitFor();assert.equal(await storageKeys.getByLabel('Key name').inputValue(),'');
+ await selector.selectOption({label:'Acme product'});await keys.waitFor();
  await page.getByRole('link',{name:'Back to workspace',exact:false}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
  // A change without the CSRF token is refused as a Problem Details response.
