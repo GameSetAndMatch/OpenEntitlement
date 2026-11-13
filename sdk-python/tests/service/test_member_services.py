@@ -276,6 +276,16 @@ async def test_removing_a_product_role_keeps_the_member(scene: Scene) -> None:
     assert ("manager", "Manager", [("analytics", "Manager")]) in await scene.listed("owner")
 
 
+async def test_clearing_a_members_last_product_role_removes_them_from_the_workspace(scene: Scene) -> None:
+    async with scene.open("manager") as ws:
+        await scene.members.set_role(ws, scene.people["user"].id, role=None, product_id=scene.analytics.id)
+    assert "user" not in [m[0] for m in await scene.listed("owner")]
+    with pytest.raises(NotFound):
+        async with scene.workspaces.open(scene.people["user"], scene.workspace_id):
+            pass
+    assert await scene.workspaces.list_workspaces(scene.people["user"]) == []
+
+
 async def test_a_manager_removes_members_from_the_products_they_manage(scene: Scene) -> None:
     async with scene.open("storage_manager") as ws:
         await scene.members.remove(ws, scene.people["manager"].id)

@@ -91,6 +91,15 @@ def test_roles_change_and_members_are_removed_with_one_owner_kept() -> None:
     problem(alice.get(base), 404, "not-found")
     problem(bob.delete(f"{base}/members/{alice_id}"), 404, "not-found")
 
+    # Clearing a member's last Product Role removes them from the Workspace.
+    carol = person(app, issuer, "carol")
+    token = bob.post(base + "/invitations", json={"email": "carol@acme.test", "role": "User", "productId": analytics}).json()["token"]
+    carol.post("/api/invitations/accept", json={"token": token})
+    carol_id = carol.get("/api/session").json()["account"]["id"]
+    assert bob.put(f"{base}/members/{carol_id}", json={"role": None, "productId": analytics}).status_code == 204
+    problem(carol.get(base), 404, "not-found")
+    assert carol.get("/api/workspaces").json() == []
+
 
 def test_a_change_without_the_csrf_token_is_refused() -> None:
     app, issuer = build()

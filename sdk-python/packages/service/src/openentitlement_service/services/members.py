@@ -234,6 +234,7 @@ class MemberService:
     ) -> None:
         """Give a member ``role``: Owner of the Workspace, or Manager, User or no Role in one Product.
 
+        A member whose last Product Role is cleared leaves the Workspace.
         Making someone Owner, or changing an Owner's Role (which ends their being Owner), needs an Owner.
         """
         if role is None and product_id is None:
@@ -266,6 +267,9 @@ class MemberService:
             await ws.repos.members.set_owner(account_id, False)
         if role is None:
             await ws.repos.members.remove_product_role(product_id, account_id)
+            # A member left without any Role leaves the Workspace (ADR-0008).
+            if not await ws.repos.members.product_roles(account_id):
+                await ws.repos.members.remove(account_id)
         else:
             await ws.repos.members.set_product_role(
                 ProductMembership(
