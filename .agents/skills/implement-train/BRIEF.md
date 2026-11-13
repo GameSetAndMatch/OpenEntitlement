@@ -8,7 +8,7 @@ Implement Linear ticket `<ticket>` for OpenEntitlement as one pull request into 
 
 Read first: the ticket, the spec (its Linear project's description), AGENTS.md, GLOSSARY.md and the decision records the ticket cites. The test seams the spec lists are already approved; build tests only at those seams.
 
-1. Base your worktree on `origin/<base>`, resetting onto it if needed. Move the ticket to In Progress.
+1. Base your worktree on `origin/<base>`, resetting onto it if needed.
 2. Build it test-first with the `tdd` skill: one red test, then the code that turns it green, one vertical slice at a time. Typecheck and run single test files as you go, and the full suite at the end. Matt Pocock's `implement` skill describes this loop; follow its steps directly.
 3. Review your own diff with the `code-review` skill (Spec and Standards) and fix what it finds.
 4. Keep the documents true in the same pull request with the `domain-modeling` skill: glossary terms, implementation notes on decision records, PRD.md status and run instructions. A new product decision goes back to the conductor as a question.
