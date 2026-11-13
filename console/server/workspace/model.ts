@@ -169,3 +169,13 @@ export function catalogEnvironment(data:WorkspaceData,env:NodeJS.ProcessEnv):Env
  for(const def of data.privileges)if(def.envVariable){try{result[def.key]=environmentOverride(def.key,def.envVariable,def.type,value=>valueError(def,value),env);}catch(e){throw new WorkspaceError((e as Error).message,422);}}
  return result;
 }
+
+/** Console policy: only a customer's own contract terms need a written reason. Catalog, tier and access changes are audited with their actor alone. (Spec Req 6.3.2 separately requires a reason for every SDK provider mutation; that contract is unchanged.) */
+export function changesContractTerms(data: Pick<WorkspaceData,"organizations">, section: string, entry: unknown): boolean {
+  if (section === "subjects") return true;
+  if (section !== "organizations" || !entry || typeof entry !== "object") return false;
+  const next = (entry as { id?: unknown; terms?: Record<string, unknown> });
+  const before = data.organizations.find(o => o.id === next.id)?.terms ?? {}, after = next.terms ?? {};
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  return [...keys].some(k => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+}

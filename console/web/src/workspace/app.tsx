@@ -5,7 +5,7 @@ import { Catalog } from "./catalog.tsx";
 import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
 import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
-import type { WorkspaceData } from "../../../server/workspace/model.ts";
+import { changesContractTerms,type WorkspaceData } from "../../../server/workspace/model.ts";
 import { useReason,useToast } from "../ui.tsx";
 import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
 import { FormField } from "../form.tsx";
@@ -23,7 +23,7 @@ const settingsPages=[
   {name:"API keys",hash:"settings/api-keys",about:"Connect your application to this workspace."},
   {name:"Service",hash:"settings/service",about:"How OpenEntitlement runs this workspace."},
   {name:"Configuration",hash:"settings/configuration",about:"A read-only YAML snapshot of this workspace."},
-  {name:"Audit log",hash:"settings/audit-log",about:"Every change records who made it and why."},
+  {name:"Audit log",hash:"settings/audit-log",about:"Every change records who made it. Changes to contract terms also record why."},
 ];
 const allPages=[...pages,...settingsPages];
 // Links from before Settings had its own sidebar.
@@ -63,10 +63,10 @@ export function WorkspaceApp(){
   const save:Save=async(section,entry,title,method="PUT")=>{
     if(!workspace||savingRef.current)return false;savingRef.current=true;
     setBusy(true);setError("");
-    try{const reason=await ask(title);if(!reason)return false;const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,reason});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
+    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id)setWorkspace({...workspace,...result});toast("Changes saved");return true;}
     catch(e){setError((e as Error).message);return false;}finally{savingRef.current=false;setBusy(false);}
   };
-  async function create(){const reason=await ask("Create workspace");if(!reason)return;setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name,reason});await loadList();setSelected(value.id);setCreating(false);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  async function create(){setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name});await loadList();setSelected(value.id);setCreating(false);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   async function accept(){setBusy(true);try{const value=await request("/api/invitations/accept","POST",{token:invite});sessionStorage.removeItem("oe.invite");setInvite("");await loadList();setSelected(value.workspaceId);setCreating(false);toast(value.alreadyMember?`Already a member. Your ${value.role} role is unchanged.`:"Workspace joined");}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   if(!ready)return <main className="sign-in"><p role="status">Loading…</p></main>;
   if(!session)return <main className="sign-in"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="48" height="48"/></picture><h1>Sign in to OpenEntitlement</h1><p>Manage your privileges, tiers, and customer access in one workspace.</p>{error&&<p role="alert" className="notice error">{error}</p>}<a className="btn primary" href="/auth/login">Sign in</a></main>;
@@ -93,7 +93,7 @@ export function WorkspaceApp(){
       {shown.name==="Organizations"&&<Organizations key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}
       {shown.name==="Configuration"&&<WorkspaceConfiguration workspace={workspace}/>}
       {(shown.name==="Members"||shown.name==="API keys"||shown.name==="Service")&&<WorkspaceSettings key={workspace.id} section={shown.name} workspace={workspace} save={save} account={session.account} busy={busy} refreshAccess={refreshAccess}/>}
-      {shown.name==="Audit log"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
+      {shown.name==="Audit log"&&<section className="panel overflow"><table><thead><tr><th>When</th><th>Account</th><th>Action</th><th>Reason</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td><code>{a.actor}</code></td><td>{a.action}</td><td>{a.reason||"—"}</td></tr>)}</tbody></table>{!audit.length&&<p>No changes recorded yet.</p>}</section>}
       </>}
     </main></div>;
 }

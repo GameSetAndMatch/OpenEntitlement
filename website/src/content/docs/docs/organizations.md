@@ -22,7 +22,7 @@ Inside an Organization, an **application user** (for example `idp|alice`) can ha
 
 ## Every value is explained
 
-Each result says where it came from: Catalog default, Tier value, Organization override, or a restriction from the environment, such as `MCP_INSTALLED=false` vetoing an enabled boolean. Every change records who made it and why, in the Workspace's Audit.
+Each result says where it came from: Catalog default, Tier value, Organization override, or a restriction from the environment, such as `MCP_INSTALLED=false` vetoing an enabled boolean. Every change records who made it in the Workspace’s Audit log, and changes to contract terms also record why.
 
 Organizations, users and their terms describe entitlement only. OpenEntitlement does not create accounts, assign roles, take payments or count usage.
 

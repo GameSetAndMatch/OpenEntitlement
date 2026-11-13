@@ -77,21 +77,23 @@ function IntegerValueInput({ def, value, onChange, disabled }: { def: PrivilegeD
 
 export const Value = ({ v }: { v: Json }) => <span className={`value ${isUnlimited(v) ? "value-unlimited" : ""}`}>{formatValue(v)}</span>;
 
-// ------------------------------------------------------------------ reason dialog (spec Req 6.3.2: every change needs a reason)
+// ------------------------------------------------------------------ reason dialog (console policy: contract terms need a reason) and plain confirmation
 
-type Ask = (title: string, detail?: ReactNode) => Promise<string | null>;
+type Ask = (title: string, detail?: ReactNode, options?: { reason?: boolean }) => Promise<string | null>;
 const ReasonCtx = createContext<Ask>(async () => null);
 export const useReason = () => useContext(ReasonCtx);
+/** Asks only "are you sure", for an action that is hard to undo. */
+export const useConfirm = () => { const ask = useContext(ReasonCtx); return (title: string, detail?: ReactNode) => ask(title, detail, { reason: false }).then((v) => v !== null); };
 
 export function ReasonProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ title: string; detail?: ReactNode; resolve: (v: string | null) => void } | null>(null);
+  const [state, setState] = useState<{ title: string; detail?: ReactNode; reason: boolean; resolve: (v: string | null) => void } | null>(null);
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (state) { dialog.current?.showModal(); ref.current?.focus(); }
+    if (state) { dialog.current?.showModal(); (state.reason ? ref.current : dialog.current?.querySelector<HTMLButtonElement>("button.primary"))?.focus(); }
   }, [state]);
-  const ask: Ask = (title, detail) => new Promise((resolve) => (setText(""), setState({ title, detail, resolve })));
+  const ask: Ask = (title, detail, options) => new Promise((resolve) => (setText(""), setState({ title, detail, reason: options?.reason ?? true, resolve })));
   const close = (v: string | null) => {
     state?.resolve(v);
     setState(null);
@@ -106,18 +108,19 @@ export function ReasonProvider({ children }: { children: ReactNode }) {
             onMouseDown={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
-              if (text.trim()) close(text.trim());
+              if (!state.reason) close("");
+              else if (text.trim()) close(text.trim());
             }}
           >
             <h3 id="reason-title">{state.title}</h3>
             {state.detail && <div className="modal-detail">{state.detail}</div>}
-            <label htmlFor="change-reason" className="label">Reason (recorded in change history)</label>
-            <textarea id="change-reason" name="reason" ref={ref} className="input" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+            {state.reason && <><label htmlFor="change-reason" className="label">Reason (recorded in change history)</label>
+            <textarea id="change-reason" name="reason" ref={ref} className="input" rows={3} value={text} onChange={(e) => setText(e.target.value)} /></>}
             <div className="row end">
               <button type="button" className="btn ghost" onClick={() => close(null)}>
                 Cancel
               </button>
-              <button className="btn primary" disabled={!text.trim()}>
+              <button className="btn primary" disabled={state.reason && !text.trim()}>
                 Confirm
               </button>
             </div>

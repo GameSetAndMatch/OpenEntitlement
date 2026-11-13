@@ -2,6 +2,13 @@ import {useId,useRef,useState,type ReactNode} from 'react';
 import {identifierFromTitle} from './identifier.ts';
 import type {Group} from '../../../server/workspace/model.ts';
 
+/** A Group identifier from its title, unique among the taken ones. */
+export function newGroupId(name:string,takenIds:readonly string[]){
+ const taken=new Set(takenIds),base=identifierFromTitle(name,'group')||'group';
+ // Identifiers are at most 80 characters, so a collision suffix replaces the end of the base.
+ let groupId=base,suffix=1;while(taken.has(groupId)){const tail=`_${suffix++}`;groupId=base.slice(0,80-tail.length).replace(/_+$/,'')+tail;}
+ return groupId;
+}
 const Folder=()=><svg className="folder-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M1.5 3.5a1 1 0 0 1 1-1h3.6l1.5 1.6h5.9a1 1 0 0 1 1 1v7.4a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" fill="currentColor"/></svg>;
 
 /**
@@ -43,9 +50,7 @@ export function GroupPicker({label='Group',noneLabel='No group',groups:saved,exc
  async function create(){
   const name=draft?.name.trim();
   if(!draft||!name||!onCreate||unavailable||pending.current)return;
-  const taken=new Set([...takenIds,...groups.map(g=>g.id)]),base=identifierFromTitle(name,'group')||'group';
-  // Identifiers are at most 80 characters, so a collision suffix replaces the end of the base.
-  let groupId=base,suffix=1;while(taken.has(groupId)){const tail=`_${suffix++}`;groupId=base.slice(0,80-tail.length).replace(/_+$/,'')+tail;}
+  const groupId=newGroupId(name,[...takenIds,...groups.map(g=>g.id)]);
   pending.current=true;setCreating(true);setError('');
   const group:Group={id:groupId,name,description:'',...(draft.parentId?{parentId:draft.parentId}:{})};
   try{if(await onCreate(group)){setCreated(c=>[...c,group]);choose(groupId);}}
