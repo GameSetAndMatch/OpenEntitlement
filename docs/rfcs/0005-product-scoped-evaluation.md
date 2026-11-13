@@ -34,10 +34,14 @@ An evaluation key is created for one Workspace and one Product. An application t
 The server checks a request in this order:
 
 1. Missing or invalid credentials return 401.
-2. The key's Workspace and Product are compared with the requested Product before any Catalog lookup. Any mismatch returns 403 with the same body, `{"error":"forbidden","message":"This key cannot evaluate that Product"}`, whether or not the Product or the Privilege exists. A key therefore cannot be used to discover the Workspace's Products or their Privileges.
+2. The key's Workspace and Product are compared with the requested Product before any Catalog lookup. Any mismatch returns 403 with the same Problem Details body, whether or not the Product or the Privilege exists. A key therefore cannot be used to discover the Workspace's Products or their Privileges.
 3. Only then does an unknown Privilege return 404.
 
 SDKs treat the 403 as a transport error: evaluation fails closed (§3.1.11), with no upgrade suggestion.
+
+### Errors are Problem Details
+
+Under [ADR-0009](../../ADR-0009.md), every OEREP error response is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details object (`application/problem+json`) instead of `{error, message}` (§10.1.2). The problem `type` is the stable identifier SDKs branch on. The 403 above is the problem type `https://openentitlement.dev/problems/product-forbidden`, with the same body for every mismatch.
 
 ### Resolution within a Product
 
@@ -77,5 +81,5 @@ The implementation must add Gherkin scenarios covering:
 This RFC is accepted direction only. Before the change is described as implemented, these change together in one release:
 - §10 and the protocol name (OEREP 0.1);
 - `spec/oerep.openapi.json`, including the new routes and 403 responses;
-- both SDKs' `RemoteProvider`;
+- both SDKs' `RemoteProvider`, including reading Problem Details;
 - the shared conformance suite.

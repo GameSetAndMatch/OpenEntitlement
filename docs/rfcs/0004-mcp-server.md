@@ -1,6 +1,6 @@
 # RFC-0004: An MCP server for the Workspace control plane
 
-- **Status:** accepted direction (2026-11-10); all design questions answered. Not implemented.
+- **Status:** accepted direction (2026-11-10); all design questions answered. Not implemented. The server is built with FastMCP inside the Python service ([ADR-0009](../../ADR-0009.md)), not in the Node service; the local stdio bridge is `uvx openentitlement-mcp` instead of `npx @openentitlement/mcp`.
 - **Date:** 2026-11-10
 - **Tracks:** [PRD.md](../../PRD.md), "Agents and integrations"
 
@@ -66,7 +66,7 @@ Successful application atomically checks the revision, consumes the preview once
 - **Per-Account sign-in.** The MCP client signs the person in with their own Account, using the MCP authorization flow (OAuth 2.1 with PKCE, authorization-server metadata and dynamic client registration). The service acts as the authorization server for MCP clients. People authenticate through the same identity provider as the console (Google on the hosted service, the configured OIDC provider when self-hosted). There are no shared or personal static tokens. Access tokens are short-lived, refreshable and revocable from the console. They're bound to the Account and to the `/mcp` resource.
 - **Choosing a Workspace.** After sign-in, the agent calls `list_workspaces` and **asks the person which Workspace to use**, then calls `select_workspace`. The selection lasts for the MCP session. Switching requires another `select_workspace`, which the agent should confirm with the person.
 - **Workspaces opt in.** MCP is **off by default**. An Owner enables it in Workspace settings, and it can be disabled again at any time. Only Workspaces with MCP enabled appear in `list_workspaces` or can be selected. Disabling MCP ends access for every MCP session on that Workspace at the next call. Enabling and disabling are audited.
-- **Local:** an optional `npx @openentitlement/mcp` stdio bridge for clients without remote MCP support. It runs the same sign-in flow and forwards to the same endpoint.
+- **Local:** an optional `uvx openentitlement-mcp` stdio bridge (amended by ADR-0009; originally `npx @openentitlement/mcp`) for clients without remote MCP support. It runs the same sign-in flow and forwards to the same endpoint.
 
 ## Analytics
 
