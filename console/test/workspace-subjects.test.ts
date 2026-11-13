@@ -90,6 +90,9 @@ test("personal terms and additive allowances inherit and are isolated by Organiz
   assert.equal(r.value, 350);
   assert.equal(r.reason, "SUBJECT_GRANT");
   assert.equal(r.grantApplied, 50);
+  // The Grant adds to the layer below it, which the console names: Personal terms 300 + Grant 50.
+  assert.equal(r.source, "SUBJECT");
+  assert.equal(resolve(d, "acme", "ai_tokens").source, "CONTRACT");
   assert.equal(
     resolve(d, "acme", "retention", undefined, undefined, "idp|alice").value,
     "365d",
@@ -149,6 +152,10 @@ test("variant changes retain inert personal terms and persistent grants; grace/f
       "idp|alice",
     ).subjectState,
     "suspended",
+  );
+  assert.equal(
+    resolve(d, "acme", "ai_tokens", new Date("2027-01-02T00:00:00Z"), {}, "idp|alice").source,
+    "GRACE",
   );
   assert.equal(
     resolve(

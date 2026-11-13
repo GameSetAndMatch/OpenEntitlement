@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useUnsavedChanges } from "./unsaved.ts";
 import { Field,Group,Item } from "./settings-group.tsx";
 import type { ProductSummary } from "./product-selector.tsx";
 
@@ -28,6 +29,8 @@ export function ProductMembers({ description, members, products, viewer, owner, 
   const several = products.length > 1;
   const [email, setEmail] = useState(""), [role, setRole] = useState<NewInvitation["role"]>("User"), [product, setProduct] = useState("");
   const invitedProduct = managed.find(p => p.id === product)?.id ?? managed[0]?.id;
+  // A typed email is an invitation in progress: leaving the page or Product asks before discarding it.
+  useUnsavedChanges(true, email);
   // An Owner has every Product, so their row has one select: Owner, or a Role in one Product (which ends their being Owner).
   const ownerSelect = (m: ProductMember) => <select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value="Owner" onChange={e => {
     const [role, productId] = e.target.value.split(":");

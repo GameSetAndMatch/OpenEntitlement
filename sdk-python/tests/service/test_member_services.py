@@ -327,7 +327,9 @@ async def test_settings_changes_record_their_actor_and_product(scene: Scene) -> 
         await scene.members.remove(ws, scene.people["storage_manager"].id)
     async with scene.store.transaction(scene.workspace_id) as repos:
         entries = [e for _, e in reversed(await repos.audit.list(managed=None, limit=100))]
-    changes = [e for e in entries if e.target_kind == "Member"]
+    # The Workspace's creation recorded its Owner first.
+    assert [(e.action, e.target_kind) for e in entries[:3]] == [("created", "Workspace"), ("created", "Product"), ("created", "Member")]
+    changes = [e for e in entries[3:] if e.target_kind == "Member"]
     assert [
         (c.actor_email, c.action, c.target_name, c.product_id, c.owners_only, [(x.product_id, x.before, x.after) for x in c.changes])
         for c in changes

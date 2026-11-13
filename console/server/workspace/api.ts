@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readJson, send } from "../http.ts";
 import { Authentication } from "./auth.ts";
 import { WorkspaceStore } from "./store.ts";
-import { WorkspaceError, object, text, group, feature, privilege, tag, tier, variant, organization, resolve, catalogEnvironment, changesContractTerms, type StatusPolicy } from "./model.ts";
+import { WorkspaceError, object, text, group, feature, tag, tier, variant, organization, changePrivilege, resolve, catalogEnvironment, changesContractTerms, type StatusPolicy } from "./model.ts";
 
 export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:NodeJS.ProcessEnv={...process.env}) {
   const mode=deploymentMode(env);
@@ -103,9 +103,14 @@ export function workspaceApi(auth: Authentication,store: WorkspaceStore,env:Node
       if(section==="tags")upsert(data.tags,tag(entry),v=>v.id);
       if (section === "features") upsert(data.features,feature(data,entry),v=>v.id);
       if (section === "privileges"||section==="catalog") {
-        const def=privilege(data,entry),previous=data.privileges.find(p=>p.key===def.key);
-        if(def.envVariable!==previous?.envVariable&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change server environment bindings",403);
-        upsert(data.privileges,def,v=>v.key);
+        const previous=data.privileges.find(p=>p.key===(entry as {key?:unknown}|undefined)?.key)?.envVariable;
+        // One change: the definition, the values it needs in existing variants, and, only when asked, the values Read-only removes.
+        // The legacy privileges route never removes values: a Read-only Privilege keeps them stored, without effect.
+        if(section==="privileges"&&(body.variantValues!==undefined||body.removeOwnValues!==undefined))throw new WorkspaceError("Use the catalog route for variant values and removing values",400);
+        if(body.removeOwnValues!==undefined&&typeof body.removeOwnValues!=="boolean")throw new WorkspaceError("removeOwnValues must be true or false");
+        const change=changePrivilege(data,entry,body.variantValues,body.removeOwnValues===true);
+        if(change.privilege.envVariable!==previous&&!account.platformAdmin)throw new WorkspaceError("Only a platform administrator can change server environment bindings",403);
+        if(change.removedContractTerms&&!changeReason)throw new WorkspaceError("Add a reason for changing contract terms");
       }
       if (section === "tiers") upsert(data.tiers,tier(entry),v => v.id);
       if (section === "variants") upsert(data.variants,variant(data,entry),v => v.id);

@@ -5,7 +5,10 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
   site: 'https://openentitlement.dev',
   trailingSlash: 'always',
-  vite: { resolve: { alias: { '@openentitlement/core/authoring': new URL('../sdk-js/packages/core/src/authoring.ts', import.meta.url).pathname } } },
+  vite: { resolve: { alias: [
+    { find: '@openentitlement/core/authoring', replacement: new URL('../sdk-js/packages/core/src/authoring.ts', import.meta.url).pathname },
+    { find: /^@openentitlement\/core$/, replacement: new URL('../sdk-js/packages/core/src/index.ts', import.meta.url).pathname },
+  ] } },
   integrations: [react(), starlight({
     title: 'OpenEntitlement',
     description: 'An open-source entitlement service and protocol. Learn to resolve what an organization may do, and how much of it.',

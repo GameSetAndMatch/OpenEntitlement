@@ -1,37 +1,46 @@
 import { useEffect,useRef,useState } from "react";
+import { trackWrite,useUnsavedChanges } from "./unsaved.ts";
 import { Field,Group,Item,Row } from "./settings-group.tsx";
-import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
-import { stringify } from "yaml";
+import { configurationYaml,type SnapshotProduct } from "./configuration.ts";
 import { request } from "./client.ts";
 import type { Workspace,Save } from "./app.tsx";
 import { useConfirm,useToast } from "../ui.tsx";
+import { ProductApiKeys } from "./product-api-keys.tsx";
+import type { ProductSummary } from "./product-selector.tsx";
 import { ProductMembers,managesMembers,type MemberRoleChange,type NewInvitation,type ProductMember } from "./product-members.tsx";
-export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
+/** `product` is the Product the selector shows on the Python service: API keys belong to it. */
+export function WorkspaceSettings({section,workspace:w,save,account,busy,refreshAccess,product}:{section:"Members"|"API keys"|"Service";workspace:Workspace;save:Save;product?:ProductSummary;account:{id:string;email:string;platformAdmin:boolean};busy:boolean;refreshAccess:()=>Promise<void>}){
   const [members,setMembers]=useState<any[]>([]),[keys,setKeys]=useState<any[]>([]),[email,setEmail]=useState(""),[role,setRole]=useState("User"),[link,setLink]=useState(""),[secret,setSecret]=useState(""),[name,setName]=useState(""),[error,setError]=useState("");
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
   const sectionGeneration=useRef(0);
-  useEffect(()=>{sectionGeneration.current++;setError("");},[section]);
+  // Leaving a section discards what was typed in it (the console asked first), and a secret is shown once.
+  // The page is keyed by Product, so changing Product starts it afresh; its drafts ask before they are discarded.
+  useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");setSecret("");},[section]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
-  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
+  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier,section]);
+  useUnsavedChanges(true,{email,name,hostedTier:hostedTier!==(w.hosting?.tier??"pro")});
   const confirm=useConfirm(),toast=useToast();
   // The Python service has Roles per Product: a Manager of any Product manages its members.
   const python=w.products!==undefined;
   const owner=w.role==="Owner"||w.role==="Platform administrator",manager=owner||(python?w.products!.some(managesMembers):w.role==="Manager");
   const base=`/api/workspaces/${w.id}`;
+  // On the Python service, the selected Product's Managers and the Owners administer its API keys (OPE-42).
+  const keysPath=python&&product&&(owner||product.role==="Manager")?`${base}/products/${product.id}/api-keys`:undefined;
   // Every load takes a generation number; only the newest one may update the lists.
   const generation=useRef(0);
-  // API keys per Product arrive on the Python service with OPE-42.
-  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=owner&&!python?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
+  async function load(){const mine=++generation.current;const m=manager?await request(base+"/members"):[];const k=keysPath?await request(keysPath):owner&&!python?await request(base+"/keys"):[];if(mine===generation.current){setMembers(m);setKeys(k);}}
   async function reload(){await load();}
-  useEffect(()=>{let active=true;const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
+  // Keys of the previously selected Product never show while this one's load.
+  useEffect(()=>{let active=true;setKeys([]);const refresh=async()=>{try{await load();}catch(e){if(active)setError((e as Error).message);}};void refresh();
     // Stay current without a refresh button: reload when the person comes back to this window.
     const onFocus=()=>{if(document.visibilityState==="visible")void refresh();};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
-  },[base,manager,owner]); // load reads exactly base, manager and owner
+  },[base,manager,owner,keysPath]); // load reads exactly base, manager, owner and keysPath
   // Settings changes are audited with their actor; only removals ask to confirm.
-  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return false;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return false;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");return true;}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);return false;}finally{pendingRef.current=false;setPending(false);}}
+  // A write already sent may still commit; leaving the section waits for it (see unsaved.ts).
+  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return false;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return false;setError("");const result=await trackWrite(action(""));if(result!=="access-changed")await reload();toast("Changes saved");return true;}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);return false;}finally{pendingRef.current=false;setPending(false);}}
   // Changing your own access reloads your Workspace and Roles instead of this list.
   const afterOwnChange=async(id:string)=>{if(id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed" as const;}};
   const changeRole=(m:ProductMember,change:MemberRoleChange)=>void mutate("Change member role",async()=>{await request(base+"/members/"+m.id,"PUT",change);return afterOwnChange(m.id);});
@@ -57,7 +66,10 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
       </form>
       {link&&<Field label="Invitation link (expires in 7 days)" hint="Share it with the invited person. They must sign in with that verified email address."><input readOnly value={link} onFocus={e=>e.target.select()}/></Field>}
     </Group>}</>}
-    {section==="API keys"&&owner&&<><Group description="Your application evaluates entitlements in this workspace with these keys.">
+    {section==="API keys"&&keysPath&&product&&<ProductApiKeys product={product} keys={keys} name={name} secret={secret} locked={locked} onName={setName} onCopy={copy}
+      onCreate={()=>void mutate("Create API key",async()=>{const result=await request(keysPath,"POST",{name});setSecret(result.secret);setName("");})}
+      onRevoke={k=>void mutate(`Revoke ${k.name}? Applications using it stop working.`,async()=>{await request(`${keysPath}/${k.id}`,"DELETE");},true)}/>}
+    {section==="API keys"&&owner&&!python&&<><Group description="Your application evaluates entitlements in this workspace with these keys.">
       <Item label="Workspace ID" description="Identifies this workspace in the API and in support requests."><code className="settings-value">{w.id}</code><button className="btn-quiet" onClick={()=>copy(w.id,"Workspace ID copied")}>Copy</button></Item>
       {keys.map(k=><Item key={k.id} label={k.name} description={<><code>{k.prefix}…</code> · {k.revoked?"Revoked":k.scope}</>}>{!k.revoked&&<button className="btn-quiet danger" disabled={locked} aria-label={`Revoke ${k.name}`} onClick={()=>void mutate(`Revoke ${k.name}? Applications using it stop working.`,async reason=>{await request(base+"/keys/"+k.id,"DELETE",{reason});},true)}>Revoke</button>}</Item>)}
     </Group>
@@ -71,15 +83,14 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     {section==="Service"&&<Group description="The OpenEntitlement service this workspace runs on. It is separate from the Tiers you sell to your customers.">
       {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();if(python)saveTier();else void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
         <Row label="Cloud service tier" description="Pro allows one Product. Enterprise allows any number and adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
-        {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
+        {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" disabled={locked} onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
       </form>:<Item label={w.hosting?.mode==="saas"?`Cloud ${w.hosting.tier==="enterprise"?"Enterprise":"Pro"}`:"Self-hosted"} description={w.hosting?.subjectEntitlements?"Entitlements for Organizations and their users.":"Entitlements for Organizations."}/>}
     </Group>}
   </div>;
 }
-export function WorkspaceConfiguration({workspace:w}:{workspace:Workspace}){
-  const hidden=new Set(w.data.privileges.filter(p=>p.hidden||w.data.features.find(f=>f.id===p.featureId)?.hidden).map(p=>p.key));
-  const visibleValues=(values:Record<string,unknown>)=>Object.fromEntries(Object.entries(values).filter(([key])=>!hidden.has(key)));
-  const yaml=stringify({format:"openentitlement-workspace-snapshot",formatVersion:1,workspace:{id:w.id,name:w.name},...w.data,hostedTier:undefined,subjects:w.data.subjects.map(s=>({...s,terms:visibleValues(s.terms),grants:visibleValues(s.grants)})),features:undefined,groups:w.data.groups.map(({legacyFeatureId:_legacy,...g})=>({id:g.id,title:g.name,description:g.description,...(g.parentId?{parentId:g.parentId}:{})})),tags:w.data.tags.map(t=>({id:t.id,title:t.name,description:t.description})),privileges:w.data.privileges.filter(p=>!hidden.has(p.key)).map(p=>catalogDefinition(p,w.data)),variants:w.data.variants.map(v=>({...v,values:visibleValues(v.values)})),organizations:w.data.organizations.map(o=>({...o,terms:visibleValues(o.terms)}))});
-  function download(){const url=URL.createObjectURL(new Blob([yaml],{type:"application/yaml"})),a=document.createElement("a");a.href=url;a.download="workspace.yaml";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  return <section className="panel configuration-panel"><div className="section-title"><h2>Workspace YAML</h2><button className="btn" onClick={download}>Download YAML</button></div><p>Includes the catalog, tiers and variants, Organization terms, and application users’ personal terms and grants. Excludes hidden privileges, environment values, members and API keys.</p><pre className="configuration-code" tabIndex={0} aria-label="Workspace YAML"><code>{yaml}</code></pre></section>;
+/** The read-only YAML snapshot. On the Python service it covers the selected Product. */
+export function WorkspaceConfiguration({workspace:w,product}:{workspace:Workspace;product?:SnapshotProduct}){
+  const yaml=configurationYaml(w,product),name=product?`${product.name} YAML`:"Workspace YAML";
+  function download(){const url=URL.createObjectURL(new Blob([yaml],{type:"application/yaml"})),a=document.createElement("a");a.href=url;a.download=product?`${product.key}.yaml`:"workspace.yaml";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  return <section className="panel configuration-panel"><div className="section-title"><h2>{name}</h2><button className="btn" onClick={download}>Download YAML</button></div><p>Includes the catalog, tiers and variants, Organization terms, and application users’ personal terms and grants{product?` in ${product.name}`:""}. Excludes hidden privileges, environment values, members and API keys.</p><pre className="configuration-code" tabIndex={0} aria-label={name}><code>{yaml}</code></pre></section>;
 }

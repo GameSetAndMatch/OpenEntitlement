@@ -51,9 +51,23 @@ export async function schemaSql(): Promise<string> {
   return readFile(new URL("../schema.sql", import.meta.url), "utf8");
 }
 
-/** Create the oe_* tables if they don't exist. */
+/**
+ * Create the oe_* tables if they don't exist. Instances starting together on a fresh database take turns:
+ * concurrent CREATE TABLE IF NOT EXISTS statements otherwise fail on PostgreSQL's catalog uniqueness (23505).
+ */
 export async function migrate(pool: Pool): Promise<void> {
-  await pool.query(await schemaSql());
+  const sql = await schemaSql(), client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('oe_core_schema'))");
+    await client.query(sql);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 type Q = Pick<PoolClient, "query">;

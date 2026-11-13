@@ -38,7 +38,7 @@ assert client.get_limit("seat_max", {"organizationId": "globex"}) == 40
 
 - **Privilege Catalog.** What your product allows or limits: booleans, integers or `UNLIMITED`, and string enums, under flat keys like `seat_max`.
 - **Tiers.** Offers such as Basic and Pro. Their variants change only what differs from the Catalog.
-- **Organizations.** Your customers. Each gets a variant, plus its own terms when a deal needs them.
+- **Organizations.** Your customers. Each gets a variant, plus Organization terms when a deal needs them.
 - **Every value is explained.** A result says where it came from: Catalog default, Tier value, Organization override or environment restriction.
 
 Your application asks through OEREP, an open remote evaluation protocol modeled on OFREP. The Python and TypeScript SDKs share one contract. The service owns the values and audits every change. Billing, roles and usage stay in your existing tools.

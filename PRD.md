@@ -64,11 +64,13 @@ Primary users:
 | Tiers and Tier variants (standard, trial, grace), Organization terms | ✅ preview | #22, #27 |
 | Application-user entitlements: personal terms and grants | ✅ | #27 |
 | Workspace API keys and evaluation endpoint | ✅ preview | #22 |
+| Python service console: Product API keys for the selected Product's Managers and the Owners (create with the secret shown once, list, revoke), a Product-scoped configuration export without hidden values, Workspace creation in the Audit log | 🚧 on `service/python` | OPE-70; `console/web/src/workspace/product-api-keys.tsx`, `console/web/src/workspace/configuration.ts`, `console/test/python-service-browser.mjs` |
 | Products: one Workspace sells several Products, each with its own Catalog, Groups, Tags and Tiers; per-Product roles; archiving Tiers and Products; Cloud Pro 1 Product, Enterprise unlimited | 🚧 Products, per-Product roles and Product archiving on `service/python` (OPE-38), per-Product Catalog (OPE-39), Tiers and Tier archiving (OPE-40), Organizations with one Tier variant per Product (OPE-41), Cloud limits (OPE-44) · accepted (ADR-0008) | OPE-38 |
 | Tier minimums: a Tier sets the lowest value of an integer Privilege, checked when Organization terms are saved, an Organization is given the Tier, and the minimum changes; standard variant and Organization terms only; a raise above existing terms is refused and lists those Organizations; authoring only, no protocol change | 📋 accepted (ADR-0011); Python service only, after OPE-45 | `ADR-0011.md`, OPE-62 |
 | Minimum commitments: recorded on an Organization's contract and displayed only; charging out of scope | 📋 accepted (ADR-0011); Python service only, after OPE-45 | `ADR-0011.md`, OPE-62 |
 | Audit log for Managers and Owners: actor emails, readable entries naming what changed, before → after values | 🚧 on `service/python` | OPE-43; Product-projected snapshots and paginated console read side |
-| Console UX audit fixes: one value for every variant when requiring a Privilege, discard-changes warning, Read-only conversion, glossary names for value sources, standard user form | 📋 | — |
+| Console UX audit fixes: requiring a Privilege's value asks for the existing variants' values in the same save (one for every variant, or per variant); leaving a form with unsaved changes asks "Discard your changes?"; switching an Organization's variant names the terms saving will clear and switching back restores them; making a Privilege Read-only confirms which records set their own value and removes those values in the same change (with a reason when they include contract terms; API clients ask with `removeOwnValues`, otherwise values stay stored without effect); standard user form | ✅ preview | OPE-54 (Node preview service); on `service/python` the forms, discard warning (including the Product selector) and variant values apply too, while making a Privilege Read-only keeps stored values without effect (OPE-70); user form #58 |
+| Where each value comes from, in glossary terms: Catalog default, the Tier variant's name, Organization terms, Personal terms or Grace period, with a one-line sum when a Grant adds to it ("Personal terms 50 + Grant 5") | ✅ preview | OPE-55; `console/web/src/workspace/subjects.tsx` |
 | Fine-grained, scoped Permissions per Role | 📋 | issue #15 |
 | Object storage (S3-compatible) for PDFs with signed uploads | 📋 | issue #15 |
 | YAML import with diff preview and audited apply | 📋 | — |
@@ -102,9 +104,11 @@ Primary users:
 | Documentation site at openentitlement.dev (Starlight) with diagrams and link checks | ✅ | `website/`, #3, #4, #11 |
 | Automatic website deployment to Cloudflare on every merge to `main` | ✅ | #36, #41: runs only from `main` in the protected `website` environment (token scoped there), fails without credentials, verifies the live revision |
 | Landing page rebuilt on the docs' theme and components, showing the current model | ✅ | #33 |
+| One path from the homepage to a short quickstart: every primary homepage action opens it, and it ends with the SDK command and its exact output, run from a source checkout of `main`; copy-code tracking verified in production | ✅ built; 📋 watch 3–5 developers try it and fix where they stop | OPE-52; `website/src/content/docs/docs/quickstart.md`, `website/scripts/check-quickstart.mjs` |
 | PostHog on openentitlement.dev: analytics, error tracking, session replay, heatmaps, web vitals, journey events | ✅ | #34 |
 | PostHog in the console, opt-in (`OE_POSTHOG_KEY`): same features plus server-side errors and product events | ✅ | #34, `docs/maintainers/analytics.md` |
 | Funnel dashboards: website acquisition (landing → docs → quickstart → install → GitHub/Docker) and console activation (sign-in → Workspace → Privilege → Tier → Organization → API key → first evaluation) | ✅ created in PostHog; 📋 hosted console must set `OE_POSTHOG_KEY` to feed the activation funnel | #34, `tools/posthog/dashboards.mjs` |
+| PostHog definitions kept in code: the dashboards script matches PostHog after the OPE-49 fixes (internal and test traffic left out of funnels, retention and console errors), writes only what differs, and has a diff mode; maintainers leave the website numbers with `?oe_internal=1` | ✅ | #61 (OPE-56); `tools/posthog/dashboards.mjs`, `website/scripts/check-analytics.mjs`, `docs/maintainers/analytics.md` |
 
 ### Project
 
@@ -112,6 +116,12 @@ Primary users:
 |---|---|---|
 | GitHub organization `open-entitlement`, avatar, repository links | ✅ | #29 |
 | Trusted publishers on PyPI and npm moved to the `open-entitlement` owner | 👤 | `docs/maintainers/` |
+
+### Contributor workflow
+
+| Capability | Status | Where |
+|---|---|---|
+| Train parks tickets with unanswered questions, batches questions with recommendations, continues independent work and resumes after answers | ✅ documented workflow | OPE-57; `.agents/skills/implement-train/SKILL.md`, `.agents/skills/implement-train/BRIEF.md` |
 
 ## Python service decision handoff
 

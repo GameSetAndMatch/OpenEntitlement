@@ -142,6 +142,15 @@ try{
  // The Catalog sees the new variants: a Privilege without a default asks for a value in each.
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
  assert.deepEqual((await (await page.request.get(catalogPath)).json()).variants.map(v=>v.tierId),['pro','pro','pro']);
+ // Requiring a value asks for every existing variant's value in the same save, each sent with that variant's version.
+ await page.getByRole('button',{name:'Define privilege',exact:true}).click();
+ await page.getByLabel('Title',{exact:true}).fill('Projects');await page.getByLabel('Value type').selectOption('integer');
+ await page.getByRole('checkbox',{name:'Require a value in every Tier variant'}).check();
+ await page.getByText('3 variants need a value. One value applies to every variant unless you set each one.',{exact:true}).waitFor();
+ await page.getByRole('spinbutton',{name:'Value for every variant'}).fill('3');
+ await page.getByRole('checkbox',{name:'Set per variant'}).check();await page.getByRole('spinbutton',{name:'Value for Pro trial'}).fill('1');
+ await page.getByRole('button',{name:'Save privilege',exact:true}).click();await page.getByRole('button',{name:'Edit Projects',exact:true}).waitFor();
+ assert.deepEqual(Object.fromEntries((await (await page.request.get(productPath+'/tiers')).json()).variants.map(v=>[v.id,v.values.projects])),{pro_grace_period:3,pro_standard:3,pro_trial:1});
 
  // Organizations: Workspace-wide, with one Tier variant per Product and Organization terms that need a reason.
  const organizationsPath=app+`/api/workspaces/${workspaceId}/organizations`;
@@ -164,8 +173,8 @@ try{
  assert.deepEqual(organizationsView.map(o=>[o.id,o.products[0].variantId,o.products[0].terms]),[['acme','pro_standard',{seats:25}]]);
  // Changing the variant clears the terms; switching back before saving keeps them.
  await page.getByRole('button',{name:'Edit organization',exact:true}).click();
- await page.getByLabel('Tier variant').selectOption({label:'Pro trial'});assert.equal(await page.getByLabel('Override seats').isChecked(),false);
- await page.getByLabel('Tier variant').selectOption({label:'Pro standard'});assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'25');
+ await page.getByLabel('Tier variant').selectOption({label:'Pro trial'});assert.equal(await page.getByLabel('Override seats').isChecked(),false);await page.getByText('Saving clears 1 term: Seats',{exact:true}).waitFor();
+ await page.getByLabel('Tier variant').selectOption({label:'Pro standard'});assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'25');assert.equal(await page.getByText(/^Saving clears/).count(),0);
  // A contract status change alone saves without a reason.
  await page.getByLabel('Contract status').selectOption('ended');
  await saveOrganization.click();await saveOrganization.waitFor({state:'hidden'});assert.equal(await page.getByRole('dialog').count(),0);
@@ -246,7 +255,14 @@ try{
  const created=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});assert.equal(created.status(),201);
  await page.reload();const selector=page.getByRole('combobox',{name:'Product'});await selector.waitFor();
  assert.deepEqual(await selector.locator('option').allInnerTexts(),['Acme product','Storage']);
- await selector.selectOption({label:'Storage'});await page.getByRole('heading',{name:'Define your first privilege',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Edit Seats',exact:true}).count(),0);await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
+ // Switching Product with an unsaved Privilege draft asks first; keeping it stays on this Product with the draft.
+ await page.getByRole('button',{name:'Edit Seats',exact:true}).click();await page.getByLabel('seats',{exact:true}).fill('13');
+ await selector.selectOption({label:'Storage'});
+ const discard=page.getByRole('dialog').filter({hasText:'Discard your changes?'});await discard.waitFor();
+ await discard.getByRole('button',{name:'Keep editing',exact:true}).click();await discard.waitFor({state:'hidden'});
+ assert.equal(await selector.locator('option:checked').innerText(),'Acme product');assert.equal(await page.getByLabel('seats',{exact:true}).inputValue(),'13');
+ await selector.selectOption({label:'Storage'});await discard.getByRole('button',{name:'Discard',exact:true}).click();
+await page.getByRole('heading',{name:'Define your first privilege',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Edit Seats',exact:true}).count(),0);await page.reload();await page.getByRole('combobox',{name:'Product'}).waitFor();await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
  // Organizations are Workspace-wide: Storage has no Tiers, yet Acme is listed there and can be renamed.
  await page.getByRole('link',{name:'Organizations',exact:true}).click();
  const storageCard=page.locator('.workspace-card').filter({hasText:'Acme'});await storageCard.getByText('No tier in this Product').waitFor();
@@ -257,6 +273,51 @@ try{
  organizationsView=(await (await page.request.get(organizationsPath)).json()).organizations;
  assert.deepEqual(organizationsView.map(o=>[o.name,o.version,o.products.length]),[['Acme Corp',2,1]]);
  await page.getByRole('link',{name:'Privilege Catalog',exact:true}).click();
+ // Settings → Configuration exports the selected Product only. Both Products define seats; a hidden Privilege never appears.
+ const storageId=(await (await page.request.get(app+`/api/workspaces/${workspaceId}`)).json()).products.find(p=>p.key==='storage').id;
+ const define=(path,entry)=>page.request.put(path,{headers:csrf,data:{kind:'privileges',entry:{description:'',tags:[],...entry},version:0}});
+ const csrf=await csrfHeaders(page);
+ assert.equal((await define(app+`/api/workspaces/${workspaceId}/products/${storageId}/catalog`,{key:'seats',title:'Seats',type:'integer',visibility:'editable',default:100})).status(),200);
+ assert.equal((await define(catalogPath,{key:'internal_beta',title:'Internal beta',type:'boolean',visibility:'hidden',default:true})).status(),200);
+ await page.getByRole('link',{name:'Settings',exact:true}).click();await page.getByRole('link',{name:'Configuration',exact:true}).click();
+ const storageYaml=await page.getByLabel('Storage YAML',{exact:true}).innerText();
+ assert.match(storageYaml,/key: storage\n/);assert.match(storageYaml,/default: 100\n/);assert.doesNotMatch(storageYaml,/pro_standard|default: 11\n/);
+ await selector.selectOption({label:'Acme product'});
+ const acmeYaml=await page.getByLabel('Acme product YAML',{exact:true}).innerText();
+ assert.match(acmeYaml,/key: acme_product\n/);assert.match(acmeYaml,/pro_standard/);assert.match(acmeYaml,/id: acme\n/);assert.doesNotMatch(acmeYaml,/default: 100\n|internal_beta/);
+ const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Download YAML',exact:true}).click()]);
+ assert.equal(download.suggestedFilename(),'acme_product.yaml');
+ // Settings → API keys: a key for the selected Product, its secret shown once; it evaluates that Product only, until revoked.
+ await page.getByRole('link',{name:'API keys',exact:true}).click();
+ const keys=page.getByRole('region',{name:'API keys for Acme product'});await keys.waitFor();
+ await keys.getByLabel('Key name').fill('Billing app');await keys.getByRole('button',{name:'Create API key',exact:true}).click();
+ const secret=await page.getByLabel('Save this secret securely').inputValue();assert.match(secret,/^oek_/);
+ await keys.getByText('Billing app',{exact:true}).waitFor();
+ const evaluate=(product,key=secret)=>page.request.post(app+`/oerep/v1/products/${product}/privileges/resolve`,{headers:{authorization:`Bearer ${key}`},data:{context:{organizationId:'acme'}}});
+ const evaluated=await evaluate('acme_product');assert.equal(evaluated.status(),200);
+ assert.equal((await evaluated.json()).privileges.find(p=>p.privilege==='seats').value,25);
+ assert.equal((await evaluate('storage')).status(),403,'A key evaluates its own Product only');
+ await page.reload();await keys.getByText('Billing app',{exact:true}).waitFor();assert.equal(await page.getByLabel('Save this secret securely').count(),0,'The secret is shown once');
+ await keys.getByRole('button',{name:'Revoke Billing app',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
+ await keys.getByText('Billing app',{exact:true}).waitFor({state:'hidden'});
+ assert.equal((await evaluate('acme_product')).status(),401,'A revoked key is refused');
+ // A key name typed for one Product is discarded with it, not carried into the next Product.
+ await keys.getByLabel('Key name').fill('Draft app');await selector.selectOption({label:'Storage'});
+ await page.getByRole('dialog').filter({hasText:'Discard your changes?'}).getByRole('button',{name:'Discard',exact:true}).click();
+ const storageKeys=page.getByRole('region',{name:'API keys for Storage'});await storageKeys.waitFor();assert.equal(await storageKeys.getByLabel('Key name').inputValue(),'');
+ await selector.selectOption({label:'Acme product'});await keys.waitFor();
+ // An invitation draft on Members asks before a Product switch discards it.
+ await page.getByRole('link',{name:'Members',exact:true}).click();await page.getByLabel('Email address').fill('draft@example.test');
+ const sidebarProduct=page.getByRole('combobox',{name:'Product',exact:true});
+ await sidebarProduct.selectOption({label:'Storage'});
+ const discardInvite=page.getByRole('dialog').filter({hasText:'Discard your changes?'});
+ await discardInvite.getByRole('button',{name:'Keep editing',exact:true}).click();await discardInvite.waitFor({state:'hidden'});
+ assert.equal(await sidebarProduct.locator('option:checked').innerText(),'Acme product');assert.equal(await page.getByLabel('Email address').inputValue(),'draft@example.test');
+ await sidebarProduct.selectOption({label:'Storage'});await discardInvite.getByRole('button',{name:'Discard',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.product-selector select option:checked')?.textContent==='Storage');
+ assert.equal(await page.getByLabel('Email address').inputValue(),'');await sidebarProduct.selectOption({label:'Acme product'});
+ await page.getByRole('link',{name:'Back to workspace',exact:false}).click();await page.getByRole('button',{name:'Edit Seats',exact:true}).waitFor();
 
  // A change without the CSRF token is refused as a Problem Details response.
  const refused=await page.request.post(app+'/api/workspaces',{headers:{origin:app},data:{name:'No token'}});assert.equal(refused.status(),403);assert.equal((await refused.json()).type,'https://openentitlement.dev/problems/csrf-rejected');
@@ -288,7 +349,11 @@ try{
  await userPage.goto(app+'/app/#settings/members');await userPage.getByRole('button',{name:'Workspace: Acme product',exact:true}).waitFor();
  await userPage.getByLabel('Role for user@example.test').waitFor();assert.equal(await userPage.getByLabel('Role for admin@example.test').count(),0);
  assert.deepEqual(await userPage.locator('.member-email').allInnerTexts(),['admin@example.test','user@example.test']);
+ // As Storage's Manager, they administer Storage's API keys.
+ await userPage.getByRole('link',{name:'API keys',exact:true}).click();await userPage.getByRole('region',{name:'API keys for Storage'}).waitFor();
+ await userPage.getByRole('link',{name:'Members',exact:true}).click();
  await userPage.getByLabel('Role for user@example.test').selectOption('User');await userPage.getByText('Your role: User.',{exact:true}).waitFor();
+ assert.equal(await userPage.getByRole('link',{name:'API keys',exact:true}).count(),0,'A User has no API keys page');
  assert.equal(await userPage.getByLabel('Email address').count(),0);
  // Layout: the Members and Service pages never overflow, and role selects are not clipped, down to phone width.
  for(const width of [1280,768,390]){await page.setViewportSize({width,height:900});

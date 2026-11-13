@@ -3,19 +3,20 @@ import { valueError, type Privilege, type Value } from "../../../server/workspac
 import type {EnvironmentOverrides} from "../../../server/environment.ts";
 import {EnvironmentNotice, Toggle } from "../privilege-controls.tsx";
 
-export function Field({def,value,onChange}: {def:Privilege;value:Value|undefined;onChange:(value:Value|undefined)=>void}) {
+/** One value input. `label` names it when the Privilege key alone is ambiguous, such as one value per variant. */
+export function Field({def,value,onChange,label=def.key}: {def:Privilege;value:Value|undefined;onChange:(value:Value|undefined)=>void;label?:string}) {
   const id=useId(),ref=useRef<HTMLInputElement>(null);
   const unlimited=typeof value==="object" && value?.unlimited===true;
   const previous=useRef<Value|undefined>(value??def.default);
   const error=value===undefined?"Enter a value":valueError(def,value);
   useEffect(()=>{ref.current?.setCustomValidity(error??"");},[error]);
   useEffect(()=>{if(typeof value!=="object" && value!==undefined)previous.current=value;},[value]);
-  if(def.type==="boolean"&&value===undefined)return <select aria-label={def.key} required value="" onChange={e=>onChange(e.target.value==="true")}><option value="">Choose a value</option><option value="true">Enabled</option><option value="false">Disabled</option></select>;
-  if(def.type==="boolean")return <Toggle checked={value===true} onChange={onChange} label={def.key}/>;
-  if(def.type==="string" && def.enum)return <select required={value===undefined} aria-label={def.key} value={typeof value==="string"?value:""} onChange={e=>onChange(e.target.value)}>{value===undefined&&<option value="">Choose a value</option>}{def.enum.map(v=><option key={v}>{v}</option>)}</select>;
-  return <div className="int-input"><input ref={ref} aria-label={def.key} aria-invalid={Boolean(error)} aria-describedby={error?id:undefined} required={def.type==="integer"||value===undefined} type={def.type==="integer"&&!unlimited?"number":"text"} step={def.type==="integer"?1:undefined} value={unlimited?"∞":value===undefined?"":String(value)} disabled={unlimited} onChange={e=>onChange(def.type==="integer"?(e.target.value===""?undefined:Number(e.target.value)):e.target.value)}/>
+  if(def.type==="boolean"&&value===undefined)return <select aria-label={label} required value="" onChange={e=>onChange(e.target.value==="true")}><option value="">Choose a value</option><option value="true">Enabled</option><option value="false">Disabled</option></select>;
+  if(def.type==="boolean")return <Toggle checked={value===true} onChange={onChange} label={label}/>;
+  if(def.type==="string" && def.enum)return <select required={value===undefined} aria-label={label} value={typeof value==="string"?value:""} onChange={e=>onChange(e.target.value)}>{value===undefined&&<option value="">Choose a value</option>}{def.enum.map(v=><option key={v}>{v}</option>)}</select>;
+  return <div className="int-input"><input ref={ref} aria-label={label} aria-invalid={Boolean(error)} aria-describedby={error?id:undefined} required={def.type==="integer"||value===undefined} type={def.type==="integer"&&!unlimited?"number":"text"} step={def.type==="integer"?1:undefined} value={unlimited?"∞":value===undefined?"":String(value)} disabled={unlimited} onChange={e=>onChange(def.type==="integer"?(e.target.value===""?undefined:Number(e.target.value)):e.target.value)}/>
     {error&&<small id={id} role="alert" className="field-error">{error}</small>}
-    {def.type==="integer"&&def.unlimited&&<label className="unlimited-control"><input type="checkbox" checked={unlimited} aria-label={`Unlimited ${def.key}`} onChange={e=>onChange(e.target.checked?{unlimited:true}:typeof previous.current==="object"?def.minimum??0:previous.current??def.minimum??0)}/>Unlimited</label>}
+    {def.type==="integer"&&def.unlimited&&<label className="unlimited-control"><input type="checkbox" checked={unlimited} aria-label={`Unlimited ${label}`} onChange={e=>onChange(e.target.checked?{unlimited:true}:typeof previous.current==="object"?def.minimum??0:previous.current??def.minimum??0)}/>Unlimited</label>}
   </div>;
 }
 export function ValuesEditor({definitions,base,values,onChange,environment={},frozenFeatures=[]}: {environment?:EnvironmentOverrides;frozenFeatures?:string[];definitions:Privilege[];base:Record<string,Value>;values:Record<string,Value>;onChange:(values:Record<string,Value>)=>void}) {
