@@ -19,12 +19,14 @@ This handoff applies in OpenAI and Anthropic runners using the active session's 
 5. Merge the latest `origin/<base>` into your branch and rerun the checks.
 6. Push and open the pull request against `<base>`. Write its body with Matt Pocock's `pr` skill, reference the ticket, and end it with the attribution line the session gives you. Commit messages end with the session's co-author line.
 7. Wait for CI in this same turn (`gh pr checks <number> --watch`) and fix every failure. Your turn ends only after step 8.
-8. Get the Codex review. Call `orchestrator_capabilities` once, then `delegate_task` with target `{providerInstanceId: "codex", model: "gpt-6.1-sol", options: {reasoningEffort: "high"}}`, `role: "review"`, `isolation: "worktree"`, `mode: "wait"`. Ask the reviewer to:
+8. Get the Codex review. Call `orchestrator_capabilities` once, then `delegate_task` with target `{providerInstanceId: "codex", model: "gpt-6.1-sol", options: {reasoningEffort: "medium"}}`, `role: "review"`, `isolation: "worktree"`, `mode: "wait"`. Ask the reviewer to:
    - review the pull request at its head SHA with `.agents/skills/code-review/SKILL.md`, running the checks;
    - post one comment itself with `gh pr comment`, titled "Codex review (gpt-6.1-sol) of <short SHA>", listing findings as must-fix, should-fix or nit (each with file:line, a failure scenario and a fix), the checks with exact results, and a verdict of "OK to merge" or "changes needed";
    - make no commits, pushes, merges or approvals.
 
    Fix every must-fix and should-fix, push, wait for CI again, and ask a new reviewer for a re-check that verifies each finding at the new head and posts its own comment. Repeat until the verdict is "OK to merge" at the current head with every check passing.
+
+   When the review fails on a usage limit, wait and retry it later; the pull request still needs its review. Use the reviewer the conductor names in your brief, if any, and title the comment with that reviewer's model.
 9. Leave the merge to the conductor.
 
 Never read, print or commit credentials or `.env` files.
