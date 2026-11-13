@@ -6,7 +6,7 @@ It has three layers, and dependencies point inward:
 
 | Package | Contents | May import |
 |---|---|---|
-| `openentitlement_service.interfaces` | The HTTP API (FastAPI): routes, the single Problem Details handler, the per-request Workspace transaction (`WorkspaceTransaction`), the console's static files | the service layer |
+| `openentitlement_service.interfaces` | The HTTP API (FastAPI): routes, the single Problem Details handler, the per-request Workspace transaction and Actor (`WorkspaceAccess`, which yields an `OpenWorkspace`: the repositories plus the Actor), the console's static files | the service layer |
 | `openentitlement_service.services` | Operations and rules, typed problems (`services/problems.py`), the records it works with and the repository protocols it needs (`services/repositories.py`) | Pydantic only: never FastAPI, FastMCP or SQLAlchemy |
 | `openentitlement_service.repositories` | `memory`: in-memory repositories for fast tests. `postgres`: SQLAlchemy Core tables, asyncpg, Alembic migrations, row-level security | the service layer |
 
@@ -69,7 +69,7 @@ Every error is a typed exception in `services/problems.py` with a stable `type` 
 
 Product deletions serialize within their Workspace before checking the remaining count, so concurrent deletions cannot remove its last Product. Edits to different Products remain independent. Membership changes, Product creation on Cloud Pro and Cloud service tier changes lock the Workspace row, so "one Owner remains", "a member keeps a Role or leaves" and "Cloud Pro has one Product" hold under concurrent requests.
 
-An invitation token is `<workspace id>.<secret>`: accepting it opens a transaction bound to that Workspace only, so invitations stay under row-level security. Only the token's SHA-256 hash is stored. Member, invitation and Cloud service tier changes record Audit log entries (`audit_entries`, OPE-43) with the authenticated actor and the Product they concern, or none for Workspace-wide changes.
+An invitation token is `<workspace id>.<secret>`: accepting it opens a transaction bound to that Workspace only, so invitations stay under row-level security. Only the token's SHA-256 hash is stored. Member, invitation and Cloud service tier changes record Audit log entries (`audit_entries`, OPE-43) with the authenticated actor and the Product they concern, or none for Workspace-wide changes. Creating a Workspace records Owner-only entries for the Workspace, its first Product and the creator's Owner membership in the same transaction.
 
 ## Data and row-level security
 
@@ -77,7 +77,7 @@ Each table is a SQLAlchemy Core `Table` in `repositories/postgres/tables.py`. Ea
 
 Accounts, sessions and sign-in flows belong to no Workspace and have no row-level security. `Store.transaction(account_id=…)` binds an Account in `openentitlement.account_id`, which only lets it read its own memberships and the Workspaces they belong to (every Workspace for a Platform administrator): the Workspace switcher. Writes stay bound to the transaction's Workspace.
 
-`Store.transaction(workspace_id)` opens one transaction bound to one Workspace; on the HTTP API a route takes `repos: WorkspaceTransaction` to get one per request. It commits when the route returns and rolls back when it raises, both before the response is sent, so a failed COMMIT becomes an `internal-error` problem rather than a success. A duplicate unique key raises `AlreadyExists` from either implementation. On Postgres it switches to the `openentitlement_service` role (created by the first migration, never allowed to bypass row-level security) and sets `openentitlement.workspace_id`. Every Workspace table has a forced row-level security policy on that setting, so even a raw SQL query in the transaction sees and writes only that Workspace's rows.
+`Store.transaction(workspace_id)` opens one transaction bound to one Workspace; on the HTTP API a route takes `workspace: WorkspaceAccess` to get one per request: an `OpenWorkspace` holding the repositories (`workspace.repos`) and the authenticated Actor (`workspace.actor`). It commits when the route returns and rolls back when it raises, both before the response is sent, so a failed COMMIT becomes an `internal-error` problem rather than a success. A duplicate unique key raises `AlreadyExists` from either implementation. On Postgres it switches to the `openentitlement_service` role (created by the first migration, never allowed to bypass row-level security) and sets `openentitlement.workspace_id`. Every Workspace table has a forced row-level security policy on that setting, so even a raw SQL query in the transaction sees and writes only that Workspace's rows.
 
 Connect with a role that is **not** a superuser and has no `BYPASSRLS`: such a role could leave the `openentitlement_service` role with `RESET ROLE`. The service logs a warning at startup when it can. The connecting role must be allowed to create roles for the first migration (or an administrator creates `openentitlement_service` and grants it to that role beforehand).
 
