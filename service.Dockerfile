@@ -13,7 +13,8 @@ RUN ln -s ../console/node_modules /app/sdk-js/node_modules && npm run build
 
 FROM python:3.12-slim-bookworm AS service
 COPY --from=ghcr.io/astral-sh/uv:0.11.29 /uv /bin/uv
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+# The virtual environment is built at its final path: its scripts name their interpreter by path.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PROJECT_ENVIRONMENT=/app/.venv
 WORKDIR /app/sdk-python
 COPY sdk-python/ ./
 RUN uv sync --locked --no-dev --no-editable --package openentitlement-service
@@ -23,7 +24,7 @@ LABEL org.opencontainers.image.source="https://github.com/open-entitlement/OpenE
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.description="OpenEntitlement Python service and administration console"
 RUN useradd --system --uid 10001 openentitlement
-COPY --from=service /app/sdk-python/.venv /app/.venv
+COPY --from=service /app/.venv /app/.venv
 COPY --from=console /app/console/web/dist /app/console
 COPY LICENSE /app/LICENSE
 ENV PATH="/app/.venv/bin:$PATH" OE_HOST=0.0.0.0 PORT=8787 OE_CONSOLE_DIR=/app/console
