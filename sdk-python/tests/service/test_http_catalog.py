@@ -41,17 +41,43 @@ async def test_catalog_http_validation_and_concurrent_records(store):
         conflict = next(r.json() for r in responses if r.status_code == 409)
         assert conflict["type"].endswith("/revision-conflict")
         assert conflict["id"] == "one"
-        for entry in [
-            {"key": "bad", "title": "Bad", "type": "integer", "envOverride": "BAD"},
-            {"key": "bad", "title": "Bad", "type": "boolean", "visibility": "read_only"},
-            {"key": "bad", "title": "Bad", "type": "boolean", "visibility": "hidden"},
-            {"id": "child", "title": "Child", "parentId": "absent"},
-        ]:
+        cases = [
+            ({"key": "bad", "title": "Bad", "type": "integer", "envOverride": "BAD"}, ["/entry/envOverride"]),
+            ({"key": "bad", "title": "Bad", "type": "boolean", "visibility": "read_only"}, ["/entry/default"]),
+            ({"key": "bad", "title": "Bad", "type": "boolean", "visibility": "hidden"}, ["/entry/default"]),
+            # Both integer alternatives (a number or Unlimited) reject it, at the submitted member.
+            ({"key": "bad", "title": "Bad", "type": "integer", "default": "oops"}, ["/entry/default"] * 2),
+            ({"key": "bad", "title": "Bad", "type": "integer", "default": 9, "maximum": 8}, ["/entry/default"]),
+            (
+                {"key": "bad", "title": "Bad", "type": "integer", "visibility": "read_only", "default": 9, "maximum": 8},
+                ["/entry/default"],
+            ),
+            ({"key": "bad", "title": "Bad", "type": "enum", "values": ["a"]}, ["/entry/enum", "/entry/values"]),
+            ({"key": "bad", "title": "Bad", "type": "nope"}, ["/entry/type"]),
+            ({"key": "bad", "title": "Bad", "type": "boolean", "default": False, "groupId": "absent"}, ["/entry/groupId"]),
+            ({"id": "child", "title": "Child", "parentId": "absent"}, ["/entry/parentId"]),
+        ]
+        for entry, pointers in cases:
             response = await client.put(
                 path, json={"kind": "groups" if "id" in entry else "privileges", "entry": entry, "version": 0}
             )
             assert response.status_code == 400, response.text
             problem = response.json()
             assert problem["type"].endswith("/validation-failed")
-            assert all(e["pointer"] == "" or e["pointer"].startswith("/") for e in problem["errors"])
+            assert [e["pointer"] for e in problem["errors"]] == pointers, (entry, problem["errors"])
+        # Request-model errors in variant values also point at the submitted value, not a union member.
+        response = await client.put(
+            path,
+            json={
+                "kind": "privileges",
+                "entry": {"key": "x", "title": "X", "type": "integer"},
+                "variantValues": {"basic": {"version": 1, "value": [1]}, "pro": {"value": 1}},
+                "version": 0,
+            },
+        )
+        assert response.status_code == 400, response.text
+        assert sorted({e["pointer"] for e in response.json()["errors"]}) == [
+            "/variantValues/basic/value",
+            "/variantValues/pro/version",
+        ]
         assert len((await client.get(path)).json()["catalog"]["privileges"]) == 2

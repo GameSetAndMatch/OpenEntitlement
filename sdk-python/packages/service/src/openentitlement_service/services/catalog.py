@@ -3,20 +3,28 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID, uuid4
 
 from openentitlement.model import OpenEntitlementModel
-from openentitlement.privileges import Group, Tag, Privilege, TypedPrivilege, PrivilegeCatalog, Unlimited, Identifier
+from openentitlement.privileges import Group, Tag, Privilege, TypedPrivilege, PrivilegeCatalog, Unlimited, Identifier, Visibility
 from pydantic import Field, StrictBool, StrictInt, StrictStr, ValidationError, model_validator
 
 from .access import Permission
-from .problems import FieldError, NotFound, RevisionConflict, ValidationFailed
+from .problems import FieldError, NotFound, RevisionConflict, ValidationFailed, escape_pointer_token, input_pointer
 from .repositories import AlreadyExists, StaleVersion
 from .workspaces import OpenWorkspace
 
 CatalogKind = Literal["groups", "tags", "privileges"]
 CatalogEntry = Group | Tag | TypedPrivilege
+
+
+def typed_entry(kind: CatalogKind, data: dict[str, object]) -> CatalogEntry:
+    if kind == "groups":
+        return Group.model_validate(data)
+    if kind == "tags":
+        return Tag.model_validate(data)
+    return cast(TypedPrivilege, Privilege.from_dict(data))
 
 
 class CatalogRecord(OpenEntitlementModel):
@@ -33,13 +41,7 @@ class CatalogRecord(OpenEntitlementModel):
         if isinstance(value, dict) and isinstance(value.get("entry"), dict):
             data = dict(value)
             entry = data["entry"]
-            data["entry"] = (
-                Group.model_validate(entry)
-                if data["kind"] == "groups"
-                else Tag.model_validate(entry)
-                if data["kind"] == "tags"
-                else Privilege.from_dict(entry)
-            )
+            data["entry"] = typed_entry(data["kind"], entry)
             return data
         return value
 
@@ -78,6 +80,18 @@ class CatalogChange(OpenEntitlementModel):
     variant_before: tuple[VariantValues, ...] = ()
     variant_after: tuple[VariantValues, ...] = ()
 
+    @model_validator(mode="before")
+    @classmethod
+    def typed_entries(cls, value: object) -> object:
+        # Groups and Tags share a shape, so stored entries are typed by their kind.
+        if isinstance(value, dict) and "kind" in value:
+            data = dict(value)
+            for member in ("before", "after"):
+                if isinstance(data.get(member), dict):
+                    data[member] = typed_entry(data["kind"], data[member])
+            return data
+        return value
+
 
 class CatalogView(OpenEntitlementModel):
     variants: tuple[VariantValues, ...] = ()
@@ -93,13 +107,76 @@ def identity(entry: CatalogEntry) -> tuple[CatalogKind, str]:
     return "privileges", entry.key
 
 
-def validation_problem(exc: ValidationError, prefix: str = "") -> ValidationFailed:
-    return ValidationFailed(
-        [
-            FieldError(prefix + "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in e["loc"]), e["msg"])
-            for e in exc.errors()
-        ]
-    )
+# Model-level Catalog rules that concern one member of the submitted entry.
+_RULE_MEMBERS = {
+    "Integer Privilege default is out of bounds": "default",
+    "Unlimited is not allowed": "default",
+    "String enum default must be one of its choices": "default",
+    "Hidden, read-only and environment-linked Privileges need a default": "default",
+    "Use an absent default rather than null": "default",
+    "Minimum cannot exceed maximum": "minimum",
+    "String enum requires unique string choices": "enum",
+    "Privilege tags must be unique Tag identifiers": "tags",
+    "A Group cannot contain itself": "parentId",
+}
+
+
+def entry_errors(exc: ValidationError, data: object, prefix: str = "", *, discriminated: bool = False) -> list[FieldError]:
+    """Field errors with JSON Pointers into the submitted ``data`` under ``prefix``.
+
+    ``discriminated`` drops the leading Privilege type branch that ``Privilege.from_dict`` reports.
+    """
+    errors = []
+    for e in exc.errors():
+        loc = tuple(e["loc"])
+        if discriminated and loc and isinstance(data, dict) and loc[0] == data.get("type"):
+            loc = loc[1:]
+        pointer = input_pointer(loc, data, e["type"], e.get("ctx"))
+        member = _RULE_MEMBERS.get(str((e.get("ctx") or {}).get("error", "")))
+        if not pointer and member:
+            pointer = "/" + member
+        errors.append(FieldError(prefix + pointer, e["msg"]))
+    return errors
+
+
+def validation_problem(exc: ValidationError, data: object, prefix: str = "", *, discriminated: bool = False) -> ValidationFailed:
+    return ValidationFailed(entry_errors(exc, data, prefix, discriminated=discriminated))
+
+
+def _reference_errors(entry: CatalogEntry, records: list[CatalogRecord]) -> list[FieldError]:
+    """Unknown or cyclic references made by the submitted entry, at its own members."""
+    groups = {r.key: r.entry for r in records if r.kind == "groups" and isinstance(r.entry, Group)}
+    if isinstance(entry, Group):
+        groups[entry.id] = entry
+        if entry.parent_id is None:
+            return []
+        if entry.parent_id not in groups:
+            return [FieldError("/entry/parentId", "Unknown parent Group")]
+        seen: set[str] = {entry.id}
+        parent: str | None = entry.parent_id
+        while parent is not None:
+            if parent in seen:
+                return [FieldError("/entry/parentId", "Group hierarchy contains a cycle")]
+            seen.add(parent)
+            ancestor = groups.get(parent)
+            parent = ancestor.parent_id if ancestor else None
+        return []
+    if isinstance(entry, Privilege):
+        tags = {r.key for r in records if r.kind == "tags"}
+        errors = []
+        if entry.group_id is not None and entry.group_id not in groups:
+            errors.append(FieldError("/entry/groupId", "Privilege references an unknown Group"))
+        errors.extend(
+            FieldError(f"/entry/tags/{i}", "Privilege references an unknown Tag")
+            for i, tag in enumerate(entry.tags)
+            if tag not in tags
+        )
+        return errors
+    return []
+
+
+def _variant_pointer(variant_id: str, *members: str) -> str:
+    return "".join("/" + escape_pointer_token(t) for t in ("variantValues", variant_id, *members))
 
 
 class CatalogService:
@@ -134,7 +211,8 @@ class CatalogService:
                 }
             )
         except ValidationError as exc:
-            raise validation_problem(exc) from exc
+            # Stored records are already valid, so a remaining rule concerns the submitted entry.
+            raise ValidationFailed([FieldError("/entry", e["msg"]) for e in exc.errors()]) from exc
 
     async def save(
         self,
@@ -164,37 +242,66 @@ class CatalogService:
             version=version + 1,
             entry=entry,
         )
-        self._catalog([r for r in records if (r.kind, r.key) != (kind, key)] + [record])
+        others = [r for r in records if (r.kind, r.key) != (kind, key)]
+        reference_errors = _reference_errors(entry, others)
+        if reference_errors:
+            raise ValidationFailed(reference_errors)
+        self._catalog(others + [record])
         supplied = variant_values or {}
         variants = await ws.repos.catalog.variants(product_id)
-        if supplied.keys() - {v.id for v in variants}:
-            raise ValidationFailed([FieldError("/variantValues", "Unknown Tier variant.")])
+        unknown = sorted(supplied.keys() - {v.id for v in variants})
+        if unknown:
+            raise ValidationFailed([FieldError(_variant_pointer(v), "Unknown Tier variant.") for v in unknown])
         if supplied and not isinstance(entry, Privilege):
             raise ValidationFailed([FieldError("/variantValues", "Only a Privilege has variant values.")])
+        changes: list[VariantValues] = []
         if isinstance(entry, Privilege):
+            errors: list[FieldError] = []
+            read_only = entry.visibility is Visibility.READ_ONLY
             for variant in variants:
                 override = supplied.get(variant.id)
                 if override and override.version != variant.version:
                     raise RevisionConflict(kind="Tier variant", id=variant.id)
+                if read_only:
+                    # RFC-0002: a Read-only value is the Catalog default, which the entry already
+                    # validated. Stored variant values stay as they are and have no effect.
+                    if override:
+                        errors.append(
+                            FieldError(
+                                _variant_pointer(variant.id),
+                                "A Read-only Privilege uses its Catalog default; omit this variant value.",
+                            )
+                        )
+                    continue
                 values = dict(variant.values)
                 if override:
                     values[key] = override.value
                 value = values.get(key, getattr(entry, "default", None))
                 if value is None:
-                    raise ValidationFailed(
-                        [FieldError("/variantValues/" + variant.id, "Set a value in every Tier variant.")]
-                    )
+                    errors.append(FieldError(_variant_pointer(variant.id), "Set a value in every Tier variant."))
+                    continue
                 try:
                     # Validate assigned values with precisely the same bounds/type rules as a default.
-                    Privilege.from_dict(
-                        entry.model_dump(mode="json")
-                        | {"default": value.model_dump(mode="json") if isinstance(value, Unlimited) else value}
-                    )
+                    data = entry.model_dump(mode="json") | {
+                        "default": value.model_dump(mode="json") if isinstance(value, Unlimited) else value
+                    }
+                    Privilege.from_dict(data)
                 except ValidationError as exc:
-                    raise validation_problem(exc, "/variantValues/" + variant.id) from exc
+                    # One message per value: union alternatives would otherwise repeat it.
+                    first = exc.errors()[0]
+                    rule = str((first.get("ctx") or {}).get("error", ""))
+                    detail = f"{variant.name}: {rule}" if rule else first["msg"]
+                    errors.append(FieldError(_variant_pointer(variant.id, "value"), detail))
+                    continue
                 if override:
-                    changed = variant.model_copy(update={"values": values, "version": variant.version + 1})
-                    await ws.repos.catalog.save_variant(changed, expected_version=variant.version)
+                    changes.append(variant.model_copy(update={"values": values, "version": variant.version + 1}))
+            if errors:
+                raise ValidationFailed(errors)
+        for changed in changes:
+            try:
+                await ws.repos.catalog.save_variant(changed, expected_version=changed.version - 1)
+            except StaleVersion as exc:
+                raise RevisionConflict(kind="Tier variant", id=changed.id) from exc
         try:
             await ws.repos.catalog.save(record, expected_version=version)
         except (StaleVersion, AlreadyExists) as exc:

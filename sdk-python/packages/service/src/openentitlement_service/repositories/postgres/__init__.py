@@ -289,6 +289,11 @@ class PostgresCatalogRepository:
         ensure_bound_workspace(self.workspace_id, change.workspace_id)
         await self.connection.execute(catalog_changes.insert().values(id=change.id, workspace_id=change.workspace_id, entry=change.model_dump(mode="json")))
 
+    async def changes(self, product_id: UUID) -> Sequence[CatalogChange]:
+        rows = (await self.connection.execute(select(catalog_changes.c.entry).where(catalog_changes.c.workspace_id == self.workspace_id))).scalars()
+        found = [CatalogChange.model_validate(row) for row in rows]
+        return sorted((c for c in found if c.product_id == product_id), key=lambda c: c.at)
+
     def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
         self.connection, self.workspace_id = connection, workspace_id
 

@@ -237,6 +237,9 @@ class InMemoryCatalogRepository:
         ensure_bound_workspace(self.workspace_id, change.workspace_id)
         self.rows.catalog_changes.append(change)
 
+    async def changes(self, product_id: UUID) -> Sequence[CatalogChange]:
+        return [c for c in self.rows.catalog_changes if (c.workspace_id, c.product_id) == (self.workspace_id, product_id)]
+
     def __init__(self, rows: _Rows, workspace_id: UUID | None) -> None:
         self.rows, self.workspace_id = rows, workspace_id
 

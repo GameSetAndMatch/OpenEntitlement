@@ -18,13 +18,15 @@ from ...services.problems import (
     NotFound,
     Problem,
     ValidationFailed,
+    escape_pointer_token,
+    input_pointer,
 )
 
 PROBLEM_JSON = "application/problem+json"
 logger = logging.getLogger("openentitlement_service")
 
 
-def _pointer(error: Mapping[str, Any]) -> str:
+def _pointer(error: Mapping[str, Any], body: Any) -> str:
     """A JSON Pointer (RFC 6901) for a FastAPI error location such as ("body", "tiers", 0, "name").
 
     Body fields point into the body; other locations start with their name ("/query/limit").
@@ -33,9 +35,10 @@ def _pointer(error: Mapping[str, Any]) -> str:
     if error.get("type") == "json_invalid":
         return ""
     where, *path = tuple(error["loc"])
-    tokens = [str(t).replace("~", "~0").replace("/", "~1") for t in path]
-    prefix = "" if where == "body" else "/" + str(where)
-    return prefix + "".join("/" + t for t in tokens)
+    if where == "body":
+        # Union members and discriminator branches are not request locations.
+        return input_pointer(path, body, error.get("type", ""), error.get("ctx"))
+    return "/" + str(where) + "".join("/" + escape_pointer_token(t) for t in path)
 
 
 def as_problem(request: Request, exc: Exception) -> Problem | HTTPException:
@@ -46,7 +49,7 @@ def as_problem(request: Request, exc: Exception) -> Problem | HTTPException:
     if isinstance(exc, Problem):
         return exc
     if isinstance(exc, RequestValidationError):
-        return ValidationFailed([FieldError(_pointer(e), e["msg"]) for e in exc.errors()])
+        return ValidationFailed([FieldError(_pointer(e, exc.body), e["msg"]) for e in exc.errors()])
     if isinstance(exc, HTTPException):
         if exc.status_code == 404:
             return NotFound()

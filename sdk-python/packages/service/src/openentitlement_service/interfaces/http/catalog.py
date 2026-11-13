@@ -44,7 +44,7 @@ async def save(product_id: UUID, body: CatalogSave, workspace: WorkspaceAccess) 
             else Privilege.from_dict(data)
         )
     except ValidationError as exc:
-        raise validation_problem(exc, "/entry") from exc
+        raise validation_problem(exc, body.entry, "/entry", discriminated=body.kind == "privileges") from exc
     return await CatalogService().save(
         workspace, product_id, cast(CatalogEntry, entry), version=body.version, variant_values=body.variant_values
     )

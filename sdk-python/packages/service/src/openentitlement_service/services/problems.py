@@ -189,3 +189,30 @@ class LastProduct(Problem):
 
     def __init__(self, *, id: str) -> None:  # noqa: A002
         super().__init__("A Workspace keeps at least one Product. Create another one before deleting this one.", id=id)
+
+
+def escape_pointer_token(token: object) -> str:
+    return str(token).replace("~", "~0").replace("/", "~1")
+
+
+def input_pointer(loc: Sequence[object], data: object, error_type: str = "", ctx: Mapping[str, Any] | None = None) -> str:
+    """A JSON Pointer into ``data`` (the submitted JSON) for a Pydantic error location.
+
+    Pydantic locations also name union members and discriminator branches ("constrained-int",
+    "Unlimited", "integer"), which do not exist in the request. Only steps that address the
+    submitted document are kept, plus a missing member's name and a rejected discriminator.
+    """
+    tokens: list[str] = []
+    node = data
+    for index, step in enumerate(loc):
+        if isinstance(node, Mapping) and isinstance(step, str) and step in node:
+            node = node[step]
+            tokens.append(step)
+        elif isinstance(node, list) and isinstance(step, int) and 0 <= step < len(node):
+            node = node[step]
+            tokens.append(str(step))
+        elif error_type == "missing" and index == len(loc) - 1 and isinstance(node, Mapping) and isinstance(step, str):
+            tokens.append(step)
+    if error_type.startswith("union_tag") and isinstance(node, Mapping) and ctx and "discriminator" in ctx:
+        tokens.append(str(ctx["discriminator"]).strip("'"))
+    return "".join("/" + escape_pointer_token(t) for t in tokens)

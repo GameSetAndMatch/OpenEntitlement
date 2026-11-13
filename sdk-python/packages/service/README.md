@@ -114,14 +114,20 @@ Use version `0` to create, or the record's last-read version to edit. A stale sa
 The console Catalog uses the selected Product and its Role. Managers edit their Product;
 Users read it; Owners administer every Product. Validation uses the SDK Catalog models,
 including acyclic Group references, unique Tags, typed defaults and restrictive boolean
-prerequisites. Catalog saves ask for no contract-term reason.
+prerequisites. Catalog saves ask for no contract-term reason. `validation-failed` errors
+point at the submitted JSON (`/entry/default`, `/entry/parentId`, `/entry/tags/1`,
+`/variantValues/{variant_id}/value`), never at SDK union or discriminator branch names.
 
 A required Privilege can supply `variantValues: {variant_id: {version, value}}` in the same
 save. All existing variants must have valid values; a missing value or stale variant rolls
-back the entire save. `catalog_variant_values` is the Catalog-facing value storage seam for
+back the entire save. A Read-only Privilege uses its Catalog default (RFC-0002): its
+variant values are neither validated nor accepted in `variantValues`, and stored ones are kept
+unchanged with no effect. They are validated again if the Privilege becomes editable. Clearing
+them, with a console confirmation, is the separate OPE-54 policy. `catalog_variant_values` is the Catalog-facing value storage seam for
 OPE-40's Tier lifecycle, which must take the same Product lock before creating/changing
 variants. No Tier creation API is introduced here. Write audit facts include the real Account,
-Product, target name, before/after definition and variant values; the filtered read side is OPE-43.
+Product, target name, before/after definition and variant values; the repositories read them back
+per Product (`changes`); the filtered audit view is OPE-43.
 
 Run `uv run pytest -q tests/service/test_catalog_service.py tests/service/test_http_catalog.py`
 from `sdk-python` for the shared memory/Postgres behavior tests. Set `OE_PG_DSN` for Postgres.
