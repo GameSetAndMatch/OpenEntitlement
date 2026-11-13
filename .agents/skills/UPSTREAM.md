@@ -2,7 +2,7 @@
 
 Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills/tree/4ae2317ddb22b046e26455e4f9c9b3aaaf62212d), revision `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d`, reviewed 2026-11-09. Upstream MIT terms are preserved in [LICENSE.mattpocock](LICENSE.mattpocock). These are local adaptations, not an official upstream distribution or endorsement.
 
-Sources: `skills/engineering/code-review`, `skills/engineering/domain-modeling`, `skills/engineering/grill-with-docs`, and `skills/productivity/grilling`. The setup skill informed repository layout; no automatic issue creation, label changes, plugins, hooks or accounts were configured.
+Sources: `skills/engineering/code-review`, `skills/engineering/domain-modeling`, `skills/engineering/grill-with-docs`, and `skills/productivity/grilling`. `implement-train` adapts `skills/engineering/implement-spec` (integration branch, task-graph frontier, one implementer per ticket) to this project: one pull request and thread per ticket, a Codex review before every merge, and Linear as the tracker. It points at the upstream `tdd`, `implement`, `pr` and `retro` skills by name instead of copying them. The setup skill informed repository layout; no automatic issue creation, label changes, plugins, hooks or accounts were configured.
 
 Changes: known decisions replace repeated interviews; existing root ADR/glossary layout is retained; Spec and Standards are still separate; delegation and authorization follow the active session; provider-specific Skill-tool calls were replaced with direct Markdown workflows.
 

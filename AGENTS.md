@@ -17,6 +17,7 @@ Read the relevant repository-local SKILL.md directly; these workflows require no
 - [grill-with-docs](.agents/skills/grill-with-docs/SKILL.md): genuinely unresolved requirements and durable decisions.
 - [domain-modeling](.agents/skills/domain-modeling/SKILL.md): terminology, relationships, glossary and ADR changes.
 - [code-review](.agents/skills/code-review/SKILL.md): separate Spec and Standards review, with evidence.
+- [implement-train](.agents/skills/implement-train/SKILL.md): when a person starts the work train for a spec: build each ticket in its own PR, review with Codex, merge, repeat.
 
 The adaptations are pinned and attributed in [.agents/skills/UPSTREAM.md](.agents/skills/UPSTREAM.md). Reuse decisions already made; do not repeatedly interview the user or require a blanket confirmation for authorized reversible work. Do not start additional agents unless requested by the user or applicable workflow instructions.
 
