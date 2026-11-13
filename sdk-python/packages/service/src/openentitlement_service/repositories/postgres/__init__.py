@@ -28,10 +28,12 @@ from ...services.catalog import CatalogRecord, CatalogChange, VariantValues
 from ...services.tiers import StatusPolicyRecord, TierChange, TierRecord
 from ...services.models import (
     Account,
+    Invitation,
     Member,
     Product,
     ProductMembership,
     Session,
+    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -43,6 +45,7 @@ from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
 from .tables import catalog_variant_values, catalog_changes, catalog_groups, catalog_tags, catalog_privileges
 from .tables import status_policies, tier_changes, tiers
 from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
+from .tables import invitations, settings_changes
 
 
 UNIQUE_VIOLATION = "23505"
@@ -94,6 +97,21 @@ class PostgresWorkspacesRepository:
         query = select(workspaces).where(workspaces.c.id == self._workspace_id)
         row = (await self.connection.execute(query)).mappings().first()
         return Workspace.model_validate(dict(row)) if row else None
+
+    async def lock(self) -> None:
+        await self.connection.execute(
+            select(workspaces.c.id).where(workspaces.c.id == self._workspace_id).with_for_update()
+        )
+
+    async def update(self, workspace: Workspace, *, expected_version: int) -> None:
+        ensure_bound_workspace(self._workspace_id, workspace.id)
+        statement = (
+            workspaces.update()
+            .where(workspaces.c.id == workspace.id, workspaces.c.version == expected_version)
+            .values(service_tier=workspace.service_tier.value, version=workspace.version)
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(f"workspace {workspace.id}")
 
 
 class PostgresProductsRepository:
@@ -181,6 +199,87 @@ class PostgresMembersRepository:
             .order_by(cast(product_roles.c.product_id, Text))
         )
         return [ProductMembership.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
+
+    async def list(self) -> Sequence[Member]:
+        query = select(members).where(members.c.workspace_id == self._workspace_id).order_by(cast(members.c.account_id, Text))
+        return [Member.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
+
+    async def all_product_roles(self) -> Sequence[ProductMembership]:
+        query = (
+            select(product_roles)
+            .where(product_roles.c.workspace_id == self._workspace_id)
+            .order_by(cast(product_roles.c.product_id, Text), cast(product_roles.c.account_id, Text))
+        )
+        return [ProductMembership.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
+
+    async def set_owner(self, account_id: UUID, owner: bool) -> None:
+        statement = (
+            members.update()
+            .where(members.c.workspace_id == self._workspace_id, members.c.account_id == account_id)
+            .values(owner=owner)
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise LookupError(f"member {account_id}")
+
+    async def remove_product_role(self, product_id: UUID, account_id: UUID) -> None:
+        await self.connection.execute(
+            product_roles.delete().where(
+                product_roles.c.workspace_id == self._workspace_id,
+                product_roles.c.product_id == product_id,
+                product_roles.c.account_id == account_id,
+            )
+        )
+
+    async def remove(self, account_id: UUID) -> None:
+        # Product Roles go with the membership (ON DELETE CASCADE).
+        await self.connection.execute(
+            members.delete().where(members.c.workspace_id == self._workspace_id, members.c.account_id == account_id)
+        )
+
+
+class PostgresInvitationsRepository:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self._workspace_id = connection, workspace_id
+
+    async def add(self, invitation: Invitation, *, now: datetime) -> None:
+        ensure_bound_workspace(self._workspace_id, invitation.workspace_id)
+        await self.connection.execute(
+            invitations.delete().where(invitations.c.workspace_id == self._workspace_id, invitations.c.expires_at <= now)
+        )
+        values = invitation.model_dump(by_alias=False) | {"role": invitation.role.value if invitation.role else None}
+        await _insert(self.connection, invitations.insert().values(**values))
+
+    async def take(self, token_hash: str, *, now: datetime) -> Invitation | None:
+        statement = (
+            invitations.delete()
+            .where(invitations.c.workspace_id == self._workspace_id, invitations.c.token_hash == token_hash)
+            .returning(*invitations.c)
+        )
+        row = (await self.connection.execute(statement)).mappings().first()
+        if row is None or row["expires_at"] <= now:
+            return None
+        return Invitation.model_validate(dict(row))
+
+
+class PostgresSettingsChangesRepository:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self._workspace_id = connection, workspace_id
+
+    async def add(self, change: SettingsChange) -> None:
+        ensure_bound_workspace(self._workspace_id, change.workspace_id)
+        await self.connection.execute(
+            settings_changes.insert().values(
+                id=change.id, workspace_id=change.workspace_id, at=change.at, entry=change.model_dump(mode="json")
+            )
+        )
+
+    async def list(self) -> Sequence[SettingsChange]:
+        query = (
+            select(settings_changes.c.entry)
+            .where(settings_changes.c.workspace_id == self._workspace_id)
+            .order_by(settings_changes.c.seq)
+        )
+        return [SettingsChange.model_validate(row) for row in (await self.connection.execute(query)).scalars()]
 
 
 class PostgresAccountsRepository:
@@ -456,6 +555,8 @@ class PostgresStore:
                 catalog=PostgresCatalogRepository(connection, workspace_id),
                 tiers=PostgresTiersRepository(connection, workspace_id),
                 directory=PostgresDirectoryRepository(connection, account_id),
+                invitations=PostgresInvitationsRepository(connection, workspace_id),
+                settings_changes=PostgresSettingsChangesRepository(connection, workspace_id),
                 connection=connection,
             )
 

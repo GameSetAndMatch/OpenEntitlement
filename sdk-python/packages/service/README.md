@@ -37,6 +37,7 @@ OE_IN_MEMORY=true uv run openentitlement-service   # to try it out: data is lost
 | `OE_OIDC_LOCAL_HTTP` | `false` | `true` allows plain HTTP for the issuer and app URL on loopback only, for local development. Otherwise both must be HTTPS. |
 | `OE_PLATFORM_ADMIN_SUBJECT` | none | The OIDC subject that becomes a Platform administrator when it signs in. |
 | `OE_SIGNUP_DOMAINS` | all | Comma-separated email domains allowed to sign in. |
+| `OE_DEPLOYMENT_MODE` | `self_hosted` | `saas` applies OpenEntitlement Cloud service tiers: a Workspace starts on Cloud Pro (one Product) and a Platform administrator can move it to Enterprise (any number). `self_hosted` has no Product limit. |
 
 `GET /healthz` answers `{"status": "ok"}`, or the [`service-unavailable`](https://openentitlement.dev/problems/service-unavailable/) problem when the database cannot be reached.
 
@@ -56,12 +57,19 @@ Routes take `CurrentAccount` (the signed-in Account) or `WorkspaceAccess` (one t
 |---|---|
 | `GET /api/workspaces` · `POST /api/workspaces` | Any signed-in Account: list your Workspaces (every one for a Platform administrator) or create one, which starts with one Product and makes you its Owner |
 | `GET /api/workspaces/{id}` · `GET …/products` · `GET …/products/{product}` | Members, with the Products where they have a Role |
-| `POST …/products` · `PATCH …/products/{product}` · `POST …/products/{product}/archive` · `…/restore` · `DELETE …/products/{product}?version=` | Owners: create, rename, archive, restore and delete Products. Changes name the version they were made from (`revision-conflict` otherwise); a Product's ID and key never change; a used Product or the last one cannot be deleted |
+| `POST …/products` · `PATCH …/products/{product}` · `POST …/products/{product}/archive` · `…/restore` · `DELETE …/products/{product}?version=` | Owners: create, rename, archive, restore and delete Products. Changes name the version they were made from (`revision-conflict` otherwise); a Product's ID and key never change; a used Product or the last one cannot be deleted. On Cloud Pro, a second Product is `product-limit` |
+| `GET …/members` | Owners (every member) and Managers (the Owners and the members of the Products they manage, with only those Roles) |
+| `POST …/invitations` `{email, role, productId}` | Owners invite anyone, including Owners (no `productId`); a Product's Managers invite its Managers and Users. The link's token is returned once, expires after 7 days and works once |
+| `POST /api/invitations/accept` `{token}` | The signed-in Account whose verified email was invited. A member keeps any Role they already have; a new Product Role is added |
+| `PUT …/members/{account}` `{role, productId}` · `DELETE …/members/{account}` | Owners: any Role, including Owner, and removal from the Workspace; a Product's Managers: Manager, User or no Role (`null`) in that Product, and removal from the Products they manage. A Workspace keeps one Owner (`last-owner`) |
+| `PUT …/service-tier` `{tier, version}` | Platform administrators, with `OE_DEPLOYMENT_MODE=saas`. A move to Cloud Pro is `product-limit` while the Workspace has more than one Product, naming them |
 
 
 Every error is a typed exception in `services/problems.py` with a stable `type` URI, a status, a title and parameters. One handler (`interfaces/http/problems.py`) renders it as `application/problem+json` (RFC 9457). An HTTP error raised by the framework itself that no problem type describes (for example 413) becomes RFC 9457's untyped `about:blank` problem. Anything else becomes a generic [`internal-error`](https://openentitlement.dev/problems/internal-error/) and is logged, never returned. A new problem type needs a page in `website/src/content/docs/problems/`.
 
-Product deletions serialize within their Workspace before checking the remaining count, so concurrent deletions cannot remove its last Product. Edits to different Products remain independent.
+Product deletions serialize within their Workspace before checking the remaining count, so concurrent deletions cannot remove its last Product. Edits to different Products remain independent. Membership changes, Product creation on Cloud Pro and Cloud service tier changes lock the Workspace row, so "one Owner remains", "a member keeps a Role or leaves" and "Cloud Pro has one Product" hold under concurrent requests.
+
+An invitation token is `<workspace id>.<secret>`: accepting it opens a transaction bound to that Workspace only, so invitations stay under row-level security. Only the token's SHA-256 hash is stored. Member, invitation and Cloud service tier changes write authenticated audit facts (`settings_changes`), with the Product they concern or none for Workspace-wide changes; OPE-43 supplies the filtered read side.
 
 ## Data and row-level security
 

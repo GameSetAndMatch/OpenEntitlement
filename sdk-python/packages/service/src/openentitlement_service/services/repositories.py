@@ -16,10 +16,12 @@ from uuid import UUID
 
 from .models import (
     Account,
+    Invitation,
     Member,
     Product,
     ProductMembership,
     Session,
+    SettingsChange,
     SignInFlow,
     Workspace,
     WorkspaceMembership,
@@ -109,6 +111,18 @@ class WorkspacesRepository(Protocol):
         """The Workspace this transaction is bound to, if it exists."""
         ...
 
+    async def lock(self) -> None:
+        """Serialize changes to the Workspace's members, Owners, Product count and Cloud service tier.
+
+        Held until the transaction ends. Acquire before checking an invariant such as "at least one
+        Owner" or "Cloud Pro has one Product", so concurrent changes cannot both pass the check.
+        """
+        ...
+
+    async def update(self, workspace: Workspace, *, expected_version: int) -> None:
+        """Replace the Workspace's ``service_tier`` and ``version``, raising ``StaleVersion`` unless it is still at ``expected_version``."""
+        ...
+
 
 class ProductsRepository(Protocol):
     async def lock_deletion(self) -> None:
@@ -156,6 +170,44 @@ class MembersRepository(Protocol):
         ...
 
     async def product_roles(self, account_id: UUID) -> Sequence[ProductMembership]: ...
+
+    async def list(self) -> Sequence[Member]:
+        """Every member of the Workspace, by Account ID."""
+        ...
+
+    async def all_product_roles(self) -> Sequence[ProductMembership]:
+        """Every member's Roles in every Product of the Workspace."""
+        ...
+
+    async def set_owner(self, account_id: UUID, owner: bool) -> None:
+        """Make the member an Owner, or no longer one. Their Product Roles are kept."""
+        ...
+
+    async def remove_product_role(self, product_id: UUID, account_id: UUID) -> None:
+        """Remove the member's Role in the Product, if they have one."""
+        ...
+
+    async def remove(self, account_id: UUID) -> None:
+        """Remove the member and all their Product Roles from the Workspace."""
+        ...
+
+
+class InvitationsRepository(Protocol):
+    async def add(self, invitation: Invitation, *, now: datetime) -> None:
+        """Save the invitation and forget the Workspace's invitations that expired before ``now``."""
+        ...
+
+    async def take(self, token_hash: str, *, now: datetime) -> Invitation | None:
+        """Remove and return the invitation, unless it does not exist or expired. An invitation is used once."""
+        ...
+
+
+class SettingsChangesRepository(Protocol):
+    async def add(self, change: SettingsChange) -> None: ...
+
+    async def list(self) -> Sequence[SettingsChange]:
+        """The Workspace's settings audit facts, oldest first."""
+        ...
 
 
 class AccountsRepository(Protocol):
@@ -216,6 +268,8 @@ class Repositories:
     catalog: CatalogRepository
     tiers: TiersRepository
     directory: DirectoryRepository
+    invitations: InvitationsRepository
+    settings_changes: SettingsChangesRepository
 
 
 class Store(Protocol):

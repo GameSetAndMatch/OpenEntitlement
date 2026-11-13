@@ -1,4 +1,4 @@
-/** The console against the Python service: real OIDC sign-in, Workspace creation, switcher, Product selector, sign-out. */
+/** The console against the Python service: real OIDC sign-in, Workspace creation, switcher, Product selector, Settings (Members, invitations, Cloud service tier), sign-out. */
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
@@ -18,7 +18,7 @@ try{
  await admin.query(`CREATE DATABASE ${name}`);database=true;
  const url=new URL(process.env.OE_PG_DSN);url.pathname='/'+name;
  const appPort=await port(),app=`http://localhost:${appPort}`;issuer=await startDevIssuer(await port(),app);
- service=spawn('uv',['run','--project',resolve(root,'sdk-python'),'--locked','openentitlement-service'],{cwd:root,env:{...process.env,DATABASE_URL:url.href,PORT:String(appPort),OE_HOST:'127.0.0.1',OE_APP_URL:app,OE_OIDC_ISSUER:issuer.url,OE_OIDC_LOCAL_HTTP:'true',OE_PLATFORM_ADMIN_SUBJECT:'local-admin',OE_CONSOLE_DIR:resolve(root,'console/web/dist')}});
+ service=spawn('uv',['run','--project',resolve(root,'sdk-python'),'--locked','openentitlement-service'],{cwd:root,env:{...process.env,DATABASE_URL:url.href,PORT:String(appPort),OE_HOST:'127.0.0.1',OE_APP_URL:app,OE_OIDC_ISSUER:issuer.url,OE_OIDC_LOCAL_HTTP:'true',OE_PLATFORM_ADMIN_SUBJECT:'local-admin',OE_DEPLOYMENT_MODE:'saas',OE_CONSOLE_DIR:resolve(root,'console/web/dist')}});
  service.stdout.on('data',d=>logs.push(String(d)));service.stderr.on('data',d=>logs.push(String(d)));
  const exited=new Promise(ok=>service.once('exit',ok));
  for(let i=0;;i++){
@@ -147,6 +147,17 @@ try{
  await page.reload();const switcher=page.getByRole('button',{name:'Workspace: Acme product',exact:true});await switcher.waitFor();
  await switcher.click();const menu=page.getByRole('menu',{name:'Workspaces'});assert.equal(await menu.getByRole('menuitemradio',{name:/Acme product/}).getAttribute('aria-checked'),'true');await page.keyboard.press('Escape');
 
+ // Cloud Pro allows one Product; the Platform administrator moves the Workspace to Enterprise in Settings › Service.
+ const tooMany=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});
+ assert.equal(tooMany.status(),409);assert.equal((await tooMany.json()).type,'https://openentitlement.dev/problems/product-limit');
+ await page.goto(app+'/app/#settings/service');await page.getByRole('heading',{name:'Service',exact:true,level:1}).waitFor();
+ const tier=page.getByLabel('Cloud service tier');assert.equal(await tier.inputValue(),'pro');
+ await tier.selectOption('enterprise');await page.getByRole('button',{name:'Save Cloud service tier',exact:true}).click();
+ await page.getByText('Changes saved',{exact:true}).waitFor();await page.getByRole('button',{name:'Save Cloud service tier',exact:true}).waitFor({state:'hidden'});
+ assert.equal(await page.getByLabel('Cloud service tier').inputValue(),'enterprise');
+ assert.equal((await (await page.request.get(app+`/api/workspaces/${workspaceId}`)).json()).hosting.tier,'enterprise');
+ await page.getByRole('link',{name:'Back to workspace'}).click();await page.getByRole('heading',{name:'Privilege Catalog',exact:true,level:1}).waitFor();
+
  // A second Product shows the selector; the choice is remembered per Workspace.
  const created=await page.request.post(app+`/api/workspaces/${workspaceId}/products`,{headers:await csrfHeaders(page),data:{key:'storage',name:'Storage'}});assert.equal(created.status(),201);
  await page.reload();const selector=page.getByRole('combobox',{name:'Product'});await selector.waitFor();
@@ -163,6 +174,40 @@ try{
  const own=userPage.getByRole('button',{name:'Workspace: Another business',exact:true});await own.waitFor();await own.click();
  assert.equal(await userPage.getByRole('menuitemradio',{name:/Acme product/}).count(),0);await userPage.keyboard.press('Escape');
  assert.equal(await userPage.getByRole('combobox',{name:'Product'}).count(),0);
+
+ // A downgrade is refused while the Workspace has two Products, naming them.
+ await page.goto(app+'/app/#settings/service');await page.getByLabel('Cloud service tier').selectOption('pro');await page.getByRole('button',{name:'Save Cloud service tier',exact:true}).click();
+ await page.getByRole('alert').filter({hasText:'Acme product, Storage'}).waitFor();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+
+ // Members: the Owner invites the other Account as Manager of Storage with a single-use link.
+ await page.getByRole('link',{name:'Members',exact:true}).click();await page.getByRole('heading',{name:'Members',exact:true,level:1}).waitFor();
+ assert.equal(await page.getByLabel('Role for admin@example.test',{exact:true}).inputValue(),'Owner');
+ await page.getByLabel('Email address').fill('user@example.test');await page.getByLabel('Role',{exact:true}).selectOption('Manager');await page.getByLabel('Invite to product').selectOption({label:'Storage'});
+ await page.getByRole('button',{name:'Create invitation link',exact:true}).click();const inviteUrl=await page.getByLabel('Invitation link (expires in 7 days)').inputValue();
+ assert.match(inviteUrl,new RegExp(`/app/#invite=${workspaceId}\\.`));
+ await userPage.evaluate(url=>{location.hash=new URL(url).hash;},inviteUrl);await userPage.getByRole('button',{name:'Join workspace',exact:true}).click();
+ await userPage.getByRole('heading',{name:'You have a workspace invitation'}).waitFor({state:'hidden'});await userPage.getByText('Workspace joined',{exact:true}).waitFor();
+ assert.equal((await userPage.request.post(app+'/api/invitations/accept',{headers:await csrfHeaders(userPage),data:{token:inviteUrl.split('#invite=')[1]}})).status(),404,'An invitation link works once');
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));const userStorage=page.getByLabel('Role for user@example.test in Storage');await userStorage.waitFor();
+ assert.equal(await userStorage.inputValue(),'Manager');assert.equal(await page.getByLabel('Role for user@example.test in Acme product').inputValue(),'');
+ // The Manager sees the Owner and the members of Storage only, and changing their own Role refreshes their access.
+ await userPage.goto(app+'/app/#settings/members');await userPage.getByRole('button',{name:'Workspace: Acme product',exact:true}).waitFor();
+ await userPage.getByLabel('Role for user@example.test').waitFor();assert.equal(await userPage.getByLabel('Role for admin@example.test').count(),0);
+ assert.deepEqual(await userPage.locator('.member-email').allInnerTexts(),['admin@example.test','user@example.test']);
+ await userPage.getByLabel('Role for user@example.test').selectOption('User');await userPage.getByText('Your role: User.',{exact:true}).waitFor();
+ assert.equal(await userPage.getByLabel('Email address').count(),0);
+ // Layout: the Members and Service pages never overflow, and role selects are not clipped, down to phone width.
+ for(const width of [1280,768,390]){await page.setViewportSize({width,height:900});
+  for(const hash of ['members','service']){await page.goto(app+'/app/#settings/'+hash);await page.locator('.settings-page').waitFor();if(hash==='members')await page.getByLabel('Role for user@example.test in Storage').waitFor();
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&[...document.querySelectorAll('.settings-row')].every(r=>r.scrollWidth<=r.clientWidth+1&&r.getBoundingClientRect().right<=innerWidth)),true,`${hash} overflows at ${width}px`);
+   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('.settings-page select')].every(el=>el.scrollWidth<=el.clientWidth+1)),true,`A select on ${hash} is clipped at ${width}px`);}}
+ await page.setViewportSize({width:1280,height:720});
+ // Removing a member asks to confirm, without a reason; they lose access to the Workspace.
+ await page.goto(app+'/app/#settings/members');await page.getByRole('button',{name:'Remove user@example.test',exact:true}).click();
+ const dialog=page.getByRole('dialog');assert.equal(await dialog.getByRole('textbox').count(),0);await dialog.getByRole('button',{name:'Confirm',exact:true}).click();
+ await page.getByRole('button',{name:'Remove user@example.test',exact:true}).waitFor({state:'hidden'});
+ assert.equal((await userPage.request.get(app+`/api/workspaces/${workspaceId}`)).status(),404);
+ await userPage.evaluate(()=>window.dispatchEvent(new Event('focus')));await userPage.getByRole('button',{name:'Workspace: Another business',exact:true}).waitFor();
 
  // The Platform administrator sees every Workspace in the switcher.
  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.reload();await page.getByRole('button',{name:'Workspace: Acme product',exact:true}).click();

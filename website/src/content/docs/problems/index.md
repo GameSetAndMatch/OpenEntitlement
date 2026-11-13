@@ -34,12 +34,16 @@ The Python service returns these types. It is in development on the `service/pyt
 | [`sign-in-refused`](/problems/sign-in-refused/) | 403 | The identity may not sign in here. |
 | [`csrf-rejected`](/problems/csrf-rejected/) | 403 | A change did not come from the console. |
 | [`permission-denied`](/problems/permission-denied/) | 403 | The Role does not allow this action. |
+| [`invitation-for-another-email`](/problems/invitation-for-another-email/) | 403 | The invitation is for another verified email address. |
 | [`not-found`](/problems/not-found/) | 404 | Nothing exists at the requested address, or you cannot see it. |
+| [`invitation-invalid`](/problems/invitation-invalid/) | 404 | The invitation link does not exist, was used, or expired. |
 | [`method-not-allowed`](/problems/method-not-allowed/) | 405 | The address exists but does not accept this HTTP method. |
 | [`already-exists`](/problems/already-exists/) | 409 | Another record already uses this unique key. |
 | [`revision-conflict`](/problems/revision-conflict/) | 409 | The record changed since it was read. |
 | [`product-in-use`](/problems/product-in-use/) | 409 | Customers use the Product, so it can only be archived. |
 | [`tier-in-use`](/problems/tier-in-use/) | 409 | Organizations or the status policy use the Tier, so it can only be archived. |
 | [`last-product`](/problems/last-product/) | 409 | A Workspace keeps at least one Product. |
+| [`last-owner`](/problems/last-owner/) | 409 | A Workspace keeps at least one Owner. |
+| [`product-limit`](/problems/product-limit/) | 409 | Cloud Pro allows one Product. |
 | [`internal-error`](/problems/internal-error/) | 500 | The service failed unexpectedly. |
 | [`service-unavailable`](/problems/service-unavailable/) | 503 | The service cannot reach its database, or sign-in is not configured. |
