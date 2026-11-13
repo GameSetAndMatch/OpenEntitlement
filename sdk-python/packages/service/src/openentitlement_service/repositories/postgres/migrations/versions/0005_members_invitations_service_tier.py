@@ -1,7 +1,7 @@
 """Invitations, settings audit facts and the Cloud service tier (OPE-44).
 
 Revision ID: 0005_members_invitations
-Revises: 0003
+Revises: 0004_tiers
 Create Date: 2026-11-13
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ from alembic import op
 from openentitlement_service.repositories.postgres import rls
 
 revision = "0005_members_invitations"
-down_revision = "0003"
+down_revision = "0004_tiers"
 branch_labels = None
 depends_on = None
 

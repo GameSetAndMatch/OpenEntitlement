@@ -177,3 +177,28 @@ settings_changes = Table(
     Column("at", DateTime(timezone=True), nullable=False),
     Column("entry", JSON, nullable=False),
 )
+
+# A Product's Tiers (OPE-40). Their variants are rows of ``catalog_variant_values``.
+tiers = catalog_table("tiers")
+
+# A Product's status policy: one row per Product, absent until first saved.
+status_policies = Table(
+    "status_policies", metadata,
+    Column("workspace_id", Uuid, nullable=False),
+    Column("product_id", Uuid, primary_key=True),
+    Column("version", Integer, nullable=False),
+    Column("entry", JSON, nullable=False),
+    ForeignKeyConstraint(["workspace_id", "product_id"], ["products.workspace_id", "products.id"], ondelete="CASCADE"),
+)
+
+# Immutable audit facts about Tiers, Tier variants and the status policy.
+tier_changes = Table(
+    "tier_changes", metadata,
+    Column("id", Uuid, primary_key=True),
+    # Insertion order: changes made in one transaction share their time.
+    Column("seq", BigInteger, Identity(), nullable=False),
+    Column("workspace_id", Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+    Column("product_id", Uuid, nullable=False),
+    Column("at", DateTime(timezone=True), nullable=False),
+    Column("entry", JSON, nullable=False),
+)

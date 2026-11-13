@@ -30,6 +30,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from .catalog import CatalogRecord, CatalogChange, VariantValues
+    from .tiers import StatusPolicyRecord, TierChange, TierRecord
 
 
 class CatalogRepository(Protocol):
@@ -37,17 +38,49 @@ class CatalogRepository(Protocol):
 
     async def save_variant(self, variant: VariantValues, *, expected_version: int) -> None: ...
 
+    async def delete_variant(self, product_id: UUID, variant_id: str, *, expected_version: int) -> None:
+        """Delete the variant, raising ``StaleVersion`` unless it is still at ``expected_version``."""
+        ...
+
     async def audit(self, change: CatalogChange) -> None: ...
 
     async def changes(self, product_id: UUID) -> Sequence[CatalogChange]:
         """The Product's Catalog audit entries, oldest first."""
         ...
 
-    async def lock(self, product_id: UUID) -> None: ...
+    async def lock(self, product_id: UUID) -> None:
+        """Serialize the Product's Catalog and Tier writes until the transaction ends (the Product row lock)."""
+        ...
 
     async def list(self, product_id: UUID) -> Sequence[CatalogRecord]: ...
 
     async def save(self, record: CatalogRecord, *, expected_version: int) -> None: ...
+
+
+class TiersRepository(Protocol):
+    """A Product's Tiers and status policy. Their variants live in ``CatalogRepository``."""
+
+    async def list(self, product_id: UUID) -> Sequence[TierRecord]: ...
+
+    async def save(self, tier: TierRecord, *, expected_version: int) -> None:
+        """Insert (``expected_version`` 0) or replace the Tier, raising ``StaleVersion`` on another version."""
+        ...
+
+    async def delete(self, product_id: UUID, tier_id: str, *, expected_version: int) -> None: ...
+
+    async def in_use(self, product_id: UUID, tier_id: str) -> bool:
+        """Whether an Organization uses one of the Tier's variants, which then cannot be deleted (ADR-0008)."""
+        ...
+
+    async def policy(self, product_id: UUID) -> StatusPolicyRecord | None: ...
+
+    async def save_policy(self, policy: StatusPolicyRecord, *, expected_version: int) -> None: ...
+
+    async def audit(self, change: TierChange) -> None: ...
+
+    async def changes(self, product_id: UUID) -> Sequence[TierChange]:
+        """The Product's Tier audit entries, oldest first."""
+        ...
 
 
 def ensure_bound_workspace(bound: UUID | None, record_workspace: UUID) -> None:
@@ -233,6 +266,7 @@ class Repositories:
     sessions: SessionsRepository
     sign_in_flows: SignInFlowsRepository
     catalog: CatalogRepository
+    tiers: TiersRepository
     directory: DirectoryRepository
     invitations: InvitationsRepository
     settings_changes: SettingsChangesRepository

@@ -85,7 +85,16 @@ async def test_required_privilege_and_variant_values_commit_together(store):
     product = ws.products[0].id
     async with store.transaction(ws.id) as repos:
         await repos.catalog.save_variant(
-            VariantValues(workspace_id=ws.id, product_id=product, id="standard", name="Standard", values={}, version=1),
+            VariantValues(
+                workspace_id=ws.id,
+                product_id=product,
+                id="standard",
+                tier_id="basic",
+                kind="standard",
+                name="Standard",
+                values={},
+                version=1,
+            ),
             expected_version=0,
         )
     required = BooleanPrivilege(key="required", title="Required")
@@ -150,6 +159,8 @@ async def _two_variants(store, values=None):
                     workspace_id=ws.id,
                     product_id=product,
                     id=variant,
+                    tier_id=variant,
+                    kind="standard",
                     name=variant.title(),
                     values=dict((values or {}).get(variant, {})),
                     version=1,

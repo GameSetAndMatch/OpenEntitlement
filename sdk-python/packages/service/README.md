@@ -140,3 +140,30 @@ per Product (`changes`); the filtered audit view is OPE-43.
 Run `uv run pytest -q tests/service/test_catalog_service.py tests/service/test_http_catalog.py`
 from `sdk-python` for the shared memory/Postgres behavior tests. Set `OE_PG_DSN` for Postgres.
 `npm run test:python-service` from `console` exercises real sign-in and the Catalog in Chromium.
+
+### Tiers (OPE-40)
+
+Under `/api/workspaces/{workspace_id}/products/{product_id}`:
+
+| Route | Does |
+|---|---|
+| `GET /tiers` | The Product's Tiers by rank, their `variants` (with `tierId` and `kind`) and the status `policy` with its `policyVersion` (0 until first saved) |
+| `POST /tiers` | `{tier: {id, name, rank?}, standard: {id, name, values}}` creates the Tier and its standard variant in one transaction. `rank` defaults to one above the highest |
+| `PATCH /tiers/{tier}` | `{name, rank, gracePeriodDays, version}`: rename, rank, and past-due grace days (0–365). The ID never changes |
+| `POST /tiers/{tier}/archive` · `…/restore` | `{version}` |
+| `DELETE /tiers/{tier}?version=` | Deletes an unused Tier with its variants: [`tier-in-use`](https://openentitlement.dev/problems/tier-in-use/) when Organizations or the status policy use it |
+| `PUT /tiers/{tier}/variants/{variant}` | `{name, kind, values, version}`: version `0` creates. A variant's Tier and purpose (`standard`, `trial`, `grace`) never change; a Tier has one variant per purpose |
+| `PUT /status-policy` | `{pastDue, ended, version}`, each `{action: "readOnly"}` or `{action: "fallback", variantId}` |
+
+Managers of the Product edit; its Users read. Every write takes the Catalog's Product row lock,
+then reads the Catalog in the same transaction, so a Privilege without a default and a new Tier
+variant never both commit without the variant's value. Values use only the Product's Privileges
+and the same type and bound rules as Catalog defaults. A Read-only Privilege uses its Catalog
+default: a variant cannot set or change its value; a stored value is kept unchanged with no
+effect (the OPE-39 policy). Archived Tiers keep their variants, are never upgrade candidates
+(`services/tiers.upgrade_candidates`, spec §3.4) and cannot be a status-policy fallback; they can
+be restored. Until Organizations arrive (OPE-41), no Tier counts as used. Writes record the real
+Account, Product, target and before/after state (`tier_changes`); the filtered audit view is OPE-43.
+
+`npm run test:python-service` from `console` runs guided creation, trial and grace, grace days,
+the status policy and archive/restore in Chromium against the service.
