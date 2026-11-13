@@ -13,6 +13,11 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.36",
   "asyncpg>=0.30",
   "alembic>=1.14",
+  # The console's OIDC client: Authlib's ID token claim rules, joserfc signatures, httpx requests.
+  "authlib>=1.9",
+  "joserfc>=1.8",
+  "httpx>=0.28",
+  "pydantic>=2.12",
 ]
 
 [project.scripts]

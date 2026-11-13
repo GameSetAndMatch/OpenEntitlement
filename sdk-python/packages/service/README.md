@@ -30,18 +30,44 @@ OE_IN_MEMORY=true uv run openentitlement-service   # to try it out: data is lost
 | `PORT` | `8787` | Listening port. |
 | `OE_HOST` | `127.0.0.1` | Listening address. |
 | `OE_CONSOLE_DIR` | `console/web/dist` in a checkout, when built | The built React console (`npm run build` in `console/`). Without it, only the API is served. |
+| `OE_OIDC_ISSUER` | none | The OpenID Connect issuer people sign in with. Without it, nobody can sign in (`/auth/login` answers `service-unavailable`). |
+| `OE_APP_URL` | none | The console's origin, required with `OE_OIDC_ISSUER`, for example `https://console.example.com`. Register `OE_APP_URL/auth/callback` as the client's redirect URI. |
+| `OE_OIDC_CLIENT_ID` | `openentitlement` | The OIDC client ID. |
+| `OE_OIDC_CLIENT_SECRET` | none | The client secret, sent with HTTP Basic authentication. Without it the client is public (PKCE only). |
+| `OE_OIDC_LOCAL_HTTP` | `false` | `true` allows plain HTTP for the issuer and app URL on loopback only, for local development. Otherwise both must be HTTPS. |
+| `OE_PLATFORM_ADMIN_SUBJECT` | none | The OIDC subject that becomes a Platform administrator when it signs in. |
+| `OE_SIGNUP_DOMAINS` | all | Comma-separated email domains allowed to sign in. |
 
 `GET /healthz` answers `{"status": "ok"}`, or the [`service-unavailable`](https://openentitlement.dev/problems/service-unavailable/) problem when the database cannot be reached.
 
 The container image builds the console and the service: from the repository root, `docker build -f service.Dockerfile .`.
 
-## Errors
+For local sign-in, start the development issuer from `console/` (`OE_APP_URL=http://localhost:8787 npm run dev:issuer`) and run the service with `OE_OIDC_ISSUER=http://localhost:18790 OE_APP_URL=http://localhost:8787 OE_OIDC_LOCAL_HTTP=true OE_PLATFORM_ADMIN_SUBJECT=local-admin`. Sign in as `local-admin` or `local-user` with any password.
+
+## Sign-in and authorization
+
+`GET /auth/login` starts the OpenID Connect authorization code flow with PKCE (S256), state and nonce; `GET /auth/callback` verifies the ID token (signature from the issuer's keys, issuer, audience, expiry, nonce) and the UserInfo email, which must be verified, then sets the `oe_session` cookie (HttpOnly, SameSite=Lax, Secure over HTTPS, 12 hours) and returns to `/app/`. `POST /auth/logout` ends the session. Sign-in flows and sessions are stored as SHA-256 hashes only.
+
+Every `/api/` route needs the session. A request that changes something must also send the console's `Origin` and the session's CSRF token in `X-OE-CSRF`; `GET /api/session` returns that token with the Account.
+
+Routes take `CurrentAccount` (the signed-in Account) or `WorkspaceAccess` (one transaction in the Workspace of the path, opened as that Account). A non-member gets `not-found`. The service layer then asks the `Actor` for each operation (`services/access.py`): Owners and Platform administrators may do everything, a Product's Manager edits it, its User reads it. A Product where the Actor has no Role is `not-found`; a visible one the Role cannot change is `permission-denied`.
+
+| Route | Who |
+|---|---|
+| `GET /api/workspaces` · `POST /api/workspaces` | Any signed-in Account: list your Workspaces (every one for a Platform administrator) or create one, which starts with one Product and makes you its Owner |
+| `GET /api/workspaces/{id}` · `GET …/products` · `GET …/products/{product}` | Members, with the Products where they have a Role |
+| `POST …/products` · `PATCH …/products/{product}` · `POST …/products/{product}/archive` · `…/restore` · `DELETE …/products/{product}?version=` | Owners: create, rename, archive, restore and delete Products. Changes name the version they were made from (`revision-conflict` otherwise); a Product's ID and key never change; a used Product or the last one cannot be deleted |
+
 
 Every error is a typed exception in `services/problems.py` with a stable `type` URI, a status, a title and parameters. One handler (`interfaces/http/problems.py`) renders it as `application/problem+json` (RFC 9457). An HTTP error raised by the framework itself that no problem type describes (for example 413) becomes RFC 9457's untyped `about:blank` problem. Anything else becomes a generic [`internal-error`](https://openentitlement.dev/problems/internal-error/) and is logged, never returned. A new problem type needs a page in `website/src/content/docs/problems/`.
+
+Product deletions serialize within their Workspace before checking the remaining count, so concurrent deletions cannot remove its last Product. Edits to different Products remain independent.
 
 ## Data and row-level security
 
 Each table is a SQLAlchemy Core `Table` in `repositories/postgres/tables.py`. Each record has its own `version` for optimistic concurrency.
+
+Accounts, sessions and sign-in flows belong to no Workspace and have no row-level security. `Store.transaction(account_id=…)` binds an Account in `openentitlement.account_id`, which only lets it read its own memberships and the Workspaces they belong to (every Workspace for a Platform administrator): the Workspace switcher. Writes stay bound to the transaction's Workspace.
 
 `Store.transaction(workspace_id)` opens one transaction bound to one Workspace; on the HTTP API a route takes `repos: WorkspaceTransaction` to get one per request. It commits when the route returns and rolls back when it raises, both before the response is sent, so a failed COMMIT becomes an `internal-error` problem rather than a success. A duplicate unique key raises `AlreadyExists` from either implementation. On Postgres it switches to the `openentitlement_service` role (created by the first migration, never allowed to bypass row-level security) and sets `openentitlement.workspace_id`. Every Workspace table has a forced row-level security policy on that setting, so even a raw SQL query in the transaction sees and writes only that Workspace's rows.
 

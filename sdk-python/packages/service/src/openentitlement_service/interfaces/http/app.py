@@ -3,21 +3,29 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from starlette.types import Receive, Scope, Send
 
 from ...services.problems import NotFound
 from ...services.repositories import Store
-from . import problems
+from ...services.sign_in import SignInPolicy, SignInService
+from ...services.workspaces import WorkspaceService, utcnow
+from . import auth, problems, workspaces
+from .oidc import OidcClient
 
 
 def create_app(
     store: Store,
     *,
     console_dir: Path | None = None,
+    sign_in: auth.SignInSettings | None = None,
+    oidc_transport: httpx.AsyncBaseTransport | None = None,
+    clock: Callable[[], datetime] = utcnow,
     on_startup: Callable[[], Awaitable[None]] | None = None,
     on_shutdown: Callable[[], Awaitable[None]] | None = None,
 ) -> FastAPI:
@@ -34,6 +42,15 @@ def create_app(
     app = FastAPI(title="OpenEntitlement", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
     problems.install(app)
     app.state.store = store
+    app.state.workspaces = WorkspaceService(store, clock=clock)
+    # Without sign-in settings nobody can sign in; the policy then only names a placeholder issuer.
+    policy = sign_in.policy() if sign_in else SignInPolicy(issuer="")
+    app.state.authentication = auth.Authentication(
+        service=SignInService(store, policy, clock=clock),
+        oidc=OidcClient(sign_in.oidc, transport=oidc_transport) if sign_in else None,
+    )
+    app.include_router(auth.router)
+    app.include_router(workspaces.router)
 
     @app.get("/healthz", tags=["health"])
     async def health() -> dict[str, str]:
@@ -45,7 +62,7 @@ def create_app(
     return app
 
 
-API_PREFIXES = ("api", "oerep", "mcp", "healthz")
+API_PREFIXES = ("api", "auth", "oerep", "mcp", "healthz")
 
 
 def _serve_console(app: FastAPI, root: Path) -> None:

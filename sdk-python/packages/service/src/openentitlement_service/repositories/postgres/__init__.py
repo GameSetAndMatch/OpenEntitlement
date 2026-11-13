@@ -2,31 +2,47 @@
 
 Every transaction switches to the ``openentitlement_service`` role, which never bypasses
 row-level security, and binds the Workspace in ``openentitlement.workspace_id``. Postgres then
-filters every query, including raw SQL, to that Workspace.
+filters every query, including raw SQL, to that Workspace. A transaction may also bind an Account
+in ``openentitlement.account_id``, which only adds read access to that Account's memberships and
+their Workspaces (the Workspace switcher). Accounts, sessions and sign-in flows belong to no
+Workspace and have no row-level security.
 """
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
-from typing import Any
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import ColumnElement, Text, and_, cast, func, select, text
+from sqlalchemy.dialects.postgresql import aggregate_order_by
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
-from ...services.models import Product, Workspace
+from ...services.models import (
+    Account,
+    Member,
+    Product,
+    ProductMembership,
+    Session,
+    SignInFlow,
+    Workspace,
+    WorkspaceMembership,
+)
 from ...services.problems import ServiceUnavailable
-from ...services.repositories import AlreadyExists, Repositories, ensure_bound_workspace
+from ...services.repositories import AlreadyExists, Repositories, StaleVersion, ensure_bound_workspace
 from .migrate import migrate
-from .rls import SERVICE_ROLE, WORKSPACE_SETTING
-from .tables import products, workspaces
+from .rls import ACCOUNT_SETTING, SERVICE_ROLE, WORKSPACE_SETTING
+from .tables import accounts, members, product_roles, products, sessions, sign_in_flows, workspaces
 
 
 UNIQUE_VIOLATION = "23505"
+FOREIGN_KEY_VIOLATION = "23503"
 
 __all__ = ["PostgresStore", "create_engine", "migrate", "asyncpg_url", "SERVICE_ROLE", "WORKSPACE_SETTING"]
 
@@ -63,7 +79,7 @@ async def _insert(connection: AsyncConnection, statement: Insert) -> None:
 
 
 class PostgresWorkspacesRepository:
-    def __init__(self, connection: AsyncConnection, workspace_id: UUID) -> None:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
         self.connection, self._workspace_id = connection, workspace_id
 
     async def add(self, workspace: Workspace) -> None:
@@ -71,12 +87,19 @@ class PostgresWorkspacesRepository:
         await _insert(self.connection, workspaces.insert().values(**workspace.model_dump(by_alias=False)))
 
     async def get(self) -> Workspace | None:
-        row = (await self.connection.execute(select(workspaces))).mappings().first()
+        query = select(workspaces).where(workspaces.c.id == self._workspace_id)
+        row = (await self.connection.execute(query)).mappings().first()
         return Workspace.model_validate(dict(row)) if row else None
 
 
 class PostgresProductsRepository:
-    def __init__(self, connection: AsyncConnection, workspace_id: UUID) -> None:
+    async def lock_deletion(self) -> None:
+        # Lock only lifecycle deletions; edits to different Products remain independent.
+        await self.connection.execute(
+            select(workspaces.c.id).where(workspaces.c.id == self._workspace_id).with_for_update()
+        )
+
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
         self.connection, self._workspace_id = connection, workspace_id
 
     async def add(self, product: Product) -> None:
@@ -84,8 +107,163 @@ class PostgresProductsRepository:
         await _insert(self.connection, products.insert().values(**product.model_dump(by_alias=False)))
 
     async def list(self) -> Sequence[Product]:
-        rows = (await self.connection.execute(select(products).order_by(products.c.key))).mappings()
-        return [Product.model_validate(dict(row)) for row in rows]
+        query = select(products).where(products.c.workspace_id == self._workspace_id).order_by(products.c.key)
+        return [Product.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
+
+    async def get(self, product_id: UUID) -> Product | None:
+        query = select(products).where(products.c.workspace_id == self._workspace_id, products.c.id == product_id)
+        row = (await self.connection.execute(query)).mappings().first()
+        return Product.model_validate(dict(row)) if row else None
+
+    def _current(self, product_id: UUID, expected_version: int) -> ColumnElement[bool]:
+        return and_(
+            products.c.workspace_id == self._workspace_id,
+            products.c.id == product_id,
+            products.c.version == expected_version,
+        )
+
+    async def update(self, product: Product, *, expected_version: int) -> None:
+        ensure_bound_workspace(self._workspace_id, product.workspace_id)
+        statement = (
+            products.update()
+            .where(self._current(product.id, expected_version))
+            .values(name=product.name, archived_at=product.archived_at, version=product.version)
+        )
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(f"product {product.id}")
+
+    async def delete(self, product_id: UUID, *, expected_version: int) -> None:
+        statement = products.delete().where(self._current(product_id, expected_version))
+        if (await self.connection.execute(statement)).rowcount != 1:
+            raise StaleVersion(f"product {product_id}")
+
+    async def in_use(self, product_id: UUID) -> bool:
+        # Organizations and their Tier variants arrive with OPE-41; until then no Organization uses a Product.
+        return False
+
+
+class PostgresMembersRepository:
+    def __init__(self, connection: AsyncConnection, workspace_id: UUID | None) -> None:
+        self.connection, self._workspace_id = connection, workspace_id
+
+    async def add(self, member: Member) -> None:
+        ensure_bound_workspace(self._workspace_id, member.workspace_id)
+        await _insert(self.connection, members.insert().values(**member.model_dump(by_alias=False)))
+
+    async def get(self, account_id: UUID) -> Member | None:
+        query = select(members).where(members.c.workspace_id == self._workspace_id, members.c.account_id == account_id)
+        row = (await self.connection.execute(query)).mappings().first()
+        return Member.model_validate(dict(row)) if row else None
+
+    async def set_product_role(self, membership: ProductMembership) -> None:
+        ensure_bound_workspace(self._workspace_id, membership.workspace_id)
+        values = membership.model_dump(by_alias=False) | {"role": membership.role.value}
+        statement = pg_insert(product_roles).values(**values)
+        statement = statement.on_conflict_do_update(
+            index_elements=[product_roles.c.product_id, product_roles.c.account_id],
+            set_={"role": statement.excluded.role},
+        )
+        try:
+            await self.connection.execute(statement)
+        except IntegrityError as exc:
+            if getattr(exc.orig, "sqlstate", None) == FOREIGN_KEY_VIOLATION:
+                raise LookupError("unknown Product or member") from exc
+            raise
+
+    async def product_roles(self, account_id: UUID) -> Sequence[ProductMembership]:
+        query = (
+            select(product_roles)
+            .where(product_roles.c.workspace_id == self._workspace_id, product_roles.c.account_id == account_id)
+            .order_by(cast(product_roles.c.product_id, Text))
+        )
+        return [ProductMembership.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
+
+
+class PostgresAccountsRepository:
+    def __init__(self, connection: AsyncConnection) -> None:
+        self.connection = connection
+
+    async def sign_in(self, account: Account) -> Account:
+        insert = pg_insert(accounts).values(**account.model_dump(by_alias=False))
+        statement = insert.on_conflict_do_update(
+            index_elements=[accounts.c.issuer, accounts.c.subject],
+            set_={
+                "email": insert.excluded.email,
+                "platform_admin": accounts.c.platform_admin.op("or")(insert.excluded.platform_admin),
+            },
+        ).returning(*accounts.c)
+        row = (await self.connection.execute(statement)).mappings().one()
+        return Account.model_validate(dict(row))
+
+    async def get(self, account_id: UUID) -> Account | None:
+        row = (await self.connection.execute(select(accounts).where(accounts.c.id == account_id))).mappings().first()
+        return Account.model_validate(dict(row)) if row else None
+
+
+class PostgresSessionsRepository:
+    def __init__(self, connection: AsyncConnection) -> None:
+        self.connection = connection
+
+    async def add(self, session: Session) -> None:
+        await _insert(self.connection, sessions.insert().values(**session.model_dump(by_alias=False)))
+
+    async def get(self, token_hash: str, *, now: datetime) -> Session | None:
+        query = select(sessions).where(sessions.c.token_hash == token_hash, sessions.c.expires_at > now)
+        row = (await self.connection.execute(query)).mappings().first()
+        return Session.model_validate(dict(row)) if row else None
+
+    async def delete(self, token_hash: str) -> None:
+        await self.connection.execute(sessions.delete().where(sessions.c.token_hash == token_hash))
+
+
+class PostgresSignInFlowsRepository:
+    def __init__(self, connection: AsyncConnection) -> None:
+        self.connection = connection
+
+    async def add(self, flow: SignInFlow, *, now: datetime) -> None:
+        await self.connection.execute(sign_in_flows.delete().where(sign_in_flows.c.expires_at <= now))
+        await _insert(self.connection, sign_in_flows.insert().values(**flow.model_dump(by_alias=False)))
+
+    async def take(self, flow_hash: str, *, now: datetime) -> SignInFlow | None:
+        statement = sign_in_flows.delete().where(sign_in_flows.c.flow_hash == flow_hash).returning(*sign_in_flows.c)
+        row = (await self.connection.execute(statement)).mappings().first()
+        if row is None or row["expires_at"] <= now:
+            return None
+        return SignInFlow.model_validate(dict(row))
+
+
+class PostgresDirectoryRepository:
+    """Reads across Workspaces, limited by row-level security to the transaction's Account."""
+
+    def __init__(self, connection: AsyncConnection, account_id: UUID | None) -> None:
+        self.connection, self._account_id = connection, account_id
+
+    async def memberships(self) -> Sequence[WorkspaceMembership]:
+        if self._account_id is None:
+            return []
+        roles = (
+            select(func.array_agg(aggregate_order_by(product_roles.c.role.distinct(), product_roles.c.role)))
+            .where(product_roles.c.workspace_id == members.c.workspace_id, product_roles.c.account_id == members.c.account_id)
+            .scalar_subquery()
+        )
+        query = (
+            select(workspaces, members.c.owner, roles.label("roles"))
+            .join(members, members.c.workspace_id == workspaces.c.id)
+            .where(members.c.account_id == self._account_id)
+            .order_by(workspaces.c.name, cast(workspaces.c.id, Text))
+        )
+        found = []
+        for row in (await self.connection.execute(query)).mappings():
+            workspace = Workspace.model_validate({c.name: row[c.name] for c in workspaces.c})
+            found.append(WorkspaceMembership(workspace=workspace, owner=row["owner"], roles=tuple(row["roles"] or ())))
+        return found
+
+    async def every_workspace(self) -> Sequence[Workspace]:
+        if self._account_id is None:
+            return []
+        admin = select(accounts.c.platform_admin).where(accounts.c.id == self._account_id).scalar_subquery()
+        query = select(workspaces).where(func.coalesce(admin, False)).order_by(workspaces.c.name, cast(workspaces.c.id, Text))
+        return [Workspace.model_validate(dict(row)) for row in (await self.connection.execute(query)).mappings()]
 
 
 @dataclass(frozen=True)
@@ -100,16 +278,28 @@ class PostgresStore:
         self.engine = engine
 
     @asynccontextmanager
-    async def transaction(self, workspace_id: UUID) -> AsyncIterator[Repositories]:
+    async def transaction(
+        self, workspace_id: UUID | None = None, *, account_id: UUID | None = None
+    ) -> AsyncIterator[Repositories]:
         async with self.engine.begin() as connection:
             await connection.execute(text(f"set local role {SERVICE_ROLE}"))
             await connection.execute(
-                text("select set_config(:setting, :workspace, true)"),
-                {"setting": WORKSPACE_SETTING, "workspace": str(workspace_id)},
+                text("select set_config(:w, :workspace, true), set_config(:a, :account, true)"),
+                {
+                    "w": WORKSPACE_SETTING,
+                    "workspace": str(workspace_id or ""),
+                    "a": ACCOUNT_SETTING,
+                    "account": str(account_id or ""),
+                },
             )
             yield PostgresRepositories(
                 workspaces=PostgresWorkspacesRepository(connection, workspace_id),
                 products=PostgresProductsRepository(connection, workspace_id),
+                members=PostgresMembersRepository(connection, workspace_id),
+                accounts=PostgresAccountsRepository(connection),
+                sessions=PostgresSessionsRepository(connection),
+                sign_in_flows=PostgresSignInFlowsRepository(connection),
+                directory=PostgresDirectoryRepository(connection, account_id),
                 connection=connection,
             )
 
