@@ -31,7 +31,7 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
  assert.equal(await page.locator('#error-stack').isVisible(),false);
  for(const width of [1280,390,360]){
   await page.setViewportSize({width,height:900});
-  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator','read-only-keeps-catalog-default','read-only-without-default','required-variant-values']){
+  for(const story of ['key-from-title','negative-integer','enum-choices','overlong-pasted-choice','boolean-for-administrator','read-only-keeps-catalog-default','read-only-without-default','require-value-in-existing-variants']){
    await page.goto(`${origin}/iframe.html?id=privilege-catalog-privilege-form--${story}&viewMode=story`);
    await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000}).catch(()=>{throw new Error(`Story privilege-form--${story} did not finish its play function at ${width}px`);});
    await assertFormLayout(page);
@@ -60,7 +60,17 @@ try{browser=await chromium.launch();const page=await browser.newPage();const fai
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`A long workspace name widens the page at ${width}px`);
  }
  await page.setViewportSize({width:1280,height:720});
- for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});await page.getByRole('row',{name:/AI tokens.*2050.*SUBJECT_GRANT/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
+ for(const story of ['personal-allowance','cloud-pro']){await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--${story}&viewMode=story`);await page.getByRole('heading',{name:'User entitlements',exact:true}).waitFor();if(story==='personal-allowance'){try{await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});await page.getByRole('row',{name:/AI tokens.*2050.*Organization terms 2000 \+ Grant 50/}).waitFor({timeout:10000});}catch(e){console.error(await page.locator('body').innerText());throw e;}}else await page.getByRole('note').waitFor();assert.equal(await page.locator('#error-stack').isVisible(),false);}
+ for(const width of [360,390,1280]){
+  await page.setViewportSize({width,height:900});
+  await page.goto(`${origin}/iframe.html?id=organizations-user-entitlements--personal-allowance&viewMode=story`);
+  await page.locator('#storybook-root[data-play-complete="true"]').waitFor({timeout:20000});
+  const calculation=page.getByText('Organization terms 2000 + Grant 50',{exact:true});
+  await calculation.waitFor();
+  const lines=await calculation.evaluate(el=>{const range=document.createRange();range.selectNodeContents(el);return new Set(Array.from(range.getClientRects(),rect=>rect.y)).size;});
+  assert.equal(lines,1,`Grant calculation must stay on one line at ${width}px`);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Grant calculation must not widen the page at ${width}px`);
+ }
  for(const story of ['inline-labels','save-failure']){await page.goto(`${origin}/iframe.html?id=catalog-privilege-tags--${story}&viewMode=story`);if(story==='inline-labels'){await page.getByRole('button',{name:'Remove tag Operations'}).waitFor();await page.waitForFunction(()=>!document.querySelector('details').open);}else{await page.getByRole('alert').waitFor();}assert.equal(await page.locator('#error-stack').isVisible(),false);}
  assert.deepEqual(failures,[]);console.log('Compiled Storybook stories rendered successfully in Chromium');
 }finally{await browser?.close();await new Promise(ok=>server.close(ok));}

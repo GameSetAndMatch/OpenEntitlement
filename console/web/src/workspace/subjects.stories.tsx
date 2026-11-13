@@ -109,7 +109,7 @@ export const PersonalAllowance: Story = {
       c.getByRole("button", { name: "Save user entitlements" }),
     );
     await expect(
-      c.getByRole("row", { name: /AI tokens.*2050.*SUBJECT_GRANT/ }),
+      c.getByRole("row", { name: /AI tokens.*2050.*Organization terms 2000 \+ Grant 50/ }),
     ).toBeVisible();
     canvasElement.dataset.playComplete = "true";
   },

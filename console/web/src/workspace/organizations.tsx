@@ -5,6 +5,7 @@ import {EffectiveEntitlements, SubjectEntitlements} from "./subjects.tsx";
 import { ValuesEditor } from "./fields.tsx";
 import { FormField } from "../form.tsx";
 import { identifierFromTitle } from "./identifier.ts";
+import { useUnsavedChanges } from "./unsaved.ts";
 export function Organizations({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:Save;canEdit:boolean;busy:boolean}){
   // An archived Tier keeps its Organizations but is given to no other one (ADR-0008).
   const archived=(tierId:string)=>Boolean((w.data.tiers.find(t=>t.id===tierId) as {archivedAt?:string}|undefined)?.archivedAt);
@@ -15,6 +16,10 @@ export function Organizations({workspace:w,save,canEdit,busy}:{workspace:Workspa
   const [saved,setSaved]=useState<Organization>();
   const assignable=offered(saved?.variantId).length>0;
   const assigned=w.data.variants.find(v=>v.id===draft.variantId);
+  useUnsavedChanges(show,draft);
+  // Organization terms belong to the Tier variant. Choosing another variant clears them on save; choosing the saved one again restores them.
+  const cleared=saved&&draft.variantId!==saved.variantId?Object.keys(saved.terms).map(key=>w.data.privileges.find(p=>p.key===key)?.name??key):[];
+  function changeVariant(variantId:string){setDraft({...draft,variantId,terms:saved&&variantId===saved.variantId?structuredClone(saved.terms):{}});}
   const selectedOrg=w.data.organizations.find(o=>o.id===selected);
   // Organizations are Workspace-wide: their names stay listed in a Product without Tiers.
   if(!w.data.variants.length&&!w.data.organizations.length)return <section className="panel empty-workspace"><h2>Create a tier variant first</h2><p>Then assign that offer to your first Organization.</p><a className="btn primary" href="#tiers">Go to Tiers</a></section>;
@@ -23,23 +28,23 @@ export function Organizations({workspace:w,save,canEdit,busy}:{workspace:Workspa
   function edit(o:Organization){const current=structuredClone(o);if(!current.variantId)current.variantId=offered()[0]?.id??"";setDraft(current);setSaved(o.variantId?o:undefined);setEditing(true);setShow(true);}
   return <>{canEdit&&w.data.organizations.length>0&&!show&&!userForm&&<div className="workspace-actions"><button className="btn primary" onClick={add}>Add organization</button></div>}
     {show&&canEdit&&<form className="panel form" onSubmit={e=>{e.preventDefault();void save("organizations",draft,editing?"Update Organization terms":"Assign Organization tier").then(ok=>{if(ok){setShow(false);setSelected(draft.id);}});}}>
-      <div className="form-header"><h2>{editing?`Edit ${draft.name}`:"Add an Organization"}</h2><p>An Organization is one of your customers. It gets a tier variant, and its own terms replace only the values that differ.</p></div>
+      <div className="form-header"><h2>{editing?`Edit ${draft.name}`:"Add an Organization"}</h2><p>An Organization is one of your customers. It gets a tier variant, and its Organization terms replace only the values that differ.</p></div>
       <fieldset className="form-section"><legend>Organization</legend>
         <div className="form-grid">
           <FormField label="Name"><input required value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value,...(editing||idEdited?{}:{id:identifierFromTitle(e.target.value,"org")})})}/></FormField>
           <FormField label="ID" hint={editing?"Your application sends this ID. It cannot change.":"Filled from the name. Your application sends this ID, and it cannot change after saving."}><input className="mono" required disabled={editing} pattern="[a-z][a-z0-9_]*" maxLength={80} value={draft.id} onChange={e=>{setIdEdited(e.target.value!=="");setDraft({...draft,id:e.target.value});}}/></FormField>
-          {assignable&&<><FormField label="Tier variant" hint={editing&&saved?"Changing it clears this Organization's terms below. Switching back before saving keeps them.":undefined}><select value={draft.variantId} onChange={e=>setDraft({...draft,variantId:e.target.value,terms:saved&&e.target.value===saved.variantId?structuredClone(saved.terms):{}})}>{offered(saved?.variantId).map(v=><option value={v.id} key={v.id}>{v.name}</option>)}</select></FormField>
+          {assignable&&<><FormField label="Tier variant" hint={cleared.length?<span role="status">Saving clears {cleared.length===1?"1 term":`${cleared.length} terms`}: {cleared.join(", ")}</span>:editing&&saved?"Organization terms belong to the variant. Choosing another clears them on save.":undefined}><select value={draft.variantId} onChange={e=>changeVariant(e.target.value)}>{offered(saved?.variantId).map(v=><option value={v.id} key={v.id}>{v.name}</option>)}</select></FormField>
           <FormField label="Contract status"><select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value as Organization["status"]})}><option value="active">Active</option><option value="past_due">Past due</option><option value="ended">Ended</option></select></FormField></>}
         </div>
       </fieldset>
       {!assignable&&<p className="section-hint">This Product has no tier yet. The Organization is saved without one; give it a tier once this Product has one.</p>}
-      {assignable&&<fieldset className="form-section"><legend>Own terms <span className="optional">Optional</span></legend>
+      {assignable&&<fieldset className="form-section"><legend>Organization terms <span className="optional">Optional</span></legend>
         <p className="section-hint">Leave a value inherited, or replace it for this Organization only.</p>
         <ValuesEditor definitions={definitions} environment={w.environment} frozenFeatures={w.data.features.filter(f=>f.frozen).map(f=>f.id)} base={assigned?.values??{}} values={draft.terms} onChange={terms=>setDraft({...draft,terms})}/>
       </fieldset>}
-      <div className="form-actions"><button type="button" className="btn" onClick={()=>setShow(false)}>Cancel</button><button className="btn primary" disabled={busy}>Save organization</button></div>
+      <div className="form-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setShow(false)}>Cancel</button><button className="btn primary" disabled={busy}>Save organization</button></div>
     </form>}
-    {!w.data.organizations.length&&!show&&<section className="panel empty-workspace"><h2>Add your first customer</h2><p>An Organization gets a tier variant. Its own terms replace only the values that differ.</p>{canEdit&&<button className="btn primary" onClick={add}>Add organization</button>}</section>}
+    {!w.data.organizations.length&&!show&&<section className="panel empty-workspace"><h2>Add your first customer</h2><p>An Organization gets a tier variant. Its Organization terms replace only the values that differ.</p>{canEdit&&<button className="btn primary" onClick={add}>Add organization</button>}</section>}
     {!show&&!userForm&&<div className="workspace-list">{w.data.organizations.map(o=><button className="workspace-card" key={o.id} aria-pressed={selected===o.id} onClick={()=>setSelected(o.id)}><strong>{o.name}</strong><small>{o.variantId?<>{w.data.variants.find(v=>v.id===o.variantId)?.name} · {o.status==="past_due"?"Past due":o.status==="ended"?"Ended":"Active"}</>:"No tier in this Product"}</small></button>)}</div>}
     {!show&&!userForm&&selectedOrg&&<section className="panel overflow"><div className="section-title"><h2>{selectedOrg.name}</h2>{canEdit&&<button className="btn" onClick={()=>edit(selectedOrg)}>Edit organization</button>}</div>{selectedOrg.variantId?<EffectiveEntitlements workspace={w} organizationId={selectedOrg.id}/>:<p>This Organization has no tier in this Product yet.</p>}</section>}
     {!show&&selectedOrg&&selectedOrg.variantId&&<SubjectEntitlements key={selectedOrg.id} workspace={w} organizationId={selectedOrg.id} save={save} canEdit={canEdit} busy={busy} onFormChange={setUserForm}/>}

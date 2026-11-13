@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useUnsavedChanges} from "./unsaved.ts";
 import type {Workspace,Save} from "./app.tsx";
 import type {Tier,Variant} from "../../../server/workspace/model.ts";
 import {ValuesEditor} from "./fields.tsx";
@@ -13,12 +14,16 @@ import {useConfirm} from "../ui.tsx";
 
 const purpose=(kind:Variant["kind"])=>kind==="grace"?"Grace period":kind==="trial"?"Trial":"Standard";
 
-export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:Save;canEdit:boolean;busy:boolean}){
+/** `leave` runs an action that replaces the page's forms (the status policy) once the person agrees to discard their changes. */
+export function Tiers({workspace:w,save,canEdit,busy,leave}:{workspace:Workspace;save:Save;canEdit:boolean;busy:boolean;leave:(go:()=>void)=>void}){
   const [tier,setTier]=useState<Tier>(),[editingTier,setEditingTier]=useState(false),[tierIdEdited,setTierIdEdited]=useState(false);
   const [variant,setVariant]=useState<Variant>(),[editingVariant,setEditingVariant]=useState(false),[variantIdEdited,setVariantIdEdited]=useState(false);
   // Creating a tier is a guided flow: values, review, then an offer to add a trial and a grace period.
   const [creating,setCreating]=useState(false),[created,setCreated]=useState<string>(),[graceDays,setGraceDays]=useState(7);
   const open=Boolean(tier||variant||creating||created);
+  useUnsavedChanges(Boolean(tier),tier);
+  // A new grace variant also sets its tier's grace days, so they belong to the form's changes.
+  useUnsavedChanges(Boolean(variant),{variant,graceDays:!editingVariant&&variant?.kind==="grace"?graceDays:undefined});
   // The "is ready" step replaces the form; move focus to it when it appears and when a variant form returns to it.
   const nextHeading=useRef<HTMLHeadingElement>(null);
   useEffect(()=>{if(created&&!variant)nextHeading.current?.focus();},[created,variant]);
@@ -54,7 +59,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
       </div>
     </fieldset>
     {editingTier&&lifecycle&&(()=>{const stored=tiers.find(t=>t.id===tier.id);return stored&&<TierAvailability tier={stored} busy={busy} onArchive={()=>void changeAvailability("tier-archive",stored)} onRestore={()=>void changeAvailability("tier-restore",stored)} onDelete={()=>void changeAvailability("tier-delete",stored)}/>;})()}
-    <div className="form-actions"><button type="button" className="btn" onClick={()=>setTier(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save tier</button></div>
+    <div className="form-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setTier(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save tier</button></div>
   </form>;
 
   const variantTier=variant&&w.data.tiers.find(t=>t.id===variant.tierId);
@@ -71,11 +76,11 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
     <fieldset className="form-section"><legend>Values</legend>
       <ValuesEditor environment={w.environment} frozenFeatures={w.data.features.filter(f=>f.frozen).map(f=>f.id)} definitions={w.data.privileges.filter(p=>!p.hidden&&!w.data.features.find(f=>f.id===p.featureId)?.hidden)} base={{}} values={variant.values} onChange={values=>setVariant({...variant,values})}/>
     </fieldset>
-    <div className="form-actions"><button type="button" className="btn" onClick={()=>setVariant(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save variant</button></div>
+    <div className="form-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setVariant(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save variant</button></div>
   </form>;
 
   return <>
-    {canEdit&&tiers.length>0&&!open&&<div className="workspace-actions"><button className="btn primary" onClick={newTier}>Create tier</button></div>}
+    {canEdit&&tiers.length>0&&!open&&<div className="workspace-actions"><button className="btn primary" onClick={()=>leave(newTier)}>Create tier</button></div>}
     {creating&&canEdit&&<TierCreate workspace={w} save={save} busy={busy} onCancel={()=>setCreating(false)} onCreated={id=>{setCreating(false);setCreated(id);}}/>}
     {created&&!variant&&(()=>{const t=w.data.tiers.find(x=>x.id===created);if(!t)return null;const has=(k:Variant["kind"])=>w.data.variants.find(v=>v.tierId===t.id&&v.kind===k);
       return <section className="panel form tier-next" aria-labelledby="tier-next-title"><div className="form-header"><h2 id="tier-next-title" ref={nextHeading} tabIndex={-1}>{t.name} is ready</h2><p>Organizations you assign to {t.name} get its standard values. You can also offer a free trial, and keep access for a while when a payment is late.</p></div>
@@ -84,10 +89,10 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
     {tierForm}{variantForm}
     {!tiers.length&&!open&&<section className="panel empty-workspace"><h2>Create your first tier</h2><p>Tiers such as Basic, Pro and Enterprise share the same catalog. Each tier holds one or more variants with its values.</p>{canEdit&&<button className="btn primary" onClick={newTier}>Create tier</button>}</section>}
     {!open&&tiers.map(t=><section className="panel tier-panel" key={t.id}>
-      <div className="section-title"><div><h2>{t.name}</h2>{t.archivedAt&&<p>Archived · current Organizations keep it; new ones can't get it</p>}{showGrace(t.id)&&<p>{t.gracePeriodDays} days of past-due grace{!hasGrace(t.id)&&" · add a grace variant to use them"}</p>}</div>{canEdit&&<button className="btn" onClick={()=>editTier(t)}>Edit tier</button>}</div>
-      {w.data.variants.filter(v=>v.tierId===t.id).map(v=><div className="variant-row" key={v.id}><div><strong>{v.name}</strong><small>{purpose(v.kind)} · {Object.keys(v.values).length} explicit values</small></div>{canEdit&&<button className="btn" onClick={()=>editVariant(v)}>Edit {v.name}</button>}</div>)}
+      <div className="section-title"><div><h2>{t.name}</h2>{t.archivedAt&&<p>Archived · current Organizations keep it; new ones can't get it</p>}{showGrace(t.id)&&<p>{t.gracePeriodDays} days of past-due grace{!hasGrace(t.id)&&" · add a grace variant to use them"}</p>}</div>{canEdit&&<button className="btn" onClick={()=>leave(()=>editTier(t))}>Edit tier</button>}</div>
+      {w.data.variants.filter(v=>v.tierId===t.id).map(v=><div className="variant-row" key={v.id}><div><strong>{v.name}</strong><small>{purpose(v.kind)} · {Object.keys(v.values).length} explicit values</small></div>{canEdit&&<button className="btn" onClick={()=>leave(()=>editVariant(v))}>Edit {v.name}</button>}</div>)}
       {!w.data.variants.some(v=>v.tierId===t.id)&&<p className="empty-note">Add a variant before assigning this tier to an Organization.</p>}
-      {canEdit&&freeKinds(t).length>0&&<div className="panel-footer"><button className="btn-link" onClick={()=>newVariant(t)} aria-label={`Add a variant to ${t.name}`}>+ Add variant</button></div>}
+      {canEdit&&freeKinds(t).length>0&&<div className="panel-footer"><button className="btn-link" onClick={()=>leave(()=>newVariant(t))} aria-label={`Add a variant to ${t.name}`}>+ Add variant</button></div>}
     </section>)}
     {canEdit&&!open&&tiers.length>0&&<div className="settings-page tier-policy"><StatusPolicy key={JSON.stringify(w.data.statusPolicy)} workspace={w} save={save} busy={busy}/></div>}
   </>;

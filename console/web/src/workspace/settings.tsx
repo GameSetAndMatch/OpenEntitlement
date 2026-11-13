@@ -1,4 +1,5 @@
 import { useEffect,useRef,useState } from "react";
+import { trackWrite,useUnsavedChanges } from "./unsaved.ts";
 import { Field,Group,Item,Row } from "./settings-group.tsx";
 import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
 import { stringify } from "yaml";
@@ -11,10 +12,12 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
   const [pending,setPending]=useState(false);const pendingRef=useRef(false);
   // An error belongs to the page it happened on; it does not follow the person to another settings page.
   const sectionGeneration=useRef(0);
-  useEffect(()=>{sectionGeneration.current++;setError("");},[section]);
+  // Leaving a section discards what was typed in it (the console asked first).
+  useEffect(()=>{sectionGeneration.current++;setError("");setEmail("");setName("");},[section]);
   const locked=busy||pending;
   const [hostedTier,setHostedTier]=useState(w.hosting?.tier??"pro");
-  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier]);
+  useEffect(()=>setHostedTier(w.hosting?.tier??"pro"),[w.hosting?.tier,section]);
+  useUnsavedChanges(true,{email,name,hostedTier:hostedTier!==(w.hosting?.tier??"pro")});
   const confirm=useConfirm(),toast=useToast();
   // The Python service has Roles per Product: a Manager of any Product manages its members.
   const python=w.products!==undefined;
@@ -31,7 +34,8 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
   },[base,manager,owner]); // load reads exactly base, manager and owner
   // Settings changes are audited with their actor; only removals ask to confirm.
-  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return false;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return false;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");return true;}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);return false;}finally{pendingRef.current=false;setPending(false);}}
+  // A write already sent may still commit; leaving the section waits for it (see unsaved.ts).
+  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return false;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return false;setError("");const result=await trackWrite(action(""));if(result!=="access-changed")await reload();toast("Changes saved");return true;}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);return false;}finally{pendingRef.current=false;setPending(false);}}
   // Changing your own access reloads your Workspace and Roles instead of this list.
   const afterOwnChange=async(id:string)=>{if(id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed" as const;}};
   const changeRole=(m:ProductMember,change:MemberRoleChange)=>void mutate("Change member role",async()=>{await request(base+"/members/"+m.id,"PUT",change);return afterOwnChange(m.id);});
@@ -71,7 +75,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     {section==="Service"&&<Group description="The OpenEntitlement service this workspace runs on. It is separate from the Tiers you sell to your customers.">
       {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();if(python)saveTier();else void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
         <Row label="Cloud service tier" description="Pro allows one Product. Enterprise allows any number and adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
-        {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
+        {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" disabled={locked} onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
       </form>:<Item label={w.hosting?.mode==="saas"?`Cloud ${w.hosting.tier==="enterprise"?"Enterprise":"Pro"}`:"Self-hosted"} description={w.hosting?.subjectEntitlements?"Entitlements for Organizations and their users.":"Entitlements for Organizations."}/>}
     </Group>}
   </div>;

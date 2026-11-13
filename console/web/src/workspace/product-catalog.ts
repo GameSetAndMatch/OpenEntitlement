@@ -19,8 +19,17 @@ export function tiersData(catalog:ProductCatalog,view:ProductTiers):WorkspaceDat
   variants:view.variants.map(({id,name,tierId,kind,values})=>({id,name,tierId,kind,values})),
   statusPolicy:{past_due:view.policy.pastDue,ended:view.policy.ended}};
 }
-export function catalogEntry(section:string,entry:unknown):{entry:unknown;kind:string;key:string;variantValues?:VariantInputs;expectedVersion?:number}{
- if(section==='catalog'){const {variantValues,expectedVersion,...p}=entry as Privilege&{variantValues?:VariantInputs;expectedVersion?:number};return {entry:p,kind:'privileges',key:p.key,variantValues,expectedVersion};}
+/**
+ * The Python request for a Catalog save. A Privilege's variant values arrive from the form by variant ID (`extra.variantValues`)
+ * and travel with the version of the variant they were entered against.
+ */
+export function catalogEntry(section:string,entry:unknown,extra?:Record<string,unknown>,variants:readonly CatalogVariant[]=[]):{entry:unknown;kind:string;key:string;variantValues?:VariantInputs;expectedVersion?:number}{
+ if(section==='catalog'){
+  const {expectedVersion,...p}=entry as Privilege&{expectedVersion?:number};
+  const supplied=extra?.variantValues as Record<string,Value>|undefined;
+  const variantValues=supplied&&Object.fromEntries(Object.entries(supplied).map(([id,value])=>[id,{version:variants.find(v=>v.id===id)?.version??0,value}]));
+  return {entry:p,kind:'privileges',key:p.key,variantValues,expectedVersion};
+ }
  const {name,expectedVersion,...meta}=entry as (Group|Tag)&{expectedVersion?:number};return {entry:{...meta,title:name},kind:section,key:meta.id,expectedVersion};
 }
 /** The console's Tier sections that the Python service serves per Product. */

@@ -36,7 +36,8 @@ Shared domain language for the authoring model and service. Compatibility terms 
 | **Override** | A scoped replacement for an inherited commercial value. Distinct from a restrictive environment prerequisite. |
 | **Grant** | An additive allowance for a scope, rather than a replacement value. |
 | **Unlimited** | An explicit absence of a numeric cap, not a missing value, null or an arbitrary large number. |
-| **Resolved value** | The effective entitlement value after applying the relevant precedence rules. |
+| **Catalog default** | The value a Privilege's Catalog definition supplies when no Tier variant, terms or Grant sets one. |
+| **Resolved value** | The effective entitlement value after applying the relevant precedence rules. The console names its source: Catalog default, the Tier variant, Organization terms, Personal terms or Grace period, plus any Grant added to it. |
 | **Usage** | Consumption measured by the application or a metering system. |
 | **Consumption dashboard** | A view combining entitlement limits with reported usage and its freshness. |
 
