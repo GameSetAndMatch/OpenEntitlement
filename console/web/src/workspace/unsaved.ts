@@ -1,9 +1,13 @@
-/** Forms with unsaved changes. Leaving one asks "Discard your changes?"; there are no silent drafts and no autosave. */
+/**
+ * Forms with unsaved changes, and writes still in flight. Leaving a changed form asks "Discard your changes?";
+ * there are no silent drafts and no autosave. No UI imports: shared forms (also rendered by the website) register here.
+ */
 import { useEffect, useRef } from "react";
-import { useConfirm } from "../ui.tsx";
 
+// Each mounted, changed form owns one entry. Only unmounting or returning to its saved state removes it, so an action
+// that fails or keeps the form (a failed sign-out, joining a workspace you already belong to) leaves the protection in place.
 const dirtyForms = new Set<object>();
-function holdTab(event: BeforeUnloadEvent) { event.preventDefault(); event.returnValue = ""; }
+function holdTab(event: BeforeUnloadEvent) { if (!dirtyForms.size) return; event.preventDefault(); event.returnValue = ""; }
 
 /**
  * Marks a form as changed while `draft` differs from its value when the form opened.
@@ -25,15 +29,23 @@ export function useUnsavedChanges(open: boolean, draft: unknown) {
 
 export const hasUnsavedChanges = () => dirtyForms.size > 0;
 
-/** Resolves true when nothing is unsaved or the person chose to discard it. */
-export function useDiscardChanges() {
-  const confirm = useConfirm();
-  return async () => {
-    if (!hasUnsavedChanges()) return true;
-    if (!await confirm("Discard your changes?", "Your changes to this form have not been saved.", { confirm: "Discard", cancel: "Keep editing" })) return false;
-    // The forms close as the person leaves; until then nothing should ask again.
-    dirtyForms.clear();
-    window.removeEventListener("beforeunload", holdTab);
-    return true;
-  };
+// A write already sent cannot be discarded: the service may commit it. Leaving waits for its outcome instead.
+const writes = new Set<Promise<unknown>>();
+/** Records a write in flight until it settles. Returns the same promise. */
+export function trackWrite<T>(write: Promise<T>): Promise<T> {
+  const settled = write.then(() => undefined, () => undefined);
+  writes.add(settled);
+  void settled.then(() => writes.delete(settled));
+  return write;
+}
+export const hasPendingWrites = () => writes.size > 0;
+
+/**
+ * Resolves once no write is in flight and the forms have rendered its outcome:
+ * a saved form has closed (and unregistered), a failed one is still open with its changes.
+ */
+export async function writesSettled() {
+  while (writes.size) await Promise.all([...writes]);
+  // The forms close in their own callbacks; let React commit them and run their effect cleanups.
+  await new Promise<void>((done) => requestAnimationFrame(() => setTimeout(done, 0)));
 }

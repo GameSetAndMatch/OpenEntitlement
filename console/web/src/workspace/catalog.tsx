@@ -5,7 +5,7 @@ import {FormField} from '../form.tsx';
 import {GroupPicker,newGroupId} from './group-picker.tsx';
 import {catalogDefinition} from '../../../server/workspace/catalog-adapter.ts';
 import type {Privilege} from '../../../server/workspace/privilege-definition.ts';
-import {ownValueHolders,type Group} from '../../../server/workspace/model.ts';
+import {holdsContractTerms,ownValueHolders,type Group} from '../../../server/workspace/model.ts';
 import {useConfirm} from '../ui.tsx';
 import {useUnsavedChanges} from './unsaved.ts';
 import type {Workspace,Save} from './app.tsx';
@@ -19,10 +19,20 @@ export function Catalog({workspace:w,save,canEdit,busy}:{workspace:Workspace;sav
  const confirm=useConfirm();
  useUnsavedChanges(Boolean(container),meta);
  async function savePrivilege(p:Privilege,variantValues?:Record<string,unknown>){
-  // Read-only Privileges use their Catalog default everywhere, so the values records set themselves are removed in the same change.
-  const holders=p.visibility==='read_only'?ownValueHolders(w.data,p.key):[];
-  if(holders.length&&!await confirm(`Make ${p.title} Read-only?`,`${new Intl.ListFormat('en',{type:'conjunction'}).format(holders)} ${holders.length===1?'sets its own value; it':'set their own value; they'} will use the Catalog default instead.`,{confirm:'Make Read-only'}))return false;
-  const ok=await save('catalog',p,editing?'Update Privilege':'Define Privilege','PUT',variantValues?{variantValues}:undefined);
+  // Making a Privilege Read-only removes the values records set themselves, in the same change, once the person confirms.
+  // An already Read-only Privilege keeps whatever is stored: nothing is removed without that confirmation.
+  const stored=w.data.privileges.find(x=>x.key===p.key);
+  const becomesReadOnly=p.visibility==='read_only'&&stored!==undefined&&!stored.frozen&&!w.data.features.find(f=>f.id===stored.featureId)?.frozen;
+  const holders=becomesReadOnly?ownValueHolders(w.data,p.key):[];
+  const title=editing?'Update Privilege':'Define Privilege',extra={...(variantValues?{variantValues}:{}),...(holders.length?{removeOwnValues:true}:{})};
+  let ok:boolean;
+  if(!holders.length)ok=await save('catalog',p,title,'PUT',variantValues?extra:undefined);
+  else{
+   const detail=`${new Intl.ListFormat('en',{type:'conjunction'}).format(holders)} ${holders.length===1?'sets its own value; it':'set their own value; they'} will use the Catalog default instead.`;
+   // Removing Organization or personal terms changes contract terms, so that dialog also asks why.
+   if(holdsContractTerms(w.data,p.key))ok=await save('catalog',p,`Make ${p.title} Read-only?`,'PUT',extra,detail);
+   else ok=await confirm(`Make ${p.title} Read-only?`,detail,{confirm:'Make Read-only'})&&await save('catalog',p,title,'PUT',extra);
+  }
   if(ok)setShow(false);
   return ok;
  }
@@ -43,7 +53,7 @@ export function Catalog({workspace:w,save,canEdit,busy}:{workspace:Workspace;sav
     <FormField label="Description" optional><textarea rows={2} value={meta.description} onChange={e=>setMeta({...meta,description:e.target.value})}/></FormField>
     <GroupPicker label="Inside" noneLabel="Top level" groups={groups} exclude={meta.id} takenIds={w.data.groups.map(g=>g.id)} selected={meta.parentId} disabled={busy} onChange={parentId=>setMeta({...meta,parentId})}/>
    </fieldset>
-   <div className="form-actions"><button className="btn" type="button" onClick={()=>setContainer(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>{meta.id?'Save group':'Create group'}</button></div>
+   <div className="form-actions"><button className="btn" type="button" disabled={busy} onClick={()=>setContainer(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>{meta.id?'Save group':'Create group'}</button></div>
   </form>}
   {show&&canEdit&&<PrivilegeForm key={draft.key+String(editing)} initial={draft} editing={editing} groups={groups} tags={w.data.tags} environment={w.environment} envEditable={envEditable} busy={busy}
    variants={w.data.variants} onSave={savePrivilege} onCreateTag={tag=>save('tags',tag,'Add tag')} takenGroupIds={w.data.groups.map(g=>g.id)} onCreateGroup={group=>save('groups',group,'Create Group')} onCancel={()=>setShow(false)}/>}

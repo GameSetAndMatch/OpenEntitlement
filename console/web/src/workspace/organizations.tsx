@@ -34,7 +34,7 @@ export function Organizations({workspace:w,save,canEdit,busy}:{workspace:Workspa
         <p className="section-hint">Leave a value inherited, or replace it for this Organization only.</p>
         <ValuesEditor definitions={definitions} environment={w.environment} frozenFeatures={w.data.features.filter(f=>f.frozen).map(f=>f.id)} base={assigned?.values??{}} values={draft.terms} onChange={terms=>setDraft({...draft,terms})}/>
       </fieldset>
-      <div className="form-actions"><button type="button" className="btn" onClick={()=>setShow(false)}>Cancel</button><button className="btn primary" disabled={busy}>Save organization</button></div>
+      <div className="form-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setShow(false)}>Cancel</button><button className="btn primary" disabled={busy}>Save organization</button></div>
     </form>}
     {!w.data.organizations.length&&!show&&<section className="panel empty-workspace"><h2>Add your first customer</h2><p>An Organization gets a tier variant. Its Organization terms replace only the values that differ.</p>{canEdit&&<button className="btn primary" onClick={add}>Add organization</button>}</section>}
     {!show&&!userForm&&<div className="workspace-list">{w.data.organizations.map(o=><button className="workspace-card" key={o.id} aria-pressed={selected===o.id} onClick={()=>setSelected(o.id)}><strong>{o.name}</strong><small>{w.data.variants.find(v=>v.id===o.variantId)?.name} · {o.status==="past_due"?"Past due":o.status==="ended"?"Ended":"Active"}</small></button>)}</div>}

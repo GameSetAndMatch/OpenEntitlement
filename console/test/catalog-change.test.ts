@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emptyData, privilege, tier, variant, organization, changePrivilege, ownValueHolders, resolve, type WorkspaceData } from "../server/workspace/model.ts";
+import { emptyData, privilege, tier, variant, organization, changePrivilege, holdsContractTerms, ownValueHolders, resolve, type WorkspaceData } from "../server/workspace/model.ts";
 
 /** Pro and Trial variants, an Organization Acme with terms, and one application user. */
 function workspace(): WorkspaceData {
@@ -37,10 +37,13 @@ test("variant values are validated against the new definition and only fill vari
   assert.equal(Object.hasOwn(d.privileges.find(p => p.key === "seats")!, "default"), false);
 });
 
-test("making a Privilege Read-only removes the values records set themselves, in the same change", () => {
+test("making a Privilege Read-only removes the values records set themselves only when asked, in the same change", () => {
   const d = workspace();
   assert.deepEqual(ownValueHolders(d, "seats"), ["Pro", "Acme", "Alice (Acme)"]);
-  changePrivilege(d, { key: "seats", name: "Seats", type: "integer", default: 5, frozen: true });
+  assert.equal(holdsContractTerms(d, "seats"), true);
+  const change = changePrivilege(d, { key: "seats", name: "Seats", type: "integer", default: 5, frozen: true }, undefined, true);
+  assert.deepEqual(change.removed, ["Pro", "Acme", "Alice (Acme)"]);
+  assert.equal(change.removedContractTerms, true);
   assert.deepEqual(ownValueHolders(d, "seats"), []);
   assert.equal(Object.hasOwn(d.variants[0]!.values, "seats"), false);
   assert.equal(Object.hasOwn(d.organizations[0]!.terms, "seats"), false);
@@ -48,6 +51,21 @@ test("making a Privilege Read-only removes the values records set themselves, in
   // A Grant is an allowance, not a value of its own; it stays and has no effect while Read-only.
   assert.deepEqual(d.subjects[0]!.grants, { seats: 2 });
   assert.equal(resolve(d, "acme", "seats", new Date(), {}, "alice").value, 5);
+});
+
+test("without that request, Read-only keeps stored values without effect, and Editable brings them back", () => {
+  const d = workspace();
+  const change = changePrivilege(d, { key: "seats", name: "Seats", type: "integer", default: 5, frozen: true });
+  assert.deepEqual(change.removed, []);
+  assert.deepEqual(ownValueHolders(d, "seats"), ["Pro", "Acme", "Alice (Acme)"]);
+  assert.equal(resolve(d, "acme", "seats", new Date(), {}, "alice").value, 5);
+  // Already Read-only: there is nothing to confirm, so nothing can be removed.
+  assert.throws(() => changePrivilege(d, { key: "seats", name: "Seats", type: "integer", default: 5, frozen: true }, undefined, true), /only when an existing Privilege becomes Read-only/);
+  changePrivilege(d, { key: "seats", name: "Seats", type: "integer", default: 5 });
+  assert.equal(resolve(d, "acme", "seats").value, 25);
+  // A new Privilege, or one staying Editable, has nothing to remove either.
+  assert.throws(() => changePrivilege(workspace(), { key: "fresh", name: "Fresh", type: "integer", default: 1, frozen: true }, undefined, true), /becomes Read-only/);
+  assert.throws(() => changePrivilege(workspace(), { key: "seats", name: "Seats", type: "integer", default: 5 }, undefined, true), /becomes Read-only/);
 });
 
 test("Hidden and Editable Privileges keep the values records set themselves", () => {

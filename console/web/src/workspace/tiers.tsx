@@ -45,7 +45,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
         {editingTier&&showGrace(tier.id)&&<FormField label="Past-due grace period" hint={hasGrace(tier.id)?"Days a past-due Organization keeps this tier's grace values.":"Add a grace variant to this tier to use these days. Until then, past-due Organizations on this tier cannot be saved; set 0 to restrict them right away."}><input type="number" required min={0} max={365} step={1} value={tier.gracePeriodDays} onChange={e=>setTier({...tier,gracePeriodDays:Number(e.target.value)})}/></FormField>}
       </div>
     </fieldset>
-    <div className="form-actions"><button type="button" className="btn" onClick={()=>setTier(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save tier</button></div>
+    <div className="form-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setTier(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save tier</button></div>
   </form>;
 
   const variantTier=variant&&w.data.tiers.find(t=>t.id===variant.tierId);
@@ -62,7 +62,7 @@ export function Tiers({workspace:w,save,canEdit,busy}:{workspace:Workspace;save:
     <fieldset className="form-section"><legend>Values</legend>
       <ValuesEditor environment={w.environment} frozenFeatures={w.data.features.filter(f=>f.frozen).map(f=>f.id)} definitions={w.data.privileges.filter(p=>!p.hidden&&!w.data.features.find(f=>f.id===p.featureId)?.hidden)} base={{}} values={variant.values} onChange={values=>setVariant({...variant,values})}/>
     </fieldset>
-    <div className="form-actions"><button type="button" className="btn" onClick={()=>setVariant(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save variant</button></div>
+    <div className="form-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setVariant(undefined)}>Cancel</button><button className="btn primary" disabled={busy}>Save variant</button></div>
   </form>;
 
   return <>

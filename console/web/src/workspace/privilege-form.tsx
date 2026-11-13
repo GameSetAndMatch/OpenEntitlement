@@ -129,7 +129,7 @@ export function PrivilegeForm({initial,editing,groups,takenGroupIds,tags,variant
   </fieldset>
 
   <div className="form-actions">
-   <button type="button" className="btn" onClick={onCancel}>Cancel</button>
+   <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
    <button className="btn primary" disabled={busy}>{editing?'Save changes':'Save privilege'}</button>
   </div>
  </form>;

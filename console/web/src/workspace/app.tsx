@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { request,setCsrf } from "./client.ts";
 import { identify, resetIdentity } from "../telemetry.ts";
 import { Catalog } from "./catalog.tsx";
@@ -6,16 +6,19 @@ import { Tiers } from "./tiers.tsx";
 import { Organizations } from "./organizations.tsx";
 import { WorkspaceSettings,WorkspaceConfiguration } from "./settings.tsx";
 import { changesContractTerms,type WorkspaceData } from "../../../server/workspace/model.ts";
-import { useReason,useToast } from "../ui.tsx";
+import { useConfirm,useReason,useToast } from "../ui.tsx";
 import { WorkspaceSwitcher } from "./workspace-switcher.tsx";
-import { hasUnsavedChanges,useDiscardChanges } from "./unsaved.ts";
+import { hasPendingWrites,hasUnsavedChanges,trackWrite,useUnsavedChanges,writesSettled } from "./unsaved.ts";
 import { FormField } from "../form.tsx";
 import "./style.css";
 export interface Workspace {hosting?:{mode:"self_hosted"|"saas";tier:"pro"|"enterprise";subjectEntitlements:boolean};id:string;name:string;role:string;data:WorkspaceData;revision:number;environment?:import("../../../server/environment.ts").EnvironmentOverrides}
 // The service's message for a save sent with an old revision (HTTP 409). Reloading the workspace fixes it.
 const STALE_REVISION="Workspace changed elsewhere. Refresh before saving.";
-/** Saves one entry as one audited change. `extra` adds fields the section accepts beside the entry, such as a new Privilege's variant values. */
-export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE",extra?:Record<string,unknown>)=>Promise<boolean>;
+/**
+ * Saves one entry as one audited change. `extra` adds fields the section accepts beside the entry, such as a new Privilege's variant values.
+ * `contractChange` describes a change to contract terms the entry alone does not show; the reason dialog shows it and asks why.
+ */
+export type Save=(section:string,entry:unknown,title:string,method?:"PUT"|"DELETE",extra?:Record<string,unknown>,contractChange?:ReactNode)=>Promise<boolean>;
 // The workspace's daily pages. Administration lives in Settings, which swaps the sidebar (as in Linear).
 const pages=[
   {name:"Privilege Catalog",hash:"catalog",about:"What your product allows or limits."},
@@ -58,8 +61,20 @@ export function WorkspaceApp(){
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const ask=useReason(),toast=useToast();
   // Leaving a form with unsaved changes asks first: another page, another workspace, joining one, or signing out.
-  const discard=useDiscardChanges(),discardRef=useRef(discard);discardRef.current=discard;
-  const leave=(go:()=>void)=>void discard().then(ok=>{if(ok)go();});
+  // A write already sent may still commit, so leaving first waits for its outcome: a saved form has closed, a failed one asks.
+  const confirm=useConfirm(),[leaving,setLeaving]=useState(false),leaveToken=useRef(0);
+  async function mayLeave(){
+    const token=++leaveToken.current;
+    if(hasPendingWrites()){setLeaving(true);await writesSettled();setLeaving(false);}
+    if(token!==leaveToken.current)return false;
+    if(!hasUnsavedChanges())return true;
+    return await confirm("Discard your changes?","Your changes to this form have not been saved.",{confirm:"Discard",cancel:"Keep editing"})&&token===leaveToken.current;
+  }
+  const mayLeaveRef=useRef(mayLeave);mayLeaveRef.current=mayLeave;
+  // The one page change the person already agreed to. The forms it discards unregister only when they unmount.
+  const approvedHash=useRef<string|null>(null);
+  function goTo(hash:string){if(location.hash===hash)return;approvedHash.current=hash;location.hash=hash;}
+  const leave=(go:()=>void)=>void mayLeave().then(ok=>{if(ok)go();});
   async function loadList(){const data=await request<typeof list>("/api/workspaces");setList(data);return data;}
   async function loadWorkspace(id:string){setWorkspace(undefined);const next=await request<Workspace>(`/api/workspaces/${id}`);if(selectedRef.current===id)setWorkspace(next);}
   // Access to the open workspace ended (another Owner removed you, or it was deleted): move to another one.
@@ -79,20 +94,27 @@ export function WorkspaceApp(){
   const navigated=useRef(false);
   useEffect(()=>{if(!navigated.current)return;navigated.current=false;if(document.activeElement&&document.activeElement!==document.body)return;document.querySelector<HTMLElement>('aside nav a[aria-current="page"]')?.focus();},[page]);
   useEffect(()=>{const changed=(event:HashChangeEvent)=>{
+    if(location.hash==="#workspace-main")return;
+    // An invitation link offers to join and keeps the current page and its form; joining asks before leaving.
+    if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);history.replaceState(null,"",event.oldURL);return;}
+    if(approvedHash.current===location.hash)approvedHash.current=null;
     // The hash already moved. Put it back while the person decides, then go on only if they discard.
-    if(!location.hash.startsWith("#invite=")&&location.hash!=="#workspace-main"&&hasUnsavedChanges()){const target=location.hash;history.replaceState(null,"",event.oldURL);void discardRef.current().then(ok=>{if(ok)location.hash=target;});return;}
-    if(location.hash.startsWith("#invite=")){const token=location.hash.slice(8);sessionStorage.setItem("oe.invite",token);setInvite(token);setError("");history.replaceState(null,"","/app/");setPage("Privilege Catalog");}else if(location.hash!=="#workspace-main"){navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);}};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
+    else if(hasUnsavedChanges()||hasPendingWrites()){const target=location.hash;history.replaceState(null,"",event.oldURL);void mayLeaveRef.current().then(ok=>{if(ok)goTo(target);});return;}
+    navigated.current=true;pageGeneration.current++;setError("");setPage(currentPage());if(loadFailed.current&&selectedRef.current)retryRef.current(selectedRef.current);};window.addEventListener("hashchange",changed);return()=>window.removeEventListener("hashchange",changed);},[]);
   useEffect(()=>{if(page!=="Audit log"||!workspace)return;let active=true;request(`/api/workspaces/${workspace.id}/audit`).then(value=>{if(active)setAudit(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[page,workspace]);
-  const save:Save=async(section,entry,title,method="PUT",extra)=>{
+  const save:Save=(...args)=>trackWrite(write(...args));
+  const write:Save=async(section,entry,title,method="PUT",extra,contractChange)=>{
     const workspace=workspaceRef.current;
     if(!workspace||savingRef.current)return false;savingRef.current=true;
     const generation=pageGeneration.current;
     setBusy(true);setError("");
-    try{let reason:string|null="";if(changesContractTerms(workspace.data,section,entry)){reason=await ask(title);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{...extra,entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
+    try{let reason:string|null="";if(contractChange!==undefined||changesContractTerms(workspace.data,section,entry)){reason=await ask(title,contractChange);if(!reason)return false;}const result=await request(`/api/workspaces/${workspace.id}/${section}`,method,{...extra,entry,revision:workspace.revision,...(reason?{reason}:{})});if(selectedRef.current===workspace.id){const next={...workspace,...result};workspaceRef.current=next;setWorkspace(next);}toast("Changes saved");return true;}
     catch(e){if(generation===pageGeneration.current)failed(e);return false;}finally{savingRef.current=false;setBusy(false);}
   };
-  async function create(){setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name});await loadList();setSelected(value.id);setCreating(false);setName("");location.hash="catalog";}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
-  async function accept(){setBusy(true);try{const value=await request("/api/invitations/accept","POST",{token:invite});sessionStorage.removeItem("oe.invite");setInvite("");await loadList();setSelected(value.workspaceId);setCreating(false);toast(value.alreadyMember?`Already a member. Your ${value.role} role is unchanged.`:"Workspace joined");}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  useUnsavedChanges(creating||(ready&&Boolean(session)&&!selected),name);
+  const create=()=>trackWrite(createWorkspace()),accept=()=>trackWrite(acceptInvitation());
+  async function createWorkspace(){setBusy(true);try{const value=await request<Workspace>("/api/workspaces","POST",{name});await loadList();setSelected(value.id);setCreating(false);setName("");goTo("#catalog");}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  async function acceptInvitation(){setBusy(true);try{const value=await request("/api/invitations/accept","POST",{token:invite});sessionStorage.removeItem("oe.invite");setInvite("");await loadList();setSelected(value.workspaceId);setCreating(false);toast(value.alreadyMember?`Already a member. Your ${value.role} role is unchanged.`:"Workspace joined");}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   if(!ready)return <main className="sign-in"><p role="status">Loading…</p></main>;
   if(!session)return <main className="sign-in"><picture><source srcSet="/logo-dark.svg" media="(prefers-color-scheme: dark)"/><img src="/logo.svg" alt="" width="48" height="48"/></picture><h1>Sign in to OpenEntitlement</h1><p>Manage your privileges, tiers, and customer access in one workspace.</p>{error.message&&<p role="alert" className="notice error">{error.message}</p>}<a className="btn primary" href="/auth/login">Sign in</a></main>;
   const current=list.find(w=>w.id===selected);
@@ -108,9 +130,10 @@ export function WorkspaceApp(){
       :<><nav aria-label="Workspace navigation">{pages.map(link)}</nav><a className="nav settings-link" href="#settings/members">Settings</a></>)}
     <div className="sidebar-footer"><p>{session.account.email}{session.account.platformAdmin&&<small>Platform administrator</small>}</p><button className="btn" onClick={()=>leave(()=>void request("/auth/logout","POST").then(()=>{resetIdentity();remember("");setCsrf("");setSession(undefined);setWorkspace(undefined);setSelected("");setCreating(false);setList([]);}).catch(e=>setError(e.message)))}>Sign out</button></div></aside>
     <main id="workspace-main" tabIndex={-1}>
+      {leaving&&<p role="status" className="notice">Finishing your save before leaving…</p>}
       {error.message&&<div role="alert" className="notice error">{error.message}{selected&&error.refresh&&<button className="btn" onClick={()=>retryLoad(selected)}>Refresh workspace</button>}</div>}
       {invite&&<section className="panel invitation"><h2>You have a workspace invitation</h2><p>Join using the verified email address you signed in with.</p><button className="btn primary" disabled={busy} onClick={()=>leave(()=>void accept())}>Join workspace</button><button className="btn" disabled={busy} onClick={()=>{sessionStorage.removeItem("oe.invite");setInvite("");setError("");}}>Dismiss invitation</button></section>}
-      {(creating||!selected)&&<form className="panel workspace-create" onSubmit={e=>{e.preventDefault();void create();}}><h1>Create a workspace</h1><p>A workspace holds one product’s privileges, tiers and Organizations. To join an existing one, open the invitation link its Owner sent you.</p><FormField label="Workspace name"><input required autoFocus={creating} maxLength={200} value={name} onChange={e=>setName(e.target.value)} /></FormField><div className="form-actions">{selected&&<button type="button" className="btn" onClick={()=>{setCreating(false);requestAnimationFrame(()=>document.querySelector<HTMLElement>(".workspace-trigger")?.focus());}}>Cancel</button>}<button className="btn primary" disabled={busy}>{busy?"Creating…":"Create workspace"}</button></div></form>}
+      {(creating||!selected)&&<form className="panel workspace-create" onSubmit={e=>{e.preventDefault();void create();}}><h1>Create a workspace</h1><p>A workspace holds one product’s privileges, tiers and Organizations. To join an existing one, open the invitation link its Owner sent you.</p><FormField label="Workspace name"><input required autoFocus={creating} maxLength={200} value={name} onChange={e=>setName(e.target.value)} /></FormField><div className="form-actions">{selected&&<button type="button" className="btn" disabled={busy} onClick={()=>{setCreating(false);setName("");requestAnimationFrame(()=>document.querySelector<HTMLElement>(".workspace-trigger")?.focus());}}>Cancel</button>}<button className="btn primary" disabled={busy}>{busy?"Creating…":"Create workspace"}</button></div></form>}
       {selected&&!creating&&!workspace&&!error.message&&<p role="status" className="notice">Loading workspace…</p>}
       {workspace&&!creating&&<><div className="page-heading"><div><h1>{shown.name}</h1><p>{shown.about}</p></div></div>
       {shown.name==="Privilege Catalog"&&<Catalog key={workspace.id} workspace={workspace} save={save} canEdit={canEdit} busy={busy}/>}

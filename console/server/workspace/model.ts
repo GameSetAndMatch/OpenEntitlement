@@ -112,12 +112,20 @@ export function ownValueHolders(data: WorkspaceData, key: string): string[] {
     ...(data.subjects ?? []).filter(s => Object.hasOwn(s.terms, key)).map(s => `${s.name} (${organizationName(s.organizationId)})`),
   ];
 }
+/** Whether Organization terms or personal terms set their own value for a Privilege: removing them changes contract terms. */
+export function holdsContractTerms(data: WorkspaceData, key: string): boolean {
+  return data.organizations.some(o => Object.hasOwn(o.terms, key)) || (data.subjects ?? []).some(s => Object.hasOwn(s.terms, key));
+}
+/** What a Privilege change removed: the values records set themselves, when it became Read-only and the request asked for that. */
+export interface PrivilegeChange { privilege: Privilege; removed: string[]; removedContractTerms: boolean }
 /**
  * Defines or updates a Privilege as one change. On error, the caller discards `data` (the service rolls back the transaction).
  * Without a Catalog default, `variantValues` supplies the value of each existing variant that does not set its own.
- * Read-only Privileges use their Catalog default everywhere, so the values records set themselves are removed.
+ * Read-only Privileges use their Catalog default everywhere. Values records set themselves stay stored and have no effect,
+ * unless `removeOwnValues` is true and the Privilege becomes Read-only in this change: then they are removed with it.
+ * Nothing is removed implicitly, by an edit of an already Read-only Privilege, or through the legacy `privileges` route.
  */
-export function changePrivilege(data: WorkspaceData, input: unknown, variantValues?: unknown): Privilege {
+export function changePrivilege(data: WorkspaceData, input: unknown, variantValues?: unknown, removeOwnValues = false): PrivilegeChange {
   const entry = object(input);
   if (variantValues !== undefined) {
     const supplied = object(variantValues);
@@ -130,14 +138,18 @@ export function changePrivilege(data: WorkspaceData, input: unknown, variantValu
       target.values[key] = structuredClone(value as Value);
     }
   }
-  if (entry.frozen === true) {
-    const key = identifier(entry.key);
+  let removed: string[] = [], removedContractTerms = false;
+  if (removeOwnValues) {
+    const key = identifier(entry.key), previous = data.privileges.find(p => p.key === key);
+    if (entry.frozen !== true || !previous || previous.frozen || data.features.find(f => f.id === previous.featureId)?.frozen) throw new WorkspaceError("Values are removed only when an existing Privilege becomes Read-only", 409);
+    removed = ownValueHolders(data, key); removedContractTerms = holdsContractTerms(data, key);
+    if (!removed.length) throw new WorkspaceError(`No record sets its own value for ${key}`, 409);
     for (const row of [...data.variants.map(v => v.values), ...data.organizations.map(o => o.terms), ...(data.subjects ?? []).map(s => s.terms)]) delete row[key];
   }
   // Validates the definition against every remaining value, including the variant values supplied above.
   const result = privilege(data, entry), index = data.privileges.findIndex(p => p.key === result.key);
   if (index < 0) data.privileges.push(result); else data.privileges[index] = result;
-  return result;
+  return { privilege: result, removed, removedContractTerms };
 }
 export function tier(input: unknown): Tier {
   const b = object(input); only(b,["id","name","rank","gracePeriodDays"]);

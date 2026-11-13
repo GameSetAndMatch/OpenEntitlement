@@ -1,5 +1,5 @@
 import { useEffect,useRef,useState } from "react";
-import { useUnsavedChanges } from "./unsaved.ts";
+import { trackWrite,useUnsavedChanges } from "./unsaved.ts";
 import { Field,Group,Item,Row } from "./settings-group.tsx";
 import {catalogDefinition} from "../../../server/workspace/catalog-adapter.ts";
 import { stringify } from "yaml";
@@ -30,7 +30,8 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     return()=>{active=false;generation.current++;window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
   },[base,manager,owner]); // load reads exactly base, manager and owner
   // Settings changes are audited with their actor; only removals ask to confirm.
-  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return;setError("");const result=await action("");if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
+  // A write already sent may still commit; leaving the section waits for it (see unsaved.ts).
+  async function mutate(label:string,action:(reason:string)=>Promise<void|"access-changed">,ask=false){if(pendingRef.current||busy)return;pendingRef.current=true;setPending(true);const generation=sectionGeneration.current;try{if(ask&&!await confirm(label))return;setError("");const result=await trackWrite(action(""));if(result!=="access-changed")await reload();toast("Changes saved");}catch(e){if(generation===sectionGeneration.current)setError((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}
   const tierChanged=hostedTier!==(w.hosting?.tier??"pro");
   const roleSelect=(m:{id:string;email:string;role:string})=><select className="fit" disabled={locked} aria-label={`Role for ${m.email}`} value={m.role} onChange={e=>{const nextRole=e.target.value;void mutate("Change member role",async reason=>{await request(base+"/members","PUT",{accountId:m.id,role:nextRole,reason});if(m.id===account.id&&!account.platformAdmin){await refreshAccess();return "access-changed";}});}}>{["Owner","Manager","User"].map(r=><option key={r}>{r}</option>)}</select>;
   const copy=(text:string,done:string)=>void navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>setError("Copy failed. Select and copy it manually."));
@@ -61,7 +62,7 @@ export function WorkspaceSettings({section,workspace:w,save,account,busy,refresh
     {section==="Service"&&<Group description="The OpenEntitlement service this workspace runs on. It is separate from the Tiers you sell to your customers.">
       {account.platformAdmin&&w.hosting?.mode==="saas"?<form onSubmit={e=>{e.preventDefault();void save("hosting",{tier:hostedTier},"Change Cloud service tier");}}>
         <Row label="Cloud service tier" description="Enterprise adds entitlements for individual users inside an Organization."><select className="fit" value={hostedTier} onChange={e=>setHostedTier(e.target.value as "pro"|"enterprise")}><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></Row>
-        {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
+        {tierChanged&&<div className="settings-row settings-save"><button type="button" className="btn" disabled={locked} onClick={()=>setHostedTier(w.hosting?.tier??"pro")}>Cancel</button><button className="btn primary" disabled={locked}>Save Cloud service tier</button></div>}
       </form>:<Item label={w.hosting?.mode==="saas"?`Cloud ${w.hosting.tier==="enterprise"?"Enterprise":"Pro"}`:"Self-hosted"} description={w.hosting?.subjectEntitlements?"Entitlements for Organizations and their users.":"Entitlements for Organizations."}/>}
     </Group>}
   </div>;

@@ -329,7 +329,7 @@ export function SubjectEntitlements({
           </fieldset>
         )}
         <div className="form-actions">
-          <button type="button" className="btn" onClick={close}>
+          <button type="button" className="btn" disabled={busy} onClick={close}>
             Cancel
           </button>
           <button className="btn primary" disabled={busy}>
