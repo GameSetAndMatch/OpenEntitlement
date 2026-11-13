@@ -8,14 +8,16 @@ Every task has exactly one entry point, shown only when it can be used:
 
 - One button per action. Do not offer the same action from the sidebar, the page and a form. Create things where they are used, such as a Group from the Privilege form's folder picker or a variant from its tier.
 - Hide what cannot be used yet instead of showing it disabled ("Create variant" before any tier exists). An empty state names the one next step and holds its button. The same button moves above the list once the list has items.
-- While a form is open, it is the only thing on the page. Hide the list and the page's create button until the person saves or cancels.
+- While a form is open, it is the only thing on the page. Hide the list and the page's create button until the person saves or cancels. This includes forms opened from a detail view, such as an application user's form on an Organization.
+- A filter hides what holds no match: under a Tag filter, a Group shows only if it or a child Group holds a matching Privilege. Without a filter, empty Groups stay visible so they can be edited.
 - Settings has its own sidebar (Members, API keys, Service, Configuration, Audit log), opened from the one Settings link and left with "Back to workspace". The main sidebar keeps only daily work: Privilege Catalog, Tiers and Organizations.
 - Do not repeat information. The page title, workspace switcher and sidebar already say where the person is and what role they have, so there is no breadcrumb bar or role badge. Each value appears once (a member's role is the role control itself).
-- Ask for a reason only where the record needs one: changes to an Organization's own terms and to user terms and grants. Everything else saves directly and is audited with its actor. Removing a member or revoking a key asks to confirm, without a reason.
+- Ask for a reason only where the record needs one: changes to an Organization's own terms and to an application user's personal terms and grants. Everything else saves directly and is audited with its actor. Removing a member or revoking a key asks to confirm, without a reason.
 - Each thing has one direct way to create it. A Group is created with "New group" on the Catalog, or named in place from the Group picker while defining a Privilege.
 - Guide multi-step creation when the object is useless half-made. Creating a tier sets its values (every Privilege without a default must get one), shows a review, creates the tier with its standard variant, then offers a free trial and a grace period.
 - Keep the person where they were. The console reopens the last workspace this browser used. Switching and creating workspaces live behind the workspace mark at the top left, not on a page of their own.
 - No manual refresh buttons. Pages reload their data when the window regains focus.
+- An error belongs to the page where it happened; changing page clears it. Offer "Refresh workspace" only when refreshing fixes the error: a save from an old revision ("Workspace changed elsewhere") or a workspace that failed to load. Never for a validation error.
 - One export format action per page (Download YAML). Copying is available from the shown text.
 
 These rules keep console forms readable and consistent. `test/form-layout.mjs` enforces the mechanical ones in the Storybook and workspace browser regressions, so a form that breaks them fails CI.
@@ -42,6 +44,9 @@ Order sections by what the person must decide, not by data model:
 - Two related short fields can share a row with `.form-grid`. It collapses to one column on phones. Long inputs (description, lists) take the full width.
 - Never add margins to individual fields. A section's `gap` spaces its children; the layout check rejects a direct child of a section that sets its own vertical margin.
 - Show a control only to people who can use it. For example, hide the environment prerequisite from non-administrators unless it is already set.
+- Visibility locks values where they are inherited (tiers, Organizations, application users), never the Catalog default in the Privilege form: a Read-only or Hidden Privilege's default is the value everyone gets, so it is always set and always editable there. Choosing Read-only for a Privilege without a default gives it one.
+- A row of controls (an input, a select and a button) stays on one line when it fits and wraps when it does not, at any width. Never set `flex-wrap: nowrap` on a row of controls.
+- A Privilege without a Catalog default shows one label, "No default · set in each variant", with no default caption.
 - Do not use placeholders as example values. Use one only for a format hint ("0" for an empty number that means 0), never for a suggested name.
 
 ## Identifiers

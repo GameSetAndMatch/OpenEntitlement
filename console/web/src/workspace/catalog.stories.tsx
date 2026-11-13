@@ -41,3 +41,24 @@ export const NestedGroups:Story={args:{workspace:{...meta.args.workspace,data:ne
  await expect(canvas.queryByText('Reports',{exact:true})).not.toBeInTheDocument();
  await expect(canvas.queryByText('Scheduled exports')).not.toBeInTheDocument();
 }};
+
+// A tag filter shows only Groups that hold a match, directly or in a child Group. Without a filter, an empty Group stays so it can be edited.
+const sparse=structuredClone(nested);
+sparse.groups.push({id:'billing',name:'Billing',description:''});
+sparse.privileges.push({key:'api_calls',name:'API calls',description:'',type:'integer',tags:['enterprise']});
+export const TagFilterHidesEmptyGroups:Story={args:{workspace:{...meta.args.workspace,data:sparse}},play:async({canvasElement})=>{
+ const canvas=within(canvasElement),heading=(name:string)=>canvas.queryByRole('heading',{name});
+ await expect(heading('Billing')).toBeVisible();
+ await expect(heading('Analytics')).toBeVisible();
+ // A Privilege without a default says so once, without a "Catalog default" caption.
+ const apiCalls=canvas.getByText('API calls',{exact:true}).closest('.catalog-feature') as HTMLElement;
+ await expect(within(apiCalls).getByText('No default · set in each variant')).toBeVisible();
+ await expect(within(apiCalls).queryByText('Catalog default')).not.toBeInTheDocument();
+ await userEvent.selectOptions(canvas.getByLabelText('Filter by tag'),'enterprise');
+ // MCP access (enterprise) sits in Product › Integrations; Analytics, Scheduled and Billing hold no match.
+ for(const name of ['Product','Integrations'])await expect(heading(name)).toBeVisible();
+ for(const name of ['Analytics','Scheduled','Billing'])await expect(heading(name)).not.toBeInTheDocument();
+ await userEvent.selectOptions(canvas.getByLabelText('Filter by tag'),'');
+ await expect(heading('Billing')).toBeVisible();
+ canvasElement.dataset.playComplete='true';
+}};
